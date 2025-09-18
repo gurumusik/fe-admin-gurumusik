@@ -1,15 +1,21 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet } from "react-router-dom";
+import AdminNavbar from "./AdminNavbar";
+import AdminSidebar from "./AdminSidebar";
 
 export default function AdminLayout() {
   return (
-    <div className="min-h-screen grid grid-cols-[240px_1fr]">
-      <aside className="border-r border-neutral-200 p-4">
-        <div className="font-semibold mb-4">Admin</div>
-        {/* nav menu */}
+    <div className="min-h-screen grid grid-cols-[260px_1fr] bg-neutral-50">
+      <aside className="border-r border-neutral-200">
+        <AdminSidebar />
       </aside>
-      <main className="p-6">
-        <Outlet />
-      </main>
+
+      <section className="flex min-h-screen flex-col">
+        <AdminNavbar />             
+        {/* cntent */}
+        <div className="p-10">
+          <Outlet />
+        </div>
+      </section>
     </div>
   );
 }
