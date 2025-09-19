@@ -37,6 +37,28 @@ export const AdminInstrumentPage: React.FC = () => {
     []
   );
 
+  const slugify = (s: string) =>
+    s.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+  const resolveType = (payload: { type?: string; name?: string }, items: Item[]) => {
+    // 1) prioritas: type dari modal (paling akurat)
+    const t = payload?.type?.trim();
+    if (t) return t;
+
+    // 2) coba cocokkan name ke daftar items (display name ke type)
+    const nm = payload?.name?.trim().toLowerCase();
+    if (nm) {
+      // cocokkan ke name yang ditampilkan (toTitle(it.type)) atau langsung by type
+      const hit = items.find(
+        (it) => it.name.toLowerCase() === nm || it.type.toLowerCase() === nm
+      );
+      if (hit) return hit.type;
+    }
+
+    // 3) fallback ke slugify(name) — mungkin tidak cocok dengan route yang ada
+    return nm ? slugify(nm) : '';
+  };
+
   // modal state
   const [showAdd, setShowAdd] = React.useState(false);
   const [showEdit, setShowEdit] = React.useState(false);
@@ -90,8 +112,7 @@ export const AdminInstrumentPage: React.FC = () => {
             {items.map((it) => (
               <div
                 key={it.type}
-                onClick={() => navigate(`/dashboard-admin/instrument/${it.type}`)}
-                className="cursor-pointer flex items-center justify-between rounded-3xl border border-[#C9D9EA] bg-white px-4 py-3 shadow-[0_1px_0_#0000000d] hover:border-[#AFC3DA] transition"
+                className="flex items-center justify-between rounded-3xl border border-[#C9D9EA] bg-white px-4 py-3 shadow-[0_1px_0_#0000000d] hover:border-[#AFC3DA] transition"
               >
                 <div className="flex flex-col text-left">
                   <div className="flex items-center gap-3">
@@ -114,11 +135,10 @@ export const AdminInstrumentPage: React.FC = () => {
                 <div className="flex items-center">
                   <button
                     type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();            
-                        setSelected(it);
-                        setShowEdit(true);
-                      }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/dashboard-admin/instrument/${it.type}`);
+                    }}
                     className="h-11 w-11 rounded-2xl border border-[#C9D9EA] grid place-items-center hover:bg-[#F4F8FC] transition cursor-pointer"
                     aria-label={`Edit ${it.name}`}
                     title="Edit"
@@ -157,9 +177,15 @@ export const AdminInstrumentPage: React.FC = () => {
       <AddInstrumentModal
         open={showAdd}
         onClose={() => setShowAdd(false)}
-        onSubmit={(payload) => {
-          console.log("ADD:", payload);
-          setShowAdd(false);
+        onSubmit={(payload: { type?: string; name?: string }) => {
+          const newType = resolveType(payload, items)
+          setShowAdd(false); 
+
+          if (newType) {
+            navigate(`/dashboard-admin/instrument/${newType}`);
+          } else {
+            console.warn('Gagal menentukan type instrumen baru:', payload);
+          }
         }}
       />
 
@@ -167,7 +193,7 @@ export const AdminInstrumentPage: React.FC = () => {
       <AddInstrumentModal
         open={showEdit}
         onClose={() => { setShowEdit(false); setSelected(null); }}
-        defaultName={selected?.name ?? ""} // prefill nama
+        defaultName={selected?.name ?? ""}
         onSubmit={(payload) => {
           console.log("EDIT:", selected, payload);
           setShowEdit(false);

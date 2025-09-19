@@ -9,14 +9,21 @@ import {
 } from "react-icons/ri";
 import { getInstrumentIcon } from "@/utils/getInstrumentIcon";
 import SylabusModal from "@/features/dashboard/components/SylabusModal";
+import AddInstrumentModal from "@/features/dashboard/components/AddInstrumentModal";
+
+const toTitle = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const slugify = (s: string) =>
+  s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
 export const InstrumentDetailPage: React.FC = () => {
   const navigate = useNavigate();
-  const { type = "piano" } = useParams(); // mis. "piano"
-  const iconUrl = getInstrumentIcon(type);
-  const title = type.charAt(0).toUpperCase() + type.slice(1);
+  const { type: paramType = "piano" } = useParams();
 
-  // dummy rows 
+  const [typeSlug, setTypeSlug] = React.useState(paramType);
+  const title = React.useMemo(() => toTitle(typeSlug), [typeSlug]);
+  const iconUrl = React.useMemo(() => getInstrumentIcon(typeSlug), [typeSlug]);
+
+  // dummy rows
   const [rows, setRows] = React.useState(
     Array.from({ length: 4 }, (_, i) => ({
       id: i + 1,
@@ -27,6 +34,22 @@ export const InstrumentDetailPage: React.FC = () => {
 
   const [showSylabus, setShowSylabus] = React.useState(false);
   const [currentGrade, setCurrentGrade] = React.useState<string>("");
+
+  // state & handler untuk EDIT modal
+  const [showEdit, setShowEdit] = React.useState(false);
+
+  const resolveType = (payload: { type?: string; name?: string }) => {
+    // 1) paling akurat: type dari modal
+    const t = payload?.type?.trim();
+    if (t) return t;
+
+    // 2) coba cocokkan name -> type (mis. "Gitar" → "guitar" jika backend memberi mapping),
+    // di sini fallback langsung slug dari name
+    const nm = payload?.name?.trim();
+    if (nm) return slugify(nm);
+
+    return "";
+  };
 
   return (
     <div className="rounded-2xl">
@@ -45,7 +68,7 @@ export const InstrumentDetailPage: React.FC = () => {
 
           {/* Tengah: icon + title + pencil */}
           <div className="flex items-center gap-3">
-            <img src={iconUrl} alt={`${title}`} className="h-8 w-8 object-contain" />
+            <img src={iconUrl} alt={title} className="h-8 w-8 object-contain" />
             <div className="leading-tight">
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-semibold text-[#0F172A]">{title}</h1>
@@ -53,12 +76,13 @@ export const InstrumentDetailPage: React.FC = () => {
               <p className="text-[13px] text-[#6B7E93]">Total Level: 5</p>
             </div>
             <button
-                  type="button"
-                  className="h-10 w-10 rounded-2xl border border-[#B8C8DA] text-[var(--secondary-color)] grid place-items-center hover:bg-[#F4F8FC]"
-                  title="Edit nama/ikon instrumen"
-                >
-                  <RiPencilFill size={20} />
-                </button>
+              type="button"
+              onClick={() => setShowEdit(true)} // buka modal edit
+              className="h-10 w-10 rounded-2xl border border-[#B8C8DA] text-[var(--secondary-color)] grid place-items-center hover:bg-[#F4F8FC]"
+              title="Edit nama/ikon instrumen"
+            >
+              <RiPencilFill size={20} />
+            </button>
           </div>
 
           {/* Kanan: dropdown program + simpan */}
@@ -84,7 +108,7 @@ export const InstrumentDetailPage: React.FC = () => {
         <div className="rounded-2xl bg-white p-4 sm:p-6">
           {/* rows */}
           <div className="space-y-6">
-            {rows.map((row /*, _idx */) => (  
+            {rows.map((row) => (
               <div key={row.id} className="pb-6 border-b border-[#E5EDF6] last:border-none">
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 md:gap-6 items-end">
                   {/* Instrument Grade */}
@@ -151,12 +175,31 @@ export const InstrumentDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      {/* mODAL */}
+
+      {/* MODALS */}
       <SylabusModal
         open={showSylabus}
         onClose={() => setShowSylabus(false)}
         subtitle={`${title} - ${currentGrade || "Grade I"}`}
+      />
+
+      {/* Modal Edit Instrumen */}
+      <AddInstrumentModal
+        open={showEdit}
+        onClose={() => setShowEdit(false)}
+        defaultName={title}          // prefill nama saat ini
+        title="Edit Instrumen"       // judul modal
+        onSubmit={(payload: { type?: string; name?: string }) => {
+          const newType = resolveType(payload);
+
+          if (newType && newType !== typeSlug) {
+            setTypeSlug(newType);           // update state lokal agar header langsung berubah
+            setShowEdit(false);
+            navigate(`/dashboard-admin/instrument/${newType}`); // redirect jika slug/type berubah
+          } else {
+            setShowEdit(false);
+          }
+        }}
       />
     </div>
   );
