@@ -6,6 +6,7 @@ import AdminLayout from '@/components/layout/AdminLayout';
 import { AdminInstrumentPage } from '@/features/dashboard/pages/instrument/page';
 import { InstrumentDetailPage } from "@/features/dashboard/pages/instrument/InstrumentDetailPage/page";
 import { AdminModulePage } from '@/features/dashboard/pages/module/page';
+import AdminRefundPage from '@/features/dashboard/pages/refund/page';
 
 export const router = createBrowserRouter([
   {
@@ -22,12 +23,13 @@ export const router = createBrowserRouter([
       { path: '/dashboard-admin', element: <DashboardPage /> },
       { path: '/dashboard-admin/instrument', element: <AdminInstrumentPage /> },
       { path: '/dashboard-admin/instrument/:type', element: <InstrumentDetailPage /> },
+      { path: '/dashboard-admin/refund', element: <AdminRefundPage /> },
 
       // belum selesai
       { path: '/dashboard-admin/module', element: <AdminModulePage /> },
       { path: '/dashboard-admin/earnings', element: <LoginPage /> },
       { path: '/dashboard-admin/tutor-commision', element: <LoginPage /> },
-      { path: '/dashboard-admin/refund', element: <LoginPage /> },
+      
       { path: '/dashboard-admin/data-rekrutment', element: <LoginPage /> },
       { path: '/dashboard-admin/student-report', element: <LoginPage /> },
       { path: '/dashboard-admin/tutor-list', element: <LoginPage /> },
