@@ -8,77 +8,86 @@ import {
   RiCloseLine,
 } from "react-icons/ri";
 import ConfirmationModal from "@/components/ui/common/ConfirmationModal";
-import { icons as instrumentIconDefs } from "@/utils/icons";
-import { getInstrumentIcon } from "@/utils/getInstrumentIcon";
 import AddInstrumentModal from "@/features/dashboard/components/AddInstrumentModal";
 import { useNavigate } from "react-router-dom";
-
-type Item = {
-  type: string;
-  name: string;
-  iconUrl: string;
-  totalGrade: number;
-  isNew?: boolean;
-};
-
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState, AppDispatch } from "@/app/store";
+import { fetchInstrumentsThunk, deleteInstrumentThunk } from "@/features/slices/instruments/slice";
+import { resolveIconUrl } from "@/services/api/instrument.api";
+import { countByInstrument } from "@/services/api/detailProgram.api";
+import { startDraft, prefillFromInstrumentThunk } from "@/features/slices/instrumentWizard/slice";
+import type {
+  LevelCountMap,
+  ModalKind,
+  CountByInstrumentResponse,
+  AddInstrumentSubmitPayload,
+} from "@/features/slices/instruments/types";
 
 const toTitle = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const slugify = (s: string) =>
+  s?.toLowerCase()?.trim()?.replace(/\s+/g, "-")?.replace(/[^a-z0-9-]/g, "") ?? "";
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result || ""));
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+}
 
 export const AdminInstrumentPage: React.FC = () => {
   const navigate = useNavigate();
-  const items: Item[] = React.useMemo(
-    () =>
-      instrumentIconDefs.map((it) => ({
-        type: it.type,
-        name: toTitle(it.type),
-        iconUrl: getInstrumentIcon(it.type),
-        totalGrade: 5,
-      })),
-    []
-  );
+  const dispatch = useDispatch<AppDispatch>();
 
-  const slugify = (s: string) =>
-    s.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const { items, status, error, page, limit, q } = useSelector((s: RootState) => s.instrument);
 
-  const resolveType = (payload: { type?: string; name?: string }, items: Item[]) => {
-    // 1) prioritas: type dari modal (paling akurat)
-    const t = payload?.type?.trim();
-    if (t) return t;
+  // fetch on mount & when page/q changes
+  React.useEffect(() => {
+    dispatch(fetchInstrumentsThunk({ q, page, limit }));
+  }, [dispatch, q, page, limit]);
 
-    // 2) coba cocokkan name ke daftar items (display name ke type)
-    const nm = payload?.name?.trim().toLowerCase();
-    if (nm) {
-      // cocokkan ke name yang ditampilkan (toTitle(it.type)) atau langsung by type
-      const hit = items.find(
-        (it) => it.name.toLowerCase() === nm || it.type.toLowerCase() === nm
-      );
-      if (hit) return hit.type;
-    }
+  // NEW: level counts state (instrumentId -> count grade)
+  const [levelCounts, setLevelCounts] = React.useState<LevelCountMap>({});
 
-    // 3) fallback ke slugify(name) — mungkin tidak cocok dengan route yang ada
-    return nm ? slugify(nm) : '';
-  };
+  // fetch counts setelah items tersedia
+  React.useEffect(() => {
+    const loadCounts = async () => {
+      if (!items || items.length === 0) return;
+      try {
+        const ids = items.map((i) => i.id);
+        const res = await countByInstrument(ids);
+        const { counts } = (res as CountByInstrumentResponse) ?? { counts: {} };
+        setLevelCounts(counts || {});
+      } catch {
+        setLevelCounts({});
+      }
+    };
+    loadCounts();
+  }, [items]);
 
   // modal state
   const [showAdd, setShowAdd] = React.useState(false);
-  const [showEdit, setShowEdit] = React.useState(false);
-  const [selected, setSelected] = React.useState<Item | null>(null);
-  const [modalType, setModalType] = React.useState<
-    "confirm" | "success" | "error" | null
-  >(null);
+  const [modalType, setModalType] = React.useState<ModalKind | null>(null);
+  const [selectedId, setSelectedId] = React.useState<number | null>(null);
+  const [selectedName, setSelectedName] = React.useState<string>("");
 
   const closeModal = () => {
     setModalType(null);
-    setSelected(null);
+    setSelectedId(null);
+    setSelectedName("");
   };
 
-  const onDelete = (it: Item) => {
-    setSelected(it);
+  const onDelete = (id: number, name: string) => {
+    setSelectedId(id);
+    setSelectedName(name);
     setModalType("confirm");
   };
 
   const reallyDelete = async () => {
+    if (!selectedId) return;
     try {
+      await dispatch(deleteInstrumentThunk(selectedId)).unwrap();
       setModalType("success");
     } catch {
       setModalType("error");
@@ -90,83 +99,105 @@ export const AdminInstrumentPage: React.FC = () => {
       <div className="px-6 sm:px-8 lg:px-10 py-6">
         {/* Header */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold text-neutral-800">
+          <h1 className="text-xl font-semibold text-neutral-800">
             Kelola Instrumen Guru Musik
           </h1>
 
-          <div className="w-full sm:w-[420px] flex sm:justify-end">
+          <div className="w-full sm:w-[520px] flex gap-3 sm:justify-end">
             <button
               type="button"
               onClick={() => setShowAdd(true)}
-              className="inline-flex items-center justify-center w-full sm:w-auto h-11 rounded-full bg-[#F6C437] text-[#0B0B0B] font-semibold px-6 hover:brightness-95 transition cursor-pointer"
+              className="inline-flex items-center justify-center h-11 rounded-full bg-[#F6C437] text-[#0B0B0B] font-semibold px-6 hover:brightness-95 transition cursor-pointer"
             >
-              <span className="text-xl mr-2 leading-none">+</span>
+              <span className="text-lg mr-2 leading-none">+</span>
               Tambah Instrumen
             </button>
           </div>
         </div>
 
         {/* Grid kartu */}
-        <div className="rounded-2xl pt-5 bg-white">
-          <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {items.map((it) => (
-              <div
-                key={it.type}
-                className="flex items-center justify-between rounded-3xl border border-[#C9D9EA] bg-white px-4 py-3 shadow-[0_1px_0_#0000000d] hover:border-[#AFC3DA] transition"
-              >
-                <div className="flex flex-col text-left">
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-10 w-10 items-center justify-center">
-                      <img
-                        src={it.iconUrl}
-                        alt={`${it.name} Icon`}
-                        className="h-8 w-8 object-contain"
-                      />
-                    </span>
-                    <p className="text-lg font-semibold text-[#0F172A]">
-                      {it.name}
-                    </p>
+        <div className="rounded-2xl bg-white">
+          {status === "loading" && (
+            <div className="py-10 text-center text-sm text-neutral-500">Memuat instrumen...</div>
+          )}
+
+          {status === "failed" && (
+            <div className="py-10 text-center text-sm text-red-600">{error ?? "Gagal memuat data"}</div>
+          )}
+
+          {status !== "loading" && items.length > 0 && (
+            <div className="grid gap-4 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {items.map((it) => {
+                const iconUrl = resolveIconUrl(it.icon);
+                const name = toTitle(it.nama_instrumen);
+                const slug = slugify(it.nama_instrumen);
+                const totalLevel = levelCounts[it.id] ?? 0;
+
+                return (
+                  <div
+                    key={it.id}
+                    className="flex items-center justify-between rounded-3xl border border-[#C9D9EA] bg-white p-3 py-5 shadow-[0_1px_0_#0000000d] hover:border-[#AFC3DA] transition"
+                  >
+                    <div className="flex flex-col text-left">
+                      <div className="flex items-center gap-2 mb-2 pl-2">
+                        {iconUrl ? (
+                          <img
+                            src={iconUrl}
+                            alt={`${name} Icon`}
+                            className="h-6 w-6 object-contain"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="h-6 w-6 rounded bg-neutral-200" />
+                        )}
+                        <p className="text-md font-semibold text-[#0F172A]">{name}</p>
+                      </div>
+                      <p className="pl-2 text-md font-semibold text-[#6B7E93]">
+                        Total Level: {totalLevel}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center">
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          // Prefill wizard dari data existing, lalu arahkan ke halaman detail edit
+                          try {
+                            await dispatch(prefillFromInstrumentThunk({ instrumentId: it.id })).unwrap();
+                          } catch {
+                            // kalau gagal, tetap lanjutkan ke halaman; user bisa perbaiki manual
+                          }
+                          navigate(`/dashboard-admin/instrument/${slug}?edit=1&id=${it.id}`);
+                        }}
+                        className="h-10 w-10 rounded-xl border border-[#C9D9EA] grid place-items-center hover:bg-[#F4F8FC] transition cursor-pointer"
+                        aria-label={`Edit ${name}`}
+                        title="Edit"
+                      >
+                        <RiPencilFill className="text-[22px] text-[var(--secondary-color,#0682DF)]" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(it.id, name);
+                        }}
+                        className="h-11 w-11 grid place-items-center cursor-pointer"
+                        aria-label={`Delete ${name}`}
+                        title="Delete"
+                      >
+                        <RiDeleteBinFill className="text-[22px] text-[#FF437B]" />
+                      </button>
+                    </div>
                   </div>
-                  <p className="mt-1 text-[18px] font-semibold text-[#6B7E93]">
-                    Total Level: {it.totalGrade}
-                  </p>
-                </div>
-
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/dashboard-admin/instrument/${it.type}`);
-                    }}
-                    className="h-11 w-11 rounded-2xl border border-[#C9D9EA] grid place-items-center hover:bg-[#F4F8FC] transition cursor-pointer"
-                    aria-label={`Edit ${it.name}`}
-                    title="Edit"
-                  >
-                    <RiPencilFill className="text-[22px] text-[var(--secondary-color,#0682DF)]" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();         
-                      onDelete(it);
-                    }}
-                    className="h-11 w-11 grid place-items-center cursor-pointer"
-                    aria-label={`Delete ${it.name}`}
-                    title="Delete"
-                  >
-                    <RiDeleteBinFill className="text-[22px] text-[#FF437B]" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {items.length === 0 && (
-            <div className="mt-8 text-center text-sm text-neutral-500">
-              Belum ada instrumen.
+                );
+              })}
             </div>
+          )}
+
+          {status === "succeeded" && items.length === 0 && (
+            <div className="mt-8 text-center text-sm text-neutral-500">Belum ada instrumen.</div>
           )}
         </div>
       </div>
@@ -177,29 +208,21 @@ export const AdminInstrumentPage: React.FC = () => {
       <AddInstrumentModal
         open={showAdd}
         onClose={() => setShowAdd(false)}
-        onSubmit={(payload: { type?: string; name?: string }) => {
-          const newType = resolveType(payload, items)
-          setShowAdd(false); 
+        onSubmit={async (payload: AddInstrumentSubmitPayload) => {
+          const n = (payload.name || "").trim();
+          if (!n) return;
 
-          if (newType) {
-            navigate(`/dashboard-admin/instrument/${newType}`);
-          } else {
-            console.warn('Gagal menentukan type instrumen baru:', payload);
-          }
-        }}
-      />
+          let base64: string | undefined = undefined;
+          if (payload.file) base64 = await fileToDataUrl(payload.file);
 
-      {/* Edit Instrumen */}
-      <AddInstrumentModal
-        open={showEdit}
-        onClose={() => { setShowEdit(false); setSelected(null); }}
-        defaultName={selected?.name ?? ""}
-        onSubmit={(payload) => {
-          console.log("EDIT:", selected, payload);
-          setShowEdit(false);
-          setSelected(null);
+          // simpan ke redux wizard (mode create)
+          dispatch(startDraft({ name: n, iconBase64: base64 }));
+
+          const slug = slugify(n);
+          setShowAdd(false);
+          // tambahkan query ?new=1 supaya detail tahu ini mode create
+          navigate(`/dashboard-admin/instrument/${slug}?new=1`);
         }}
-        title="Edit Instrumen"
       />
 
       {/* Confirm delete */}
@@ -208,25 +231,12 @@ export const AdminInstrumentPage: React.FC = () => {
         onClose={closeModal}
         icon={<RiQuestionFill />}
         iconTone="warning"
-        title={`Yakin Mau Hapus Instrumen Musik Ini?`}
-        texts={[
-          <>
-            Jika instrumen dihapus, <strong>semua silabus</strong> yang terkait
-            dengan instrumen ini juga <strong>akan ikut terhapus.</strong>
-          </>,
-        ]}
+        title={`Yakin hapus instrumen "${selectedName}"?`}
+        texts={[<>Jika instrumen dihapus, data terkait bisa ikut terdampak.</>]}
         align="center"
         widthClass="max-w-lg"
-        button2={{
-          label: "Ga Jadi Deh",
-          onClick: closeModal,
-          variant: "outline",
-        }}
-        button1={{
-          label: "Ya, Saya Yakin",
-          onClick: reallyDelete,
-          variant: "primary",
-        }}
+        button2={{ label: "Batal", onClick: closeModal, variant: "outline" }}
+        button1={{ label: "Hapus", onClick: reallyDelete, variant: "primary" }}
       />
 
       {/* Success */}
@@ -236,9 +246,7 @@ export const AdminInstrumentPage: React.FC = () => {
         icon={<RiCheckboxCircleFill />}
         iconTone="success"
         title="Instrumen Berhasil Dihapus"
-        texts={[
-          `Instrumen ini telah dihapus, maka murid dan guru sudah tidak bisa mengaksesnya.`,
-        ]}
+        texts={[`Instrumen sudah dihapus.`]}
         align="center"
         widthClass="max-w-lg"
         button1={{ label: "Tutup", onClick: closeModal, variant: "primary" }}
@@ -252,9 +260,7 @@ export const AdminInstrumentPage: React.FC = () => {
         icon={<RiCloseLine />}
         iconTone="danger"
         title="Instrumen Gagal Dihapus!"
-        texts={[
-          `Terjadi kendala saat menghapus instrumen ini. Silakan coba lagi beberapa saat lagi.`,
-        ]}
+        texts={[`Terjadi kendala saat menghapus instrumen. Coba lagi.`]}
         align="center"
         widthClass="max-w-lg"
         button1={{ label: "Tutup", onClick: closeModal, variant: "primary" }}

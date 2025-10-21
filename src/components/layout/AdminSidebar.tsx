@@ -8,6 +8,7 @@ import {
   RiArrowDownSLine,
   RiUserSearchLine,
   RiSoundModuleLine,
+  RiStarLine,
 } from "react-icons/ri";
 import logo from "@/assets/images/gurumusik.png";
 
@@ -26,7 +27,7 @@ const DropWrap: React.FC<{ open: boolean; className?: string; children: React.Re
   </div>
 );
 
-/* Subitem dengan badge */
+/* Subitem TANPA badge */
 const SubItem: React.FC<{ to: string; label: string; active?: boolean; className?: string }> = ({
   to,
   label,
@@ -35,15 +36,12 @@ const SubItem: React.FC<{ to: string; label: string; active?: boolean; className
 }) => (
   <Link
     to={to}
-    className={`mt-2 flex items-center gap-2 px-3 py-2 rounded-xl ${
+    className={`mt-2 flex items-center px-3 py-2 rounded-xl ${
       active
         ? "bg-[var(--secondary-light-color,#E6F4FF)] text-[var(--secondary-color,#0682DF)]"
         : "text-[#0f172a] hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
     } ${className}`}
   >
-    <span className="text-xs text-center p-1 h-5 w-5 rounded-full bg-[#FF437B] text-white leading-none">
-      3
-    </span>
     <span className={`text-md ${active ? "font-medium" : ""}`}>{label}</span>
   </Link>
 );
@@ -73,6 +71,11 @@ const AdminSidebar: React.FC = () => {
   const groupActiveFinance = starts(financePrefixes);
   const groupActiveReport = starts(reportPrefixes);
   const groupActiveUsers = starts(usersPrefixes);
+
+  // single-item actives
+  const isPromoActive = isUnder("/dashboard-admin/manage-promo");
+  const isVerifiedTutorActive = isUnder("/dashboard-admin/verified-tutor");
+  const isRatingActive = isUnder("/dashboard-admin/manage-rating");
 
   // state dropdown
   const [openManage, setOpenManage] = React.useState(groupActiveManage);
@@ -136,13 +139,13 @@ const AdminSidebar: React.FC = () => {
                 <SubItem
                   to="/dashboard-admin/instrument"
                   label="Instrumen"
-                  active={isUnder("/dashboard-admin/instrument")} 
+                  active={isUnder("/dashboard-admin/instrument")}
                   className="mt-0 px-3 py-3"
                 />
                 <SubItem
                   to="/dashboard-admin/module"
                   label="Module"
-                  active={isExact("/dashboard-admin/module")}
+                  active={isUnder("/dashboard-admin/module")}
                 />
               </div>
             </DropWrap>
@@ -189,17 +192,12 @@ const AdminSidebar: React.FC = () => {
                 <SubItem
                   to="/dashboard-admin/tutor-commision"
                   label="Tutor Commision"
-                  active={isExact("/dashboard-admin/tutor-commision")}
+                  active={isUnder("/dashboard-admin/tutor-commision")}
                 />
                 <SubItem
                   to="/dashboard-admin/refund"
                   label="Refund"
                   active={isExact("/dashboard-admin/refund")}
-                />
-                <SubItem
-                  to="/dashboard-admin/data-rekrutmen"
-                  label="Data Rekrutmen"
-                  active={isExact("/dashboard-admin/data-rekrutmen")}
                 />
               </div>
             </DropWrap>
@@ -288,12 +286,12 @@ const AdminSidebar: React.FC = () => {
                 <SubItem
                   to="/dashboard-admin/tutor-list"
                   label="Tutor List"
-                  active={isExact("/dashboard-admin/tutor-list")}
+                  active={isUnder("/dashboard-admin/tutor-list")}
                 />
                 <SubItem
                   to="/dashboard-admin/student-list"
                   label="Student List"
-                  active={isExact("/dashboard-admin/student-list")}
+                  active={isUnder("/dashboard-admin/student-list")}
                 />
               </div>
             </DropWrap>
@@ -301,12 +299,56 @@ const AdminSidebar: React.FC = () => {
 
           <li>
             <Link
-              to="/dashboard-admin/manage-promo"
-              className="group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+              to="/dashboard-admin/manage-rating"
+              className={`group flex items-center justify-between px-2 py-3 rounded-xl
+                ${isRatingActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"}`}
             >
               <div className="flex items-center gap-3">
-                <RiCoupon2Line className="text-2xl text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)] transition-colors" />
-                <span className="ml-2 font-medium text-lg text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)] transition-colors">
+                <RiStarLine
+                  className={`text-2xl transition-colors ${
+                    isRatingActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                />
+                <span
+                  className={`ml-2 font-medium text-lg transition-colors ${
+                    isRatingActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                >
+                  Manage Rating
+                </span>
+              </div>
+            </Link>
+          </li>
+
+          <li>
+            <Link
+              to="/dashboard-admin/manage-promo"
+              className={`group flex items-center justify-between px-2 py-3 rounded-xl
+                ${isPromoActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"}`}
+            >
+              <div className="flex items-center gap-3">
+                <RiCoupon2Line
+                  className={`text-2xl transition-colors ${
+                    isPromoActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                />
+                <span
+                  className={`ml-2 font-medium text-lg transition-colors ${
+                    isPromoActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                >
                   Manage Promo
                 </span>
               </div>
@@ -316,11 +358,26 @@ const AdminSidebar: React.FC = () => {
           <li>
             <Link
               to="/dashboard-admin/verified-tutor"
-              className="group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+              className={`group flex items-center justify-between px-2 py-3 rounded-xl
+                ${isVerifiedTutorActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"}`}
             >
               <div className="flex items-center gap-3">
-                <RiUserSearchLine className="text-2xl text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)] transition-colors" />
-                <span className="ml-2 font-medium text-lg text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)] transition-colors">
+                <RiUserSearchLine
+                  className={`text-2xl transition-colors ${
+                    isVerifiedTutorActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                />
+                <span
+                  className={`ml-2 font-medium text-lg transition-colors ${
+                    isVerifiedTutorActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                >
                   Verified Tutor
                 </span>
               </div>
