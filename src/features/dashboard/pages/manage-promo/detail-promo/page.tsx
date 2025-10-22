@@ -27,7 +27,7 @@ import {
   setPage as setTxPage,
   setLimit as setTxLimit,
 } from '@/features/slices/transaksi/slice';
-
+import type { TxRange } from '@/features/slices/transaksi/types';
 import { resolveIconUrl } from '@/services/api/instrument.api';
 
 // =================== Helpers UI ===================
@@ -307,7 +307,7 @@ const DetailPromoPage: React.FC = () => {
       const { available, current } = availResp.data || { available: true, current: null };
 
       // Jika tidak available & promo aktif saat ini BUKAN yang sama → blok
-      if (!available && current && String(current.id) !== String(promoId)) {
+      if (!available && current !== String(promoId)) {
         setConfirm({
           isOpen: true,
           onClose: closeConfirm,
@@ -653,9 +653,9 @@ const DetailPromoPage: React.FC = () => {
               </span>
               <select
                 value={range ?? '30D'}
-                onChange={(e) => {
-                  dispatch(setTxPage(1) as any);
-                  dispatch(setTxRange(e.target.value) as any);
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                  dispatch(setTxPage(1));
+                  dispatch(setTxRange(e.currentTarget.value as TxRange));
                 }}
                 className="appearance-none rounded-full border border-black/15 pl-9 pr-8 py-2.5 text-sm outline-none"
               >

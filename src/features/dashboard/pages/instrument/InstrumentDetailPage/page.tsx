@@ -157,6 +157,7 @@ const InstrumentDetailPage: React.FC = () => {
           ...(prev || {}),
           ...draft,
           title,
+          completion_pts: draft.completion_pts ?? prev?.completion_pts ?? [],
         },
       })
     );

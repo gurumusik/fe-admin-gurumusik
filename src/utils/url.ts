@@ -1,9 +1,10 @@
-// src/utils/url.ts
+ // src/utils/url.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 export const stripTrailing = (s: string = ''): string => s.replace(/\/+$/, '');
 export const stripLeading  = (s: string = ''): string => s.replace(/^\/+/, '');
+export const isBrowser = typeof window !== 'undefined';
 const isAbs = (u?: string | null) => !!u && /^https?:\/\//i.test(u || '');
 
 // ── env (Vite) ────────────────────────────────────────────────────────────────
@@ -36,11 +37,13 @@ export function toSearchString(query?: Query): string {
 }
 
 // ── API URL ───────────────────────────────────────────────────────────────────
-export function buildApiUrl(path: string = '', query?: Query): string {
+
+export function buildUrl(path: string = '', query?: Query): string {
   const normalized = stripLeading(String(path));
   const base = API_BASE ? `${API_BASE}/` : '';
   return `${base}${normalized}${toSearchString(query)}`;
 }
+
 
 // ── FILE URL (/uploads, dsb.) ────────────────────────────────────────────────
 export function publicFileUrl(path?: string | null): string {

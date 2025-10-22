@@ -6,7 +6,6 @@ import type {
   EarningsChartState,
   GetEarningsChartParams,
   GetEarningsChartResp,
-  SliceStatus,
 } from './types';
 
 const initialState: EarningsChartState = {

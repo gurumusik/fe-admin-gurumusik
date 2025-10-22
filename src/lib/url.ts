@@ -25,6 +25,8 @@ const writeLS = (val: string | null) => {
   // eslint-disable-next-line no-empty
   } catch {}
 };
+
+
 export const getAccessToken = (): string | null => accessTokenCache ?? readLS();
 export const setAccessToken = (t: string | null) => {
   accessTokenCache = t ?? null;

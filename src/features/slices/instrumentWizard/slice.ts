@@ -487,6 +487,7 @@ const slice = createSlice({
         id_detail_program: draft.id_detail_program ?? prev?.id_detail_program,
         ...(prev || {}),
         ...draft,
+        completion_pts: draft.completion_pts ?? prev?.completion_pts ?? [],
       };
     },
     resetSyllabusDrafts(state) { state.syllabusDrafts = {}; },

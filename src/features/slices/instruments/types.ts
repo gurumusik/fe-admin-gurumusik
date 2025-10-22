@@ -68,9 +68,10 @@ export type ModalKind = 'confirm' | 'success' | 'error';
 
 /** Draft silabus per-grade yang dipakai di InstrumentDetailPage */
 export type SyllabusDraft = {
-  id?: number | string;
+  id?: number ;
   id_detail_program?: number;
   title?: string;
+  
   file_base64?: string | null;
   file_url?: string | null;
   link_url?: string | null;
