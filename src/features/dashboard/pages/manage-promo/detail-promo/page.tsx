@@ -27,8 +27,8 @@ import {
   setPage as setTxPage,
   setLimit as setTxLimit,
 } from '@/features/slices/transaksi/slice';
-import type { TxRange } from '@/features/slices/transaksi/types';
-import { resolveIconUrl } from '@/services/api/instrument.api';
+import type { TxRange, TxStatusLabel } from '@/features/slices/transaksi/types';
+import { resolveImageUrl } from '@/utils/resolveImageUrl';
 
 // =================== Helpers UI ===================
 type TxStatus = 'Success' | 'On Progress' | 'Failed' | 'Expired' | 'Canceled';
@@ -79,6 +79,23 @@ const capWords = (s?: string) =>
     .toString()
     .toLowerCase()
     .replace(/\b[a-z]/g, (c) => c.toUpperCase());
+
+/** ===== util tanggal utk filter server ===== */
+function toYmd(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function computeDateRange(range: TxRange): { date_from?: string; date_to?: string } {
+  if (range === 'ALL') return {};
+  const today = new Date();
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate()); // normalize 00:00
+  const start = new Date(end);
+  if (range === '30D') start.setDate(end.getDate() - 29);
+  else if (range === '90D') start.setDate(end.getDate() - 89);
+  return { date_from: toYmd(start), date_to: toYmd(end) };
+}
 
 const DetailPromoPage: React.FC = () => {
   const navigate = useNavigate();
@@ -247,8 +264,10 @@ const DetailPromoPage: React.FC = () => {
       });
     } catch (e: any) {
       setConfirm({
-        isOpen: true, onClose: closeConfirm,
-        icon: <RiCloseLine />, iconTone: 'danger',
+        isOpen: true,
+        onClose: closeConfirm,
+        icon: <RiCloseLine />,
+        iconTone: 'danger',
         title: 'Promo gagal diaktifkan',
         texts: [e?.message || 'Terjadi kendala saat menyimpan promo. Silakan coba lagi beberapa saat lagi.'],
         align: 'center',
@@ -258,7 +277,7 @@ const DetailPromoPage: React.FC = () => {
     }
   };
 
-  // ======= Toggle Headline ON/OFF dengan aturan single-headline =======
+  // ======= Toggle Headline ON/OFF =======
   const handleToggleHeadline = async () => {
     if (!promoId) return;
     const nextVal = !isHeadline;
@@ -299,14 +318,11 @@ const DetailPromoPage: React.FC = () => {
       return;
     }
 
-    // Nyalakan headline → cek dulu ke server agar hanya satu yang aktif
+    // Nyalakan headline → cek single-headline
     try {
       setHeadlineChecking(true);
-
-      const availResp = await getHeadlineAvail(); // { available: boolean; current: ApiPromo|null }
+      const availResp = await getHeadlineAvail();
       const { available, current } = availResp.data || { available: true, current: null };
-
-      // Jika tidak available & promo aktif saat ini BUKAN yang sama → blok
       if (!available && current !== String(promoId)) {
         setConfirm({
           isOpen: true,
@@ -320,9 +336,7 @@ const DetailPromoPage: React.FC = () => {
         });
         return;
       }
-      // Jika available (atau current adalah promo ini), lanjut put
     } catch (e: any) {
-      // Gagal cek → demi konsistensi aturan, blok agar tidak melanggar single-headline
       setConfirm({
         isOpen: true,
         onClose: closeConfirm,
@@ -338,7 +352,6 @@ const DetailPromoPage: React.FC = () => {
       setHeadlineChecking(false);
     }
 
-    // Lolos cek → boleh aktifkan
     try {
       setHeadlineToggling(true);
       await updatePromo(promoId, { is_headline_promo: true });
@@ -382,36 +395,39 @@ const DetailPromoPage: React.FC = () => {
     q = '',
     statusFilter = 'ALL',
     category = 'ALL',
-    range = '30D',
+    range = 'ALL', // default ALL
     status: listStatus = 'idle',
     error,
   } = tx;
 
-  // Paksa kategori valid (tidak boleh ALL / dua-duanya)
+  // Paksa kategori valid (UI tabel hanya 2 mode)
   useEffect(() => {
     if (category !== 'Kursus' && category !== 'Modul') {
-      dispatch(setTxCategory('Kursus') as any); // default
+      dispatch(setTxCategory('Kursus') as any); // default tampilan
     }
   }, [category, dispatch]);
 
-  // ======= Fetch list
+  // ======= Fetch list (WITH working filters)
   useEffect(() => {
     if (!promoId) return;
+    const { date_from, date_to } = computeDateRange(range as TxRange);
     dispatch(fetchTxByPromoThunk({
       promoId,
       params: {
         page,
         limit,
-        q: q || undefined,
-        status_label: statusFilter !== 'ALL' ? statusFilter : undefined,
-        category: category !== 'ALL' ? category : undefined,
-        range,
+        q: q || undefined,                         // search
+        status_label: statusFilter !== 'ALL' ? statusFilter : undefined, // status label (dimap di thunk)
+        category: category !== 'ALL' ? category : undefined,             // tab
+        range,                                     // kirim flag range
+        date_from,                                 // tanggal awal (YYYY-MM-DD)
+        date_to,                                   // tanggal akhir (YYYY-MM-DD)
       },
     }) as any);
   }, [dispatch, promoId, page, limit, q, statusFilter, category, range]);
 
   // ======= Derive items (client guard by type)
-  const visibleItems = useMemo(() => {
+  const baseByCategory = useMemo(() => {
     const arr = Array.isArray(items) ? items : [];
     const want = String(category || 'Kursus').toLowerCase();
     return arr.filter((t: any) =>
@@ -419,20 +435,46 @@ const DetailPromoPage: React.FC = () => {
     );
   }, [items, category]);
 
+  // ======= FE fallback: Search & Status (kalau BE belum support)
+  const qLower = (q || '').trim().toLowerCase();
+
+  const itemsSearchFiltered = useMemo(() => {
+    if (!qLower) return baseByCategory;
+    return baseByCategory.filter((t: any) => {
+      const student =
+        (t.student?.name || t.student_name || t.murid?.nama || '').toLowerCase();
+      const title =
+        (t.module?.title || t.module_title || t.modul?.judul || t.paket?.nama_paket || '').toLowerCase();
+      const instrument =
+        (t.instrument?.name || t.instrument_name || t.detailProgram?.instrument?.nama_instrumen || '').toLowerCase();
+      return [student, title, instrument].some((s) => s.includes(qLower));
+    });
+  }, [baseByCategory, qLower]);
+
+  const itemsStatusFiltered = useMemo(() => {
+    if (!statusFilter || statusFilter === 'ALL') return itemsSearchFiltered;
+    const want = String(statusFilter).toLowerCase();
+    return itemsSearchFiltered.filter((t: any) =>
+      String(t.status_label || '').toLowerCase() === want
+    );
+  }, [itemsSearchFiltered, statusFilter]);
+
+  const rows = itemsStatusFiltered; // gunakan rows untuk render
+
   const isModuleView = String(category).toLowerCase() === 'modul';
 
   // ======= Summary sync dgn tabel
-  const totalTransactions = visibleItems.length;
+  const totalTransactions = rows.length;
 
+  // diskon untuk rekap (ambil dari promo jika ada)
   const discountPctRaw = Number(currentPromo.discountPct ?? promo?.persentase_diskon ?? 0);
   const discountPct = Math.min(100, Math.max(0, discountPctRaw));
 
   const totalTable = useMemo(
-    () => visibleItems.reduce((sum: number, t: any) => sum + Number(t.price ?? t.total_harga ?? 0), 0),
-    [visibleItems]
+    () => rows.reduce((sum: number, t: any) => sum + Number(t.price ?? t.total_harga ?? 0), 0),
+    [rows]
   );
 
-  // pengeluaran promo = totalTable * diskon%
   const totalDiscount = useMemo(
     () => Math.round(totalTable * (discountPct / 100)),
     [totalTable, discountPct]
@@ -505,7 +547,7 @@ const DetailPromoPage: React.FC = () => {
               <RiArrowLeftLine size={20} />
             </button>
             <span className="grid size-10 place-items-center rounded-full bg-(--primary-color)">
-              <RiCouponFill size={25} />
+              <RiCouponFill />
             </span>
             <h2 className="text-lg font-semibold text-neutral-900">Rekap Kode Promo</h2>
           </div>
@@ -618,7 +660,7 @@ const DetailPromoPage: React.FC = () => {
                 value={q ?? ''}
                 onChange={(e) => {
                   dispatch(setTxPage(1) as any);
-                  dispatch(setTxQuery(e.target.value) as any);
+                  dispatch(setTxQuery(e.target.value) as any); // Search filter
                 }}
                 className="w-full rounded-full border border-black/15 pl-9 pr-4 py-2 outline-none placeholder:text-neutral-600"
                 placeholder="Cari Transaksi: cth: Murid Satu / Judul Modul"
@@ -633,7 +675,7 @@ const DetailPromoPage: React.FC = () => {
                 value={statusFilter ?? 'ALL'}
                 onChange={(e) => {
                   dispatch(setTxPage(1) as any);
-                  dispatch(setTxStatusFilter(e.target.value as any) as any);
+                  dispatch(setTxStatusFilter(e.target.value as TxStatusLabel | 'ALL') as any); // Status filter
                 }}
                 className="appearance:none rounded-full border border-black/15 px-3 py-2.5 pr-8 text-sm outline-none"
               >
@@ -652,10 +694,10 @@ const DetailPromoPage: React.FC = () => {
                 <RiCalendar2Line />
               </span>
               <select
-                value={range ?? '30D'}
+                value={range ?? 'ALL'} // default ALL
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                   dispatch(setTxPage(1));
-                  dispatch(setTxRange(e.currentTarget.value as TxRange));
+                  dispatch(setTxRange(e.currentTarget.value as TxRange)); // Date (range) filter
                 }}
                 className="appearance-none rounded-full border border-black/15 pl-9 pr-8 py-2.5 text-sm outline-none"
               >
@@ -708,12 +750,12 @@ const DetailPromoPage: React.FC = () => {
                 <tr>
                   <td colSpan={isModuleView ? 8 : 7} className="p-6 text-center text-neutral-500">Memuat…</td>
                 </tr>
-              ) : !visibleItems || visibleItems.length === 0 ? (
+              ) : !rows || rows.length === 0 ? (
                 <tr>
                   <td colSpan={isModuleView ? 8 : 7} className="p-6 text-center text-neutral-500">Tidak ada data</td>
                 </tr>
               ) : (
-                visibleItems.map((t: any, idx: number) => {
+                rows.map((t: any, idx: number) => {
                   const price = Number(t.price ?? t.total_harga ?? 0);
                   const dateIso = (t.date || t.tanggal_transaksi || '').slice(0, 10);
                   const statusLabel: TxStatus = (t.status_label || 'On Progress') as TxStatus;
@@ -724,15 +766,16 @@ const DetailPromoPage: React.FC = () => {
                       id: t.id_modul,
                       title: t.module_title || t.judul || '-',
                       type: t.module_type || t.type,
-                      thumbnail: t.module_thumbnail || t.thumbnail_path || '/assets/images/modul.png',
+                      thumbnail: t.module_thumbnail || t.thumbnail_path || null,
                     };
                     const buyerName = t.student?.name || t.student_name || '-';
+                    const thumbSrc = resolveImageUrl(module.thumbnail) || '/assets/images/modul.png';
 
                     return (
                       <tr key={t.id ?? `${idx}`} className={idx === 0 ? 'text-md' : 'border-t border-black/5 text-md'}>
                         <td className="px-4 py-4">
                           <img
-                            src={module.thumbnail || '/assets/images/modul.png'}
+                            src={thumbSrc}
                             alt={module.title || 'Modul'}
                             className="h-14 w-14 rounded-lg object-cover bg-neutral-100"
                           />
@@ -762,14 +805,13 @@ const DetailPromoPage: React.FC = () => {
                   }
 
                   // ==== ROW KURSUS ====
-                  const avatar =
-                    t.student?.avatar ||
-                    t.student_avatar ||
-                    defaultUser;
+                  const avatarRaw = t.student?.avatar || t.student_avatar || null;
+                  const avatarResolved = resolveImageUrl(avatarRaw) || defaultUser;
                   const studentName = t.student?.name || t.student_name || '-';
 
                   const instrumentName = t.instrument?.name || t.instrument_name || '';
-                  const instrumentIcon = resolveIconUrl(t.instrument?.icon || '') || getInstrumentIcon(instrumentName);
+                  const instrumentIconResolved =
+                    resolveImageUrl(t.instrument?.icon || null) || getInstrumentIcon(instrumentName);
 
                   const packageLabel =
                     t.paket?.name
@@ -781,14 +823,14 @@ const DetailPromoPage: React.FC = () => {
                   return (
                     <tr key={t.id ?? `${idx}`} className={idx === 0 ? 'text-md' : 'border-t border-black/5 text-md'}>
                       <td className="px-4 py-4">
-                        <ProgramAvatarBadge src={avatar} alt={studentName} pkg={programName} size={55} />
+                        <ProgramAvatarBadge src={avatarResolved} alt={studentName} pkg={programName} size={55} />
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex flex-col">
                           <span className="font-medium text-neutral-900">{studentName}</span>
                           {instrumentName ? (
                             <div className="mt-1 flex items-center gap-2">
-                              <img src={instrumentIcon} alt={instrumentName} className="h-5 w-5" />
+                              <img src={instrumentIconResolved} alt={instrumentName} className="h-5 w-5" />
                               <span className="text-md text-black/80">{instrumentName}</span>
                             </div>
                           ) : null}

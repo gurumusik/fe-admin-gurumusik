@@ -96,17 +96,24 @@ const fileToDataUrl = (file: File) =>
   });
 
 // mapping UI form → body API (tanpa thumbnail; thumbnail diproses terpisah)
-const formToBody = (form: ModuleForm) => ({
-  judul: (form.title ?? '').trim(),
-  deskripsi: form.description ?? '',
-  preview_class: form.previewUrl ?? '',
-  appropriate_module: form.audience ?? '',
-  harga: typeof form.basePrice === 'number' ? form.basePrice : undefined,
-  harga_bid: typeof form.salePrice === 'number' ? form.salePrice : undefined,
-  harga_discount: typeof form.promoPrice === 'number' ? form.promoPrice : 0,
-  percent_discount: calcPercentDiscount(form.salePrice, form.promoPrice),
-  playlists: sanitizePlaylists(form.playlists), // penting: kirim playlists untuk replace
-});
+const formToBody = (form: ModuleForm) => {
+  const body: any = {
+    judul: (form.title ?? '').trim(),
+    deskripsi: form.description ?? '',
+    preview_class: form.previewUrl ?? '',
+    appropriate_module: form.audience ?? '',
+    harga: typeof form.basePrice === 'number' ? form.basePrice : undefined,
+    harga_bid: typeof form.salePrice === 'number' ? form.salePrice : undefined,
+    harga_discount: typeof form.promoPrice === 'number' ? form.promoPrice : 0,
+    percent_discount: calcPercentDiscount(form.salePrice, form.promoPrice),
+    playlists: sanitizePlaylists(form.playlists),
+  };
+
+  if (typeof form.instrumentId === 'number') body.instrument_id = form.instrumentId;
+  if (typeof form.gradeId === 'number') body.grade_id = form.gradeId;
+
+  return body;
+};
 
 // simpan perubahan (PUT /module/admin/module/:id)
 // src/features/slices/module/detailSlice.ts

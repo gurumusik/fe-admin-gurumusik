@@ -14,6 +14,7 @@ import muridReducer from '@/features/slices/murid/slice';
 import transaksiReducer from '@/features/slices/transaksi/slice';
 import payoutGuruReducer from '@/features/slices/payoutGuru/slice';
 import earningsChartReducer from '@/features/slices/earnings/slice'
+import gradesReducer from '@/features/slices/grades/slice'
 
 
 export const store = configureStore({
@@ -33,6 +34,7 @@ export const store = configureStore({
     transaksi: transaksiReducer,
     payoutGuru: payoutGuruReducer,
     earningsChart: earningsChartReducer,
+    grades: gradesReducer,
     // tambahkan slice lain
   },
   // middleware default sudah cukup (immer, serializableCheck, thunk)

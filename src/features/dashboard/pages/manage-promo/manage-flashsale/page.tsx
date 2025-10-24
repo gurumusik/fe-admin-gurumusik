@@ -19,6 +19,7 @@ import {
 } from "@/services/api/promo.api";
 import { fetchFlashPromosThunk } from "@/features/slices/promo/slice";
 import type { CreatePromoPayload } from "@/features/slices/promo/types";
+import { resolveImageUrl } from "@/utils/resolveImageUrl";
 
 import TutorFlashsaleModal, { type Tutor } from "@/features/dashboard/components/TutorFlashsaleModal";
 import ModulFlashsaleModal, { type Modul } from "@/features/dashboard/components/ModulFlashsaleModal";
@@ -141,7 +142,7 @@ export const ManageFlashsalePage: React.FC = () => {
               id: String(x.user.id),
               name: x.user.nama ?? x.user.email ?? `User#${x.user.id}`,
               city: '',
-              avatar: x.user.profile_pic_url || '',
+              avatar: resolveImageUrl(x.user.profile_pic_url || '') || '',
             }));
           if (on) setTutors(tutorsMapped);
         } else {
@@ -151,7 +152,7 @@ export const ManageFlashsalePage: React.FC = () => {
               id: String(x.modul.id),
               title: x.modul.judul ?? `Modul #${x.modul.id}`,
               category: x.modul.instrument?.nama ?? null,
-              thumbnail: x.modul.thumbnail_path ?? null,
+              thumbnail: resolveImageUrl(x.modul.thumbnail_path ?? null),
             }));
           if (on) setModules(modulesMapped);
         }
@@ -527,7 +528,11 @@ export const ManageFlashsalePage: React.FC = () => {
         selectedIds={new Set(tutors.map((t) => t.id))}
         onSave={(picked) => {
           const existing = new Set(tutors.map((t) => t.id));
-          const merged = [...tutors, ...picked.filter((t) => !existing.has(t.id))];
+                const normalized = picked.map((t) => ({
+            ...t,
+            avatar: resolveImageUrl(t.avatar || '') || '',
+          }));
+          const merged = [...tutors, ...normalized.filter((t) => !existing.has(t.id))];
           setTutors(merged);
           setTutorModalOpen(false);
         }}
@@ -539,7 +544,11 @@ export const ManageFlashsalePage: React.FC = () => {
         selectedIds={new Set(modules.map((m) => m.id))}
         onSave={(picked) => {
           const existing = new Set(modules.map((m) => m.id));
-          const merged = [...modules, ...picked.filter((m) => !existing.has(m.id))];
+          const normalized = picked.map((m) => ({
+            ...m,
+            thumbnail: resolveImageUrl(m.thumbnail ?? null),
+          }));
+          const merged = [...modules, ...normalized.filter((m) => !existing.has(m.id))];
           setModules(merged);
           setModulModalOpen(false);
         }}

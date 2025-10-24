@@ -59,8 +59,8 @@ export type PromoTransactionDTO = {
   id: number;
   total_harga: number;
   tanggal_transaksi: string; // ISO
-  status: TxStatusRaw;
-  category_transaksi: TxCategoryRaw;
+  status: TxStatusRaw | string;
+  category_transaksi?: TxCategoryRaw;
 
   // relasi yang kita butuhkan di tabel
   murid?: ApiTxUser | null;
@@ -68,8 +68,18 @@ export type PromoTransactionDTO = {
   detailProgram?: ApiTxDetailProgram | null;
   modul?: ApiTxModul | null;
 
+  // payload unified untuk halaman lain
+  price?: number;
+  date?: string;
+  module?: { id: number; title: string; type?: string | null; thumbnail?: string | null } | null;
+  student?: { name?: string; avatar?: string | null } | null;
+  instrument?: { name?: string; icon?: string | null } | null;
+  paket_label?: string | null;
+
   // opsional: sudah dipetakan dari backend atau bisa dipetakan di FE via helper
   status_label?: TxStatusLabel;
+  type?: 'Modul' | 'Kursus';
+  program?: { id: number; name: string } | null;
 };
 
 export type ListPromoTransactionsResp = {
@@ -149,11 +159,14 @@ export type ListPromoTransactionsParams = {
   page?: number;
   limit?: number;
 
-  /** Pencarian bebas (nama murid / instrumen) — kalau BE belum support, tetap kirim agar kompatibel */
-  q?: string;
+  /** Pencarian bebas (nama murid / judul modul / instrumen) */
+  q?: string;       // FE-friendly
+  query?: string;   // BE-friendly (kompatibilitas)
 
-  /** Label status ramah-UI; jika BE butuh raw, map-kan di backend/endpoint */
+  /** Label status ramah-UI; jika BE butuh raw, map-kan di thunk dan kirim 'status' */
   status_label?: TxStatusLabel | 'ALL';
+  /** Raw status untuk BE */
+  status?: TxStatusRaw;
 
   /** Chip kategori: Kursus (paket/program), Modul, ALL */
   category?: TxCategoryChip;
@@ -166,7 +179,7 @@ export type ListPromoTransactionsParams = {
   date_to?: string;
 };
 
-// --- tambahkan di dekat tipe query params ---
+// --- untuk /transaksi/all ---
 export type ListAllTransactionsParams = {
   page?: number;
   limit?: number;
@@ -237,17 +250,6 @@ export async function getTransaksiDetail(id: number | string) {
 /**
  * GET daftar transaksi yang menggunakan promo tertentu.
  * Endpoint: /transaksi/promo/:promoId/transactions
- *
- * Query yang dikirim:
- * - page, limit
- * - q (opsional)
- * - status_label (opsional, Success/On Progress/Failed/Expired/Canceled/ALL)
- * - category (opsional, Kursus/Modul/ALL)
- * - range (opsional, 30D/90D/ALL)
- * - date_from, date_to (opsional, YYYY-MM-DD)
- *
- * Catatan: jika backend-mu mengharapkan bentuk lain (mis. status raw),
- * tetap aman karena FE mengontrol mapping dan BE bisa mengabaikan field yang tidak dikenal.
  */
 export async function listTransactionsByPromo(
   promoId: number | string,
@@ -256,8 +258,18 @@ export async function listTransactionsByPromo(
   const qs = new URLSearchParams();
   if (params?.page) qs.set('page', String(params.page));
   if (params?.limit) qs.set('limit', String(params.limit));
-  if (params?.q) qs.set('q', params.q);
+
+  // SEARCH: kirim dua-duanya agar kompatibel dengan BE mana pun
+  const qStr = (params?.q ?? params?.query ?? '').trim();
+  if (qStr) {
+    qs.set('q', qStr);
+    qs.set('query', qStr);
+  }
+
+  // STATUS: dukung raw & label
+  if (params?.status) qs.set('status', params.status);
   if (params?.status_label && params.status_label !== 'ALL') qs.set('status_label', params.status_label);
+
   if (params?.category && params.category !== 'ALL') qs.set('category', params.category);
   if (params?.range && params.range !== 'ALL') qs.set('range', params.range);
   if (params?.date_from) qs.set('date_from', params.date_from);

@@ -185,8 +185,13 @@ const CashoutVerificationPage: React.FC = () => {
     }
   }
 
-  // ===== Empty State =====
-  if (status !== "loading" && filtered.length === 0) {
+  /* ===== Empty logic flags ===== */
+  const isSearching = search.trim().length > 0;
+  const showInitialEmpty =
+    status !== "loading" && !isSearching && (total === 0 || items.length === 0);
+
+  // ===== Empty State (awal benar-benar tanpa data) =====
+  if (showInitialEmpty) {
     return (
       <div className="min-h-[70vh] grid place-items-center px-4">
         <div className="text-center mt-14">
@@ -286,7 +291,18 @@ const CashoutVerificationPage: React.FC = () => {
                 </tr>
               )}
 
+              {/* Hasil pencarian kosong → tetap render tabel */}
+              {status !== "loading" && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-[#6A7B98]">
+                    Tidak ada data
+                  </td>
+                </tr>
+              )}
+
+              {/* Data ada → render rows */}
               {status !== "loading" &&
+                filtered.length > 0 &&
                 filtered.map((r) => (
                   <tr key={r.id} className="border-t border-neutral-100">
                     <td className="py-4 pl-4 pr-3">

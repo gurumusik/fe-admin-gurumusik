@@ -5,6 +5,7 @@ import { ENDPOINTS } from '@/services/endpoints';
 
 export type GradeDTO = { id: number; nama_grade: string };
 
+/* ================== CREATE / UPDATE ================== */
 export async function createGrade(payload: { nama_grade: string }) {
   return baseUrl.request<{ message: string; data: GradeDTO }>(
     ENDPOINTS.GRADES.CREATE,
@@ -19,11 +20,45 @@ export async function updateGrade(id: number | string, payload: { nama_grade?: s
   );
 }
 
-/* ========== Tambahan yang penting ========== */
+/* ================== LIST (PUBLIC) ================== */
+export type ListGradesParams = { q?: string; page?: number; limit?: number };
+export type ListGradesResponse = { total: number; page: number; limit: number; data: GradeDTO[] };
+
+/** Ambil 1 halaman daftar grade (public) */
+export async function listGrades(params?: ListGradesParams): Promise<ListGradesResponse> {
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 100;
+  const q = params?.q?.trim();
+  const query = q
+    ? `?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`
+    : `?page=${page}&limit=${limit}`;
+
+  return baseUrl.request<ListGradesResponse>(
+    `${ENDPOINTS.GRADES.LIST}${query}`,
+    { method: 'GET' }
+  );
+}
+
+/** Ambil SEMUA grade (paginate) — opsional untuk dropdown tanpa paging */
+export async function listAllGrades(q?: string): Promise<GradeDTO[]> {
+  const first = await listGrades({ q, page: 1, limit: 200 });
+  let data = first.data ?? [];
+  const total = Number(first.total ?? 0);
+  const limit = Number(first.limit ?? 200);
+  const pages = Math.max(1, Math.ceil(total / limit));
+
+  for (let p = 2; p <= pages; p++) {
+    const res = await listGrades({ q, page: p, limit });
+    data = data.concat(res.data ?? []);
+  }
+  return data;
+}
+
+/* ========== Tambahan util yang kamu tulis (dipertahankan) ========== */
 
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
 
-/** Ambil 1 halaman daftar grade (public) */
+/** Ambil 1 halaman daftar grade (alias internal untuk deep-search) */
 async function listGradesPage(params: { q?: string; page?: number; limit?: number }) {
   const q = params.q ? `?q=${encodeURIComponent(params.q)}&page=${params.page ?? 1}&limit=${params.limit ?? 100}` 
                      : `?page=${params.page ?? 1}&limit=${params.limit ?? 100}`;
@@ -36,7 +71,6 @@ async function listGradesPage(params: { q?: string; page?: number; limit?: numbe
 /** Cari exact match secara menyeluruh (paginate) */
 export async function findByExactNameDeep(name: string): Promise<GradeDTO | null> {
   const key = norm(name);
-  // pakai filter q agar hasil kecil; tapi tetap iterasi halaman untuk amankan sort/total
   const first = await listGradesPage({ q: name, page: 1, limit: 100 });
   const total = Number(first?.total ?? 0);
   const limit = Number(first?.limit ?? 100);
@@ -79,12 +113,11 @@ export async function resolveOrCreateGradeIds(names: string[]): Promise<Record<s
     const original = originals.find(n => norm(n) === k)!;
     try {
       const created = await createGrade({ nama_grade: original });
-      const id = created?.data?.id ?? (created as any)?.id;
+      const id = (created as any)?.data?.id ?? (created as any)?.id;
       if (!id) throw new Error('Gagal membuat grade');
       result[k] = Number(id);
     } catch (e: any) {
       const msg = (e?.data?.message ?? e?.message ?? '').toString().toLowerCase();
-      // kalau backend bilang "sudah digunakan", cari lagi dan pakai existing
       if (msg.includes('sudah digunakan')) {
         const retry = await findByExactNameDeep(original);
         if (retry?.id) {
@@ -92,7 +125,6 @@ export async function resolveOrCreateGradeIds(names: string[]): Promise<Record<s
           continue;
         }
       }
-      // error selain duplikasi → lempar ke atas (biar kelihatan masalahnya)
       throw e;
     }
   }

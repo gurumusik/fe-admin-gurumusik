@@ -32,6 +32,9 @@ function labelToRawStatus(label?: TxStatusLabel | 'ALL'): TxStatusRaw | undefine
   return undefined; // Canceled -> no raw, ignore
 }
 
+const toYmd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 /* ========================= INITIAL ========================= */
 
 const initialState: TransaksiByPromoState = {
@@ -44,7 +47,7 @@ const initialState: TransaksiByPromoState = {
   q: '',
   statusFilter: 'ALL',
   category: 'ALL',
-  range: '30D',
+  range: 'ALL',         // ⬅️ default waktu = ALL
   date_from: null,
   date_to: null,
 
@@ -67,14 +70,54 @@ const initialState: TransaksiByPromoState = {
 
 /* ========================= THUNKS ========================= */
 
-// === LIST BY PROMO (existing)
+// === LIST BY PROMO (full dgn normalisasi params)
 export const fetchTxByPromoThunk = createAsyncThunk<
   ListTxByPromoResponse,
   FetchTxByPromoArgs,
   { rejectValue: string }
 >('transaksi/byPromo/fetchList', async ({ promoId, params }, { rejectWithValue }) => {
   try {
-    const res = await listTransactionsByPromo(promoId, params);
+    const p: any = { ...(params || {}) };
+
+    // normalisasi angka
+    if (p.page != null) p.page = Number(p.page) || 1;
+    if (p.limit != null) p.limit = Number(p.limit) || 10;
+
+    // SEARCH -> kirim 'q' & 'query'
+    if (p.q) {
+      p.q = String(p.q).trim();
+      if (!p.query) p.query = p.q;
+    }
+
+    // STATUS: map label UI -> raw BE
+    if (p.status_label && p.status_label !== 'ALL') {
+      const raw = labelToRawStatus(p.status_label);
+      if (raw) p.status = raw;
+    }
+    delete p.status_label;
+
+    // RANGE/TANGGAL
+    if (p.range === 'ALL') {
+      delete p.date_from;
+      delete p.date_to;
+    } else if (p.range && (!p.date_from || !p.date_to)) {
+      const end = new Date(); end.setHours(0,0,0,0);
+      const start = new Date(end);
+      if (p.range === '30D') start.setDate(end.getDate() - 29);
+      if (p.range === '90D') start.setDate(end.getDate() - 89);
+      p.date_from = toYmd(start);
+      p.date_to = toYmd(end);
+    }
+
+    // CATEGORY: kalau ALL, jangan kirim
+    if (p.category === 'ALL') delete p.category;
+
+    // bersihkan kosong
+    Object.keys(p).forEach((k) => {
+      if (p[k] == null || (typeof p[k] === 'string' && p[k].trim() === '')) delete p[k];
+    });
+
+    const res = await listTransactionsByPromo(promoId, p);
     return res as ListTxByPromoResponse;
   } catch (e: any) {
     return rejectWithValue(e?.message ?? 'Gagal memuat transaksi');
@@ -107,7 +150,7 @@ export const fetchAllTxThunk = createAsyncThunk<
     // Tab "Modul" => kirim 'modul'; selain itu => 'all'
     const rawCategory: 'paket' | 'modul' | 'all' = s.category === 'Modul' ? 'modul' : 'all';
 
-    const req: ListAllTxParams = {
+    const req: any = {
       page: s.page,
       limit: s.limit,
       q: s.q || undefined,
@@ -117,6 +160,11 @@ export const fetchAllTxThunk = createAsyncThunk<
       date_to: s.date_to || undefined,
       ...(overrideParams || {}),
     };
+
+    // bersihkan kosong
+    Object.keys(req).forEach((k) => {
+      if (req[k] == null || (typeof req[k] === 'string' && req[k].trim() === '')) delete req[k];
+    });
 
     const res = await listAllTransactions(req);
     return res;
@@ -171,7 +219,7 @@ const slice = createSlice({
       s.q = '';
       s.statusFilter = 'ALL';
       s.category = 'ALL';
-      s.range = '30D';
+      s.range = 'ALL';   // ⬅️ reset ke ALL juga
       s.date_from = null;
       s.date_to = null;
       s.page = 1;
@@ -228,17 +276,12 @@ const slice = createSlice({
       // rekap agregat
       s.allRecap = (a.payload as any).recap ?? null;
 
-      // === monthly recap (NEW format): payload.monthlyrecap["this year"] { januari: {...}, ... }
+      // === monthly recap (compat handling)
       const p: any = a.payload as any;
 
-      // Compatibility lama (kalau BE lama masih kirim array):
       let monthlyFromPayload: MonthlyRecapPoint[] | null =
-        p.monthlyRecap ??
-        p.recap?.monthly ??
-        p.recap?.by_month ??
-        null;
+        p.monthlyRecap ?? p.recap?.monthly ?? p.recap?.by_month ?? null;
 
-      // Parser untuk format baru
       if (!monthlyFromPayload) {
         const box = p?.monthlyrecap?.['this year'] || p?.monthlyrecap?.thisYear;
         if (box && typeof box === 'object') {
@@ -254,12 +297,11 @@ const slice = createSlice({
             const module_count = Number(agg?.module_count ?? 0);
             const promo_tx_count = Number(agg?.promo_tx_count ?? 0);
             const count = Number(
-              agg?.course_and_module_count ??
-              (course_count + module_count)
+              agg?.course_and_module_count ?? (course_count + module_count)
             );
             return {
               year,
-              month: i + 1,        // 1..12
+              month: i + 1,
               count,
               course_count,
               module_count,

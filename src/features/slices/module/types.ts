@@ -51,6 +51,8 @@ export type ModuleForm = {
 
   // Khusus Edit: ada clips
   clips?: File[];
+  instrumentId?: number | null;
+  gradeId?: number | null;
 };
 
 /* ===== Upload item (ebooks/clips) ===== */

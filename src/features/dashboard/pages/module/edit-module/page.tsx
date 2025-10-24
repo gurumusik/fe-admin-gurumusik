@@ -15,12 +15,15 @@ import type { ModuleForm, UploadItem, OwnerRouteState } from '@/features/slices/
 // redux
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/app/store';
+import { resolveIconUrl } from '@/services/api/instrument.api';
+import { fetchInstrumentsThunk } from '@/features/slices/instruments/slice'; 
+import { fetchGradesThunk } from '@/features/slices/grades/slice';
 import { fetchGuruByIdThunk } from '@/features/slices/guru/slice';
 import {
   fetchModuleAdminDetailThunk,
   saveModuleAdminThunk,
 } from '@/features/slices/module/detailSlice';
-import defaultUser from '@/assets/images/default-ebook.jpeg';
+import defaultUser from '@/assets/images/default-user.png';
 
 /* ================== utils ================== */
 const cls = (...xs: Array<string | false | null | undefined>) => xs.filter(Boolean).join(' ');
@@ -113,6 +116,128 @@ function PreviewTile({ src, mime, footer }: { src: string; mime?: string; footer
   );
 }
 
+/* ================== Modal Pilih Instrument & Grade ================== */
+type PickIGValue = { instrumentId: number | null; gradeId: number | null };
+type PickIGProps = {
+  instruments: Array<{ id: number; nama?: string; icon?: string | null }>;
+  grades: Array<{ id: number; nama: string }>; // sudah dinormalisasi dari nama_grade
+  loading?: boolean;
+  value: PickIGValue;
+  onChange: (v: PickIGValue) => void;
+  onClose: () => void;
+  onApply: () => void;
+};
+
+function PickInstrumentGradeModal(props: PickIGProps) {
+  const { instruments, grades, loading, value, onChange, onClose, onApply } = props;
+  const [qIns, setQIns] = useState('');
+  const [qGrade, setQGrade] = useState('');
+
+  const filteredIns = useMemo(
+    () => instruments.filter((it) => (it.nama ?? '').toLowerCase().includes(qIns.toLowerCase())),
+    [instruments, qIns]
+  );
+  const filteredGrades = useMemo(
+    () => grades.filter((g) => g.nama.toLowerCase().includes(qGrade.toLowerCase())),
+    [grades, qGrade]
+  );
+
+  return (
+    <div className="fixed inset-0 z-[999] bg-black/40 grid place-items-center p-4">
+      <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between p-4 ">
+          <h3 className="text-lg font-semibold">Pilih Instrumen & Grade</h3>
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-800">✕</button>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 p-4">
+          {/* Instruments */}
+          <div>
+            <div className="mb-2 font-semibold">Instrumen</div>
+            <input
+              value={qIns}
+              onChange={(e) => setQIns(e.target.value)}
+              placeholder="Cari instrumen…"
+              className="w-full h-9 px-3 mb-2 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none"
+            />
+            <div className="max-h-64 overflow-auto pr-1 space-y-2">
+              {loading && <div className="text-sm text-neutral-500">Memuat…</div>}
+              {!loading && filteredIns.map((it) => {
+                const active = value.instrumentId === it.id;
+                return (
+                  <button
+                    key={it.id}
+                    type="button"
+                    onClick={() => onChange({ ...value, instrumentId: it.id })}
+                    className={cls(
+                      'w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left',
+                      active ? 'border-[var(--secondary-color)] bg-blue-50' : 'border-gray-200 hover:bg-neutral-50'
+                    )}
+                  >
+                    {it.icon ? (
+                      <img src={it.icon} className="h-6 w-6 rounded object-contain ring-1 ring-black/10" />
+                    ) : <RiMusic2Line className="text-neutral-400" />}
+                    <span className="text-sm">{it.nama ?? '-'}</span>
+                    {active && <span className="ml-auto text-xs text-[var(--secondary-color)]">dipilih</span>}
+                  </button>
+                );
+              })}
+              {!loading && filteredIns.length === 0 && (
+                <div className="text-sm text-neutral-500">Tidak ada instrumen</div>
+              )}
+            </div>
+          </div>
+
+          {/* Grades */}
+          <div>
+            <div className="mb-2 font-semibold">Grade</div>
+            <input
+              value={qGrade}
+              onChange={(e) => setQGrade(e.target.value)}
+              placeholder="Cari grade…"
+              className="w-full h-9 px-3 mb-2 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none"
+            />
+            <div className="max-h-64 overflow-auto pr-1 space-y-2">
+              {loading && <div className="text-sm text-neutral-500">Memuat…</div>}
+              {!loading && filteredGrades.map((g) => {
+                const active = value.gradeId === g.id;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => onChange({ ...value, gradeId: g.id })}
+                    className={cls(
+                      'w-full flex items-center justify-between rounded-lg border px-3 py-2 text-left',
+                      active ? 'border-[var(--secondary-color)] bg-blue-50' : 'border-gray-200 hover:bg-neutral-50'
+                    )}
+                  >
+                    <span className="text-sm">{g.nama}</span>
+                    {active && <span className="text-xs text-[var(--secondary-color)]">dipilih</span>}
+                  </button>
+                );
+              })}
+              {!loading && filteredGrades.length === 0 && (
+                <div className="text-sm text-neutral-500">Tidak ada grade</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 p-4">
+          <button onClick={onClose} className="h-9 px-4 rounded-full border border-gray-200">Batal</button>
+          <button
+            onClick={onApply}
+            className="h-9 px-5 rounded-full bg-[var(--primary-color)] text-black font-semibold hover:brightness-95 disabled:opacity-60"
+            disabled={!value.instrumentId || !value.gradeId}
+          >
+            Simpan Pilihan
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ================== Page ================== */
 export default function EditModulePage() {
   const navigate = useNavigate();
@@ -125,13 +250,14 @@ export default function EditModulePage() {
   const {
     item: detail,
     status: detailStatus,
-    error: detailError,
     saving,
-    saveError,
-    lastSavedAt,
   } = useSelector((s: RootState) => (s as any).moduleAdminDetail ?? {
     item: null, status: 'idle', error: null, saving: false, saveError: null, lastSavedAt: null,
   });
+
+  // instruments & grades state
+  const instrumentsState = useSelector((s: RootState) => (s as any).instrument);
+  const gradesState = useSelector((s: RootState) => (s as any).grades);
 
   // teacherId dari modul → trigger fetch guru
   const [teacherId, setTeacherId] = useState<number | null>(null);
@@ -162,6 +288,7 @@ export default function EditModulePage() {
     title: '', basePrice: '', salePrice: '', promoPrice: '', instrument: '',
     previewUrl: '', description: '', audience: '', playlists: ['', '', ''],
     thumbnail: undefined, clips: [],
+    instrumentId: null, gradeId: null,
   });
 
   const [thumbServerUrl, setThumbServerUrl] = useState<string>('');
@@ -211,6 +338,9 @@ export default function EditModulePage() {
       playlists: padArray(playlists, 3),
       thumbnail: undefined,
       clips: [],
+
+      instrumentId: detail.instrument?.id ?? null,
+      gradeId: detail.grade?.id ?? null,
     });
 
     setThumbServerUrl(detail.thumbnail_path || '');
@@ -345,6 +475,47 @@ export default function EditModulePage() {
 
   const loadingDetail = detailStatus === 'loading';
 
+  /* ===== UI values untuk field Instrumen Musik (ikon + nama) ===== */
+  const uiInstrumentIcon = useMemo(() => {
+  const idPick = form.instrumentId ?? detail?.instrument?.id ?? null;
+  const found = (instrumentsState?.items ?? []).find((it: any) => it?.id === idPick);
+  const ic = found?.icon ?? detail?.instrument?.icon ?? null;
+  return resolveIconUrl?.(ic) ?? ic ?? '';
+}, [instrumentsState?.items, form.instrumentId, detail]);
+
+  const uiInstrumentName = useMemo(() => {
+    const idPick = form.instrumentId ?? detail?.instrument?.id ?? null;
+    const found = (instrumentsState?.items ?? []).find((it: any) => it?.id === idPick);
+    const nameFromList = found?.nama_instrumen;
+    const nameFromDetail = (detail as any)?.instrument?.nama ?? (detail as any)?.instrument?.nama_instrumen;
+    return nameFromList ?? nameFromDetail ?? '';
+  }, [instrumentsState?.items, form.instrumentId, detail]);
+
+  const uiGradeName = useMemo(() => {
+    const idPick = form.gradeId ?? detail?.grade?.id ?? null;
+    const found = (gradesState?.items ?? []).find((g: any) => g?.id === idPick);
+    // list grades: nama_grade | detail: grade.nama
+    return found?.nama_grade ?? detail?.grade?.nama ?? '';
+  }, [gradesState?.items, form.gradeId, detail?.grade?.id, detail?.grade?.nama]);
+
+  /* ===== Modal state & fetch list saat dibuka ===== */
+  const [openPickIG, setOpenPickIG] = useState(false);
+  const [pickInstrumentId, setPickInstrumentId] = useState<number | null>(null);
+  const [pickGradeId, setPickGradeId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!openPickIG) return;
+    if (instrumentsState?.status === 'idle') {
+      dispatch(fetchInstrumentsThunk(undefined) as any);
+    }
+    if (gradesState?.status === 'idle') {
+      dispatch(fetchGradesThunk(undefined) as any);
+    }
+    setPickInstrumentId((prev) => form.instrumentId ?? prev ?? null);
+    setPickGradeId((prev) => form.gradeId ?? prev ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openPickIG]);
+
   return (
     <div className="w-full">
       {/* ===== Header ===== */}
@@ -384,14 +555,6 @@ export default function EditModulePage() {
         </div>
       </header>
 
-      {/* Loading / Error banner */}
-      {loadingDetail && <div className="mb-4 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700">Memuat detail modul…</div>}
-      {detailError && <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{String(detailError)}</div>}
-      {saveError && <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{String(saveError)}</div>}
-      {lastSavedAt && !saveError && (
-        <div className="mb-4 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">Perubahan tersimpan.</div>
-      )}
-
       {/* ===== FORM ===== */}
       <form id="edit-module-form" onSubmit={submit} className="w-full">
         <div className="grid gap-6 md:grid-cols-12">
@@ -402,7 +565,14 @@ export default function EditModulePage() {
                 <input value={form.title} onChange={onChange('title')} placeholder="| Masukkan Judul Modul" className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none" />
               </Field>
               <Field label="Harga Awal (Modal)" icon={<RiCoinsLine size={22} />}>
-                <input value={form.basePrice === '' ? '' : nfIDR(form.basePrice)} onChange={(e) => setForm((f) => ({ ...f, basePrice: toNumber(e.target.value) }))} placeholder="| Rp150.000" inputMode="numeric" className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none" />
+                <input
+                  value={form.basePrice === '' ? '' : nfIDR(form.basePrice)}
+                  readOnly
+                  aria-readonly="true"
+                  inputMode="numeric"
+                  className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed select-none focus:bg-gray-100 focus:outline-none"
+                  title="Field ini idak bisa diubah"
+                />
               </Field>
               <Field label="Harga Jual (Normal)" icon={<RiCoinsLine size={22} />}>
                 <input value={form.salePrice === '' ? '' : nfIDR(form.salePrice)} onChange={(e) => setForm((f) => ({ ...f, salePrice: toNumber(e.target.value) }))} placeholder="| Harga Normal, cth: 150.000" inputMode="numeric" className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none" />
@@ -410,12 +580,31 @@ export default function EditModulePage() {
               <Field label="Harga Promo (Diskon)" icon={<RiCoinsLine size={22} />}>
                 <input value={form.promoPrice === '' ? '' : nfIDR(form.promoPrice)} onChange={(e) => setForm((f) => ({ ...f, promoPrice: toNumber(e.target.value) }))} placeholder="| Harga Diskon, cth: 120.000" inputMode="numeric" className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none" />
               </Field>
-              <Field label="Instrumen Musik" icon={<RiMusic2Line size={22} />}>
-                <select value={form.instrument} onChange={onChange('instrument')} className="w-full h-11 pl-10 pr-9 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none">
-                  <option value="" hidden>| Pilih Kategori Musik</option>
-                  <option value="gitar">Gitar</option><option value="piano">Piano</option><option value="biola">Biola</option><option value="drum">Drum</option><option value="vokal">Vokal</option>
-                </select>
+
+              {/* ===== Field Instrumen Musik (klik untuk ubah) ===== */}
+              <Field label="Instrumen Musik">
+                <button
+                  type="button"
+                  onClick={() => setOpenPickIG(true)}
+                  className="w-full h-11 rounded-lg border border-gray-200 bg-neutral-50 px-3 flex items-center gap-2 text-left hover:bg-neutral-100"
+                  title="Klik untuk memilih instrumen & grade"
+                >
+                  {uiInstrumentIcon ? (
+                    <img
+                      src={uiInstrumentIcon}
+                      alt="Instrument Icon"
+                      className="h-5 w-5 rounded object-contain ring-1 ring-black/10"
+                    />
+                  ) : (
+                    <RiMusic2Line size={18} className="text-neutral-400" />
+                  )}
+                  <span className="text-md text-neutral-800">
+                    {uiInstrumentName ? `${uiInstrumentName} • ${uiGradeName || '—'}` : (uiGradeName || '—')}
+                  </span>
+                  <span className="ml-auto text-xs text-[var(--secondary-color)] underline">Ubah</span>
+                </button>
               </Field>
+
               <Field label="Preview Kelas" icon={<RiLinkM size={22} />}>
                 <input value={form.previewUrl} onChange={onChange('previewUrl')} placeholder="| Masukkan link video preview kelas, cth: youtube.com" className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none" />
               </Field>
@@ -564,7 +753,6 @@ export default function EditModulePage() {
                   </div>
                 </div>
               )}
-              
 
               {/* Local previews (baru dipilih) */}
               {clipsUp.length > 0 && (
@@ -595,6 +783,26 @@ export default function EditModulePage() {
             </div>
           </aside>
         </div>
+
+        {/* ===== Modal Pilihan Instrumen & Grade ===== */}
+        {openPickIG && (
+          <PickInstrumentGradeModal
+            instruments={(instrumentsState?.items ?? []).map((it: any) => ({
+              id: it.id,
+              nama: it.nama_instrumen,                // ⬅️ pastikan ada field nama
+              icon: resolveIconUrl?.(it.icon) ?? it.icon,
+            }))}
+            grades={(gradesState?.items ?? []).map((g: any) => ({ id: g.id, nama: g.nama_grade }))}
+            loading={(instrumentsState?.status === 'loading') || (gradesState?.status === 'loading')}
+            value={{ instrumentId: pickInstrumentId, gradeId: pickGradeId }}
+            onChange={(v) => { setPickInstrumentId(v.instrumentId); setPickGradeId(v.gradeId); }}
+            onClose={() => setOpenPickIG(false)}
+            onApply={() => {
+              setForm((f) => ({ ...f, instrumentId: pickInstrumentId ?? null, gradeId: pickGradeId ?? null }));
+              setOpenPickIG(false);
+            }}
+          />
+        )}
       </form>
     </div>
   );
