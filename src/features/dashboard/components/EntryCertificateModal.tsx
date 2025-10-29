@@ -28,6 +28,9 @@ export type CertificateItem = {
   link?: string; // url (image/pdf)
 };
 
+type InstrumentOption = { id: number; label: string; icon: string | null };
+type GradeOption = { id: number; label: string };
+
 export type CreateCertPayloadIds = {
   title: string;
   school: string;
@@ -104,24 +107,24 @@ const EntryCertificateModal: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const instrumentOptions = useMemo(
-    () =>
-      (instrumentsState?.items ?? []).map((it: any) => ({
-        id: it.id as number,
-        label: it.nama_instrumen as string,
-        icon: resolveIconUrl?.(it.icon) ?? it.icon ?? null,
-      })),
-    [instrumentsState?.items]
-  );
+const instrumentOptions = useMemo<InstrumentOption[]>(
+  () =>
+    (instrumentsState?.items ?? []).map((it: any) => ({
+      id: it.id as number,
+      label: it.nama_instrumen as string,
+      icon: resolveIconUrl?.(it.icon) ?? it.icon ?? null,
+    })),
+  [instrumentsState?.items]
+);
 
-  const gradeOptions = useMemo(
-    () =>
-      (gradesState?.items ?? []).map((g: any) => ({
-        id: g.id as number,
-        label: (g.nama_grade as string) || (g.nama as string) || '',
-      })),
-    [gradesState?.items]
-  );
+const gradeOptions = useMemo<GradeOption[]>(
+  () =>
+    (gradesState?.items ?? []).map((g: any) => ({
+      id: g.id as number,
+      label: (g.nama_grade as string) || (g.nama as string) || '',
+    })),
+  [gradesState?.items]
+);
 
   /** Items yang ditampilkan di list (dari props) */
   const [items, setItems] = useState<CertificateItem[]>(() => certificates ?? []);
@@ -280,11 +283,13 @@ const EntryCertificateModal: React.FC<Props> = ({
 
   /** Helpers untuk render label dari id */
   const labelOfInstrument = (id?: number | null) =>
-    instrumentOptions.find((o) => o.id === id)?.label ?? '—';
+    instrumentOptions.find((o: InstrumentOption) => o.id === id)?.label ?? '—';
+
   const iconOfInstrument = (id?: number | null) =>
-    instrumentOptions.find((o) => o.id === id)?.icon ?? null;
+    instrumentOptions.find((o: InstrumentOption) => o.id === id)?.icon ?? null;
+
   const labelOfGrade = (id?: number | null) =>
-    gradeOptions.find((g) => g.id === id)?.label ?? '—';
+    gradeOptions.find((g: GradeOption) => g.id === id)?.label ?? '—';
 
   if (!isOpen) return null;
 
@@ -443,11 +448,11 @@ const EntryCertificateModal: React.FC<Props> = ({
                     className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-neutral-800 outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
                   >
                     <option value="">Pilih Instrumen</option>
-                    {instrumentOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
+                      {instrumentOptions.map((opt: InstrumentOption) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
                   </select>
                   {(instrumentsState?.status === 'loading') && (
                     <div className="mt-1 text-xs text-neutral-500">Memuat daftar instrumen…</div>
@@ -464,11 +469,11 @@ const EntryCertificateModal: React.FC<Props> = ({
                     className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-neutral-800 outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
                   >
                     <option value="">Pilih Grade</option>
-                    {gradeOptions.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.label}
-                      </option>
-                    ))}
+                      {gradeOptions.map((g: GradeOption) => (
+                        <option key={g.id} value={g.id}>
+                          {g.label}
+                        </option>
+                      ))}
                   </select>
                   {(gradesState?.status === 'loading') && (
                     <div className="mt-1 text-xs text-neutral-500">Memuat daftar grade…</div>

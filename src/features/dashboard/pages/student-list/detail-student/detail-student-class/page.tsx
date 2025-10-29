@@ -14,7 +14,7 @@ import ProgramAvatarBadge from '@/components/ui/badge/ProgramAvatarBadge';
 import { getStatusColor } from '@/utils/getStatusColor';
 
 import { fetchStudentHeaderThunk, selectStudentDetail } from '@/features/slices/murid/slice';
-import StudentReportModal, { type StudentReportRow } from '@/features/dashboard/components/studentReportModal';
+import StudentReportModal, { type StudentReportRow } from '@/features/dashboard/components/StudentReportModal';
 
 import {
   listMuridClassesById,
