@@ -1,24 +1,12 @@
-// src/features/slices/guru/classesSlice.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import * as API from '@/services/api/guruClasses.api';
 import type {
   GuruClassDTO,
   ListGuruClassesParams,
-  ListGuruClassesResp,
-} from '@/services/api/guruClasses.api';
-
-export type GuruClassesState = {
-  items: GuruClassDTO[];
-  total: number;
-  page: number;
-  limit: number;
-  q: string;
-  sort_by: NonNullable<ListGuruClassesParams['sort_by']>;
-  sort_dir: NonNullable<ListGuruClassesParams['sort_dir']>; // 'asc' | 'desc'
-  status: 'idle' | 'loading' | 'succeeded' | 'failed';
-  error: string | null;
-};
+  ListGuruClassesResponse,
+  GuruClassesState,
+} from '@/features/slices/guru/classes/types';
 
 const initialState: GuruClassesState = {
   items: [],
@@ -33,14 +21,14 @@ const initialState: GuruClassesState = {
 };
 
 export const fetchGuruClassesThunk = createAsyncThunk<
-  ListGuruClassesResp,
+  ListGuruClassesResponse,
   ListGuruClassesParams | undefined,
   { rejectValue: string }
 >('guruClasses/fetchList', async (params, { rejectWithValue }) => {
   try {
     if (!params?.guruId) throw new Error('guruId wajib diisi');
     const res = await API.listGuruClasses(params);
-    return res as ListGuruClassesResp;
+    return res as ListGuruClassesResponse;
   } catch (e: any) {
     return rejectWithValue(e?.message ?? 'Gagal memuat kelas guru');
   }
@@ -76,10 +64,8 @@ const slice = createSlice({
     })
       .addCase(fetchGuruClassesThunk.fulfilled, (s, a) => {
         s.status = 'succeeded';
-        s.items = a.payload.data;
+        s.items = a.payload.data as GuruClassDTO[];
         s.total = a.payload.total;
-        // ⛔️ Jangan overwrite page/limit/sort/q dari payload agar dependency useEffect tidak berubah-ubah
-        // (kalau ingin, boleh sinkron tapi WAJIB normalisasi: String(...).toLowerCase()).
       })
       .addCase(fetchGuruClassesThunk.rejected, (s, a) => {
         s.status = 'failed';

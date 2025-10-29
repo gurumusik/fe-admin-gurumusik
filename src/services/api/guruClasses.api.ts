@@ -1,69 +1,25 @@
-// src/services/api/guru-classes.api.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { baseUrl } from '@/services/http/url';
 import { ENDPOINTS } from '@/services/endpoints';
-
-/* ========================= TYPES ========================= */
-
-export type GuruClassDTO = {
-  sesi_id: number;
-  transaksi_id: number;
-  sesi_ke: number;
-  sesi_total: number;
-  sesi_label: string;
-  waktu_mulai: string | null; 
-  waktu_selesai: string | null
-  status: string | null; 
-  
-  murid: { id: number | null; nama: string | null; profile_pic_url: string | null };
-  program: { id: number | null; nama: string | null };
-  instrument: { id: number | null; nama: string | null; detail_program_id: number | null };
-  jadwal: {
-    id: number | null;
-    hari: number | string | null;
-    waktu_mulai: string | null;
-    waktu_selesai: string | null;
-  };
-  rating: { value: number | null; count: number };
-};
-
-export type ListGuruClassesResp = {
-  total: number;
-  page: number;
-  limit: number;
-  data: GuruClassDTO[];
-
-  // opsional: ikutkan meta tambahan dari backend
-  has_next?: boolean;
-  has_prev?: boolean;
-  sort_by?: string;
-  sort_dir?: 'asc' | 'desc';
-  q?: string | null;
-};
-
-export type ListGuruClassesParams = {
-  guruId: number;
-  q?: string;
-  page?: number;
-  limit?: number;
-  sort_by?: 'sesi_ke' | 'murid_nama' | 'program_nama' | 'instrument_nama' | 'jadwal_mulai' | 'rating';
-  sort_dir?: 'asc' | 'desc';
-};
-
-/* ========================= API CALLS ========================= */
+import type {
+  GuruClassDTO,
+  ListGuruClassesParams,
+  ListGuruClassesResponse,
+  ListTransaksiSessionsResponse,
+  ListTransaksiRatingsResponse
+} from '@/features/slices/guru/classes/types';
 
 /**
  * GET /guru/:guruId/classes
- * Mengembalikan data dengan shape mirip instrument.api.ts:
- * { total, page, limit, data } (+ meta opsional)
+ * List kelas per transaksi (1 baris = 1 transaksi), berisi:
+ * - murid, program, instrument, jadwal
+ * - sesi_done/sesi_total/sesi_label
+ * - rating (avg rating per transaksi)
  */
 export async function listGuruClasses(params: ListGuruClassesParams) {
-  if (!params?.guruId) {
-    throw new Error('guruId wajib diisi');
-  }
+  if (!params?.guruId) throw new Error('guruId wajib diisi');
 
   const { guruId, q, page, limit, sort_by, sort_dir } = params;
-
   const qs = new URLSearchParams();
   if (q) qs.set('q', q);
   if (page) qs.set('page', String(page));
@@ -72,7 +28,6 @@ export async function listGuruClasses(params: ListGuruClassesParams) {
   if (sort_dir) qs.set('sort_dir', String(sort_dir));
   const qstr = qs.toString() ? `?${qs.toString()}` : '';
 
-  // Bentuk backend: { meta: {...}, data: [...] }
   const raw = await baseUrl.request<{ meta?: any; data?: GuruClassDTO[] }>(
     `${ENDPOINTS.GURU.CLASSES(guruId)}${qstr}`,
     { method: 'GET' }
@@ -81,38 +36,80 @@ export async function listGuruClasses(params: ListGuruClassesParams) {
   const meta = raw?.meta ?? {};
   const data = (raw?.data ?? []) as GuruClassDTO[];
 
-  const total = Number(meta.total ?? data.length ?? 0);
-  const pageOut = Number(meta.page ?? page ?? 1);
-  const limitOut = Number(meta.limit ?? limit ?? 10);
-  const sortDir = String(meta.sort_dir ?? sort_dir ?? 'asc').toLowerCase() as 'asc' | 'desc';
-
-  const out: ListGuruClassesResp = {
-    total,
-    page: pageOut,
-    limit: limitOut,
+  const out: ListGuruClassesResponse = {
+    total: Number(meta.total ?? data.length ?? 0),
+    page: Number(meta.page ?? page ?? 1),
+    limit: Number(meta.limit ?? limit ?? 10),
     data,
     has_next: Boolean(meta.has_next ?? false),
     has_prev: Boolean(meta.has_prev ?? false),
     sort_by: String(meta.sort_by ?? sort_by ?? 'jadwal_mulai'),
-    sort_dir: sortDir,
+    sort_dir: String(meta.sort_dir ?? sort_dir ?? 'asc').toLowerCase() as 'asc' | 'desc',
     q: meta.q ?? (q ?? ''),
   };
 
   return out;
 }
 
-/* ========================= HELPERS (opsional) ========================= */
-
 /**
- * Helper kecil kalau kamu mau normalisasi avatar murid seperti resolveIconUrl di instrument.
- * Sesuaikan BASE URL kamu kalau file avatar diserve dari path relatif.
+ * GET /guru/:guruId/classes/sessions?transaksi_id=...
+ * List SEMUA sesi untuk 1 transaksi (dipakai di page DetailClass).
+ * Response.data: 1 baris = 1 sesi (sudah termasuk avg rating per transaksi pada tiap row).
  */
+export async function listTransaksiSessions(params: { guruId: number; transaksiId: number }) {
+  const { guruId, transaksiId } = params;
+  if (!guruId || !transaksiId) throw new Error('guruId & transaksiId wajib diisi');
+
+  const qs = new URLSearchParams({ transaksi_id: String(transaksiId) }).toString();
+  const url = `${ENDPOINTS.GURU.CLASSES_SESSIONS(guruId)}?${qs}`;
+
+  const raw = await baseUrl.request<ListTransaksiSessionsResponse>(url, { method: 'GET' });
+
+  return {
+    data: raw?.data ?? [],
+    meta: raw?.meta ?? {},
+  } as ListTransaksiSessionsResponse;
+}
+
+/** Normalisasi avatar murid */
 export function resolveAvatarUrl(url: string | null): string | null {
   if (!url) return null;
   if (/^https?:\/\//i.test(url)) return url;
   const base =
-    import.meta.env.VITE_API_BASE_URL
-      ?.replace(/\/api\/v\d+\/?$/, '')
-      ?.replace(/\/$/, '') ?? '';
+    import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/v\d+\/?$/, '')?.replace(/\/$/, '') ?? '';
   return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
+}
+
+export async function listTransaksiRatings(params: {
+  guruId: number;
+  transaksiId: number;
+  muridId?: number;
+}) {
+  const { guruId, transaksiId, muridId } = params;
+  if (!guruId || !transaksiId) throw new Error('guruId & transaksiId wajib diisi');
+
+  const qs = new URLSearchParams({ transaksi_id: String(transaksiId) });
+  if (typeof muridId === 'number') qs.set('murid_id', String(muridId));
+
+  const url = `${ENDPOINTS.GURU.CLASSES_RATINGS(guruId)}?${qs.toString()}`;
+  const raw = await baseUrl.request<ListTransaksiRatingsResponse>(url, { method: 'GET' });
+
+  return {
+    meta: raw?.meta ?? {},
+    guru: raw?.guru ?? null,
+    data: raw?.data ?? [],
+  } as ListTransaksiRatingsResponse;
+}
+
+export async function updateRatingIsShow(
+  guruId: number | string,
+  ratingId: number | string,
+  is_show: boolean
+) {
+  const url = ENDPOINTS.GURU.UPDATE_IS_SHOW(guruId).replace(':ratingId', String(ratingId));
+  return baseUrl.request<any>(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_show }),
+  });
 }

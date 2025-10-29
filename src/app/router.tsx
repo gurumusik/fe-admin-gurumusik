@@ -30,6 +30,7 @@ import DetailRequestModulePage from "@/features/dashboard/pages/module/request-m
 import ProfileTutorPage from "@/features/dashboard/pages/tutor-list/class-list-tutor/profile-tutor/page";
 import DetailClassTutorPage from "@/features/dashboard/pages/tutor-list/class-list-tutor/detail-class/page";
 import ManageRatingPage from "@/features/dashboard/pages/manage-rating/page";
+import EntryTutorPage from "@/features/dashboard/pages/entry-tutor/page"
 
 export const router = createBrowserRouter([
   {
@@ -73,6 +74,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/module/request", element: <RequestModulePage /> },
       { path: "/dashboard-admin/module/request/detail/:id", element: <DetailRequestModulePage /> },
       { path: "/dashboard-admin/manage-rating", element: <ManageRatingPage /> },
+      { path: "/dashboard-admin/entry-tutor", element: <EntryTutorPage /> },
     ],
   },
 ]);

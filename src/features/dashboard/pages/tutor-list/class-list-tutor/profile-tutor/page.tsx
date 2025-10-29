@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// src/pages/dashboard-admin/tutor-list/class-list-tutor/profile-tutor/page.tsx
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   RiUser3Fill,
   RiMailLine,
@@ -17,19 +19,33 @@ import {
   RiCloseLine,
   RiArrowRightSLine,
 } from 'react-icons/ri';
+import { useDispatch, useSelector } from 'react-redux';
+import { useLocation } from 'react-router-dom';
+import type { AppDispatch } from '@/app/store';
 
-import TeacherDemo from '@/assets/images/teacher-demo.png';
-import Landscape from '@/assets/images/Landscape.png';
 import ConfirmationModal from '@/components/ui/common/ConfirmationModal';
 import TeacherVacationModal from '@/features/dashboard/components/TeacherVacationModal';
 import ManageCertificateModal from '@/features/dashboard/components/ManageCertificateModal';
-import type { CertificateItem } from '@/features/dashboard/components/ManageCertificateModal';
+import type { CertificateItem, CertStatus } from '@/features/dashboard/components/ManageCertificateModal';
+
+import Landscape from '@/assets/images/Landscape.png';
+import { fetchGuruProfileThunk, selectGuruProfile } from '@/features/slices/guru/slice';
+
+// ⬇️ thunk untuk update status sertifikat
+import { patchSertifikatStatusThunk } from '@/features/slices/sertifikat/slice';
+
+// utils
+import { resolveImageUrl } from '@/utils/resolveImageUrl';
+import { getLanguageIcon } from '@/utils/getLanguageIcon';
+
+// API
+import { updateGuruStatus } from '@/services/api/guru.api';
 
 type NavKey = 'profile' | 'skills' | 'classes';
 type Status = 'aktif' | 'non-aktif';
+type LocationState = { guruId?: number };
 
-const cls = (...xs: Array<string | false | null | undefined>) =>
-  xs.filter(Boolean).join(' ');
+const cls = (...xs: Array<string | false | null | undefined>) => xs.filter(Boolean).join(' ');
 
 const Chip: React.FC<{ icon?: React.ReactNode; label: string }> = ({ icon, label }) => (
   <span className="inline-flex items-center gap-2 px-3 py-2 text-sm text-black/80">
@@ -38,39 +54,185 @@ const Chip: React.FC<{ icon?: React.ReactNode; label: string }> = ({ icon, label
   </span>
 );
 
+/** VM instrumen (lengkap untuk filter & icon) */
+type TutorVMInstrument = {
+  instrumentId: number | null;
+  name: string;
+  icon: string | null;
+  gradeId: number | null;
+  gradeName: string | null;
+};
+
+/* ===================== YouTube helpers ===================== */
+function extractYouTubeId(input?: string | null): string | null {
+  if (!input) return null;
+  const str = String(input).trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(str)) return str;
+
+  const u = new URL(str);
+  const host = u.hostname.replace(/^www\./, '');
+  if (host === 'youtu.be') {
+    const id = u.pathname.split('/').filter(Boolean)[0];
+    if (id && /^[A-Za-z0-9_-]{11}$/.test(id)) return id;
+  }
+  if (host.endsWith('youtube.com')) {
+    if (u.pathname === '/watch') {
+      const v = u.searchParams.get('v');
+      if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+    }
+    const parts = u.pathname.split('/').filter(Boolean);
+    const takeNext = (marker: string) => {
+      const idx = parts.indexOf(marker);
+      const id = idx >= 0 ? parts[idx + 1] : '';
+      return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+    };
+    return takeNext('embed') || takeNext('shorts');
+  }
+
+  const m = str.match(/[A-Za-z0-9_-]{11}/);
+  return m ? m[0] : null;
+}
+function getYouTubeThumb(id: string | null): string | null {
+  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
+}
+
+/* ===================== Map status backend -> modal ===================== */
+const mapCertStatus = (raw?: string | null): CertStatus => {
+  const v = String(raw || '').toLowerCase();
+  if (v === 'approved' || v === 'disetujui') return 'Disetujui';
+  if (v === 'rejected' || v === 'tidak_disetujui' || v === 'ditolak') return 'Tidak Disetujui';
+  return 'Menunggu Verifikasi';
+};
+
 export default function ProfileTutorPage() {
-  // ---------- dummy data ----------
-  const tutor = {
-    name: 'Dicka Taksa Rabbani / NcenN',
-    email: 'dickataksa@gmail.com',
-    phone: '+62-813-8887-6690',
-    location: 'Kota Bekasi, Jawa Barat',
-    avatar: TeacherDemo as string,
-    instruments: ['Piano', 'Guitar', 'Vocal'],
-    languages: ['Bahasa', 'Jepang', 'Inggris'],
-    status: 'aktif' as Status,
-  };
+  const dispatch = useDispatch<AppDispatch>();
+  const { state } = useLocation() as { state?: LocationState };
 
+  // Ambil guruId dari state atau query (?guru_id / ?id)
+  const search =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search)
+      : new URLSearchParams('');
+  const guruIdFromQuery = Number(search.get('guru_id')) || Number(search.get('id')) || undefined;
+  const guruId = state?.guruId ?? guruIdFromQuery;
+
+  // Redux profile
+  const profile = useSelector(selectGuruProfile);
+  const p = profile.data;
+
+  // Fetch profile awal (admin boleh override dengan ?id)
+  useEffect(() => {
+    if (guruId) dispatch(fetchGuruProfileThunk({ id: guruId } as any));
+    else dispatch(fetchGuruProfileThunk() as any);
+  }, [dispatch, guruId]);
+
+  // Lookup nama & icon instrument + nama grade
+  const lookups = useMemo(() => {
+    const instNameById = new Map<number, string>();
+    const instIconById = new Map<number, string | null>();
+    const gradeNameById = new Map<number, string>();
+    (p?.instruments ?? []).forEach((it) => {
+      const iid = it.instrument?.id ?? it.instrument_id;
+      const gid = it.grade?.id ?? it.grade_id;
+      if (typeof iid === 'number') {
+        if (it.instrument?.nama) instNameById.set(iid, it.instrument.nama);
+        const iconUrl = resolveImageUrl(it.instrument?.icon ?? null);
+        instIconById.set(iid, iconUrl);
+      }
+      if (typeof gid === 'number' && it.grade?.nama) gradeNameById.set(gid, it.grade.nama);
+    });
+    return { instNameById, instIconById, gradeNameById };
+  }, [p?.instruments]);
+
+  // Susun daftar sertifikat (payload -> CertificateItem[])
+  const allCertificates: CertificateItem[] = useMemo(() => {
+    const rows = p?.sertifikat ?? [];
+    return rows.map((s: any): CertificateItem => {
+      const fileUrl = s.certif_path ? resolveImageUrl(s.certif_path) : undefined;
+      const instrumentName =
+        (typeof s.instrument_id === 'number' && lookups.instNameById.get(s.instrument_id)) || '—';
+      const instrumentIcon =
+        (typeof s.instrument_id === 'number' && lookups.instIconById.get(s.instrument_id)) || undefined;
+      const gradeName =
+        (typeof s.grade_id === 'number' && lookups.gradeNameById.get(s.grade_id)) || '—';
+      return {
+        id: s.id,
+        title: s.keterangan || 'Sertifikat',
+        school: s.penyelenggara || '—',
+        instrument: instrumentName,
+        instrumentIcon: instrumentIcon || undefined,
+        grade: gradeName,
+        status: mapCertStatus(s.status),
+        link: fileUrl || '',
+        rejectReason: s.alasan_penolakan ?? null,
+      };
+    });
+  }, [p?.sertifikat, lookups]);
+
+  // View model
+  const tutor = useMemo(() => {
+    const u = p?.user;
+    const d = p?.detail;
+
+    const name = u?.nama ?? '—';
+    const email = u?.email ?? '—';
+    const phone = u?.no_telp ?? '—';
+    const city = u?.city ?? '';
+    const province = u?.province ?? '';
+    const location = [city, province].filter(Boolean).join(', ') || '—';
+    const avatar = u?.profile_pic_url || '/avatar-placeholder.png';
+
+    const instruments: TutorVMInstrument[] =
+      (p?.instruments ?? [])
+        .map((x: any) => ({
+          instrumentId: x.instrument?.id ?? x.instrument_id ?? null,
+          name: x.instrument?.nama ?? '',
+          icon: resolveImageUrl(x.instrument?.icon ?? null),
+          gradeId: x.grade?.id ?? x.grade_id ?? null,
+          gradeName: x.grade?.nama ?? null,
+        }))
+        .filter((it) => it.name) as TutorVMInstrument[];
+
+    const languages = Array.isArray(d?.bahasa) ? d!.bahasa : [];
+
+    const raw = (u?.status_akun || '').toLowerCase();
+    const status: Status = raw === 'non_aktif' ? 'non-aktif' : 'aktif';
+
+    const introLink = (d?.intro_link || '').trim();
+    const videoId = extractYouTubeId(introLink);
+    const previewThumb = getYouTubeThumb(videoId);
+    const previewHref = videoId ? `https://www.youtube.com/watch?v=${videoId}` : introLink || null;
+
+    return { name, email, phone, location, avatar, instruments, languages, status, previewThumb, previewHref };
+  }, [p]);
+
+  // ====== UI & flows ======
+  const [status, setStatus] = useState<Status>('aktif');
+  const [isUpdating, setIsUpdating] = useState(false);
+  useEffect(() => {
+    if (tutor.status) setStatus(tutor.status);
+  }, [tutor.status]);
+
+  // ==== visibility tombol berdasarkan status_akun backend ====
+  const statusAkunRaw = String(p?.user?.status_akun || '').toLowerCase();
+  const showBeriCuti = statusAkunRaw === 'aktif';   // hanya tampil saat aktif
+  const showToggleAktif = statusAkunRaw !== 'cuti'; // hilang saat cuti
+
+  // State modal sertifikat
   const [openManageCert, setOpenManageCert] = useState(false);
+  const [selectedInstrument, setSelectedInstrument] = useState<TutorVMInstrument | null>(null);
 
-  // ====== HASIL APPROVAL SERTIFIKAT (success/error) ======
-  const [certApproveResult, setCertApproveResult] = useState<null | 'ok' | 'fail'>(null);
-  const simulateCertApproveError = false;
+  // Sertifikat terfilter berdasarkan chip
+  const filteredCertificates: CertificateItem[] = useMemo(() => {
+    if (!selectedInstrument?.instrumentId) return allCertificates;
+    return allCertificates.filter((c) => c.instrument.toLowerCase() === selectedInstrument.name.toLowerCase());
+  }, [selectedInstrument, allCertificates]);
 
-  // ====== HASIL REJECT SERTIFIKAT (success/error) ======
-  const [certRejectResult, setCertRejectResult] = useState<null | 'ok' | 'fail'>(null);
-  const simulateCertRejectError = false;
-
-  // status tombol aktif/non-aktif
-  const [status, setStatus] = useState<Status>(tutor.status);
-
-  // refs section (HTMLElement non-null)
   const profileRef = useRef<HTMLElement>(null!);
   const skillsRef = useRef<HTMLElement>(null!);
   const classesRef = useRef<HTMLElement>(null!);
   const [active, setActive] = useState<NavKey>('profile');
 
-  // ====== Flow modal aktif/non-aktif ======
   type Flow =
     | null
     | 'ask-deactivate'
@@ -81,75 +243,100 @@ export default function ProfileTutorPage() {
     | 'fail-activate';
   const [flow, setFlow] = useState<Flow>(null);
 
-  // ====== Flow modal cuti ======
   const [openVacation, setOpenVacation] = useState(false);
   const [vacationResult, setVacationResult] = useState<null | 'ok' | 'fail'>(null);
-
-  // simulasi API (ubah ke true untuk lihat error)
-  const simulateErrorDeactivate = false;
-  const simulateErrorActivate = false;
-  const simulateVacationError = false;
 
   const openDeactivateAsk = () => setFlow('ask-deactivate');
   const openActivateAsk = () => setFlow('ask-activate');
 
-  const confirmDeactivate = () => {
-    setFlow(null);
-    setTimeout(() => {
-      if (simulateErrorDeactivate) setFlow('fail-deactivate');
-      else {
-        setStatus('non-aktif');
-        setFlow('ok-deactivate');
-      }
-    }, 0);
+  const doRefreshProfile = () => {
+    if (guruId) dispatch(fetchGuruProfileThunk({ id: guruId } as any));
+    else dispatch(fetchGuruProfileThunk() as any);
   };
 
-  const confirmActivate = () => {
-    setFlow(null);
-    setTimeout(() => {
-      if (simulateErrorActivate) setFlow('fail-activate');
-      else {
-        setStatus('aktif');
-        setFlow('ok-activate');
-      }
-    }, 0);
+  const confirmDeactivate = async () => {
+    try {
+      setFlow(null);
+      setIsUpdating(true);
+      await updateGuruStatus({ status_akun: 'non_aktif', id: guruId } as any);
+      setStatus('non-aktif');
+      doRefreshProfile();
+      setFlow('ok-deactivate');
+    } catch {
+      setFlow('fail-deactivate');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
-  // konfirmasi dari TeacherVacationModal
-  const handleVacationConfirm = ({
-    startDate,
-    endDate,
-  }: {
-    startDate: string;
-    endDate: string;
-  }) => {
-    console.log('Set vacation:', { startDate, endDate });
-    setOpenVacation(false);
-    setTimeout(() => {
-      setVacationResult(simulateVacationError ? 'fail' : 'ok');
-    }, 0);
+  const confirmActivate = async () => {
+    try {
+      setFlow(null);
+      setIsUpdating(true);
+      await updateGuruStatus({ status_akun: 'aktif', id: guruId } as any);
+      setStatus('aktif');
+      doRefreshProfile();
+      setFlow('ok-activate');
+    } catch {
+      setFlow('fail-activate');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
-  // ====== APPROVE CERTIFICATE from ManageCertificateModal (PHASE 3 "Setujui") ======
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleApproveCertificate = (item: any) => {
-    console.log('Approve certificate:', item);
-    setOpenManageCert(false);
-    setTimeout(() => {
-      setCertApproveResult(simulateCertApproveError ? 'fail' : 'ok');
-    }, 0);
+  const handleVacationConfirm = async ({ startDate, endDate }: { startDate: string; endDate: string }) => {
+    try {
+      setOpenVacation(false);
+      setIsUpdating(true);
+      await updateGuruStatus({ status_akun: 'cuti', cuti_start_date: startDate, cuti_end_date: endDate, id: guruId } as any);
+      doRefreshProfile();
+      setVacationResult('ok');
+    } catch {
+      setVacationResult('fail');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
-  // ====== REJECT SUBMIT (PHASE 4 "Kirim Laporan") ======
+  // ====== hasil approve/reject sertifikat
+  const [certApproveResult, setCertApproveResult] = useState<null | 'ok' | 'fail'>(null);
+  const [certRejectResult, setCertRejectResult] = useState<null | 'ok' | 'fail'>(null);
+
+  const handleApproveCertificate = async (item: CertificateItem) => {
+    try {
+      await dispatch(
+        patchSertifikatStatusThunk({ id: item.id, status: 'approved' })
+      ).unwrap();
+
+      setOpenManageCert(false);
+      setCertApproveResult('ok');
+      doRefreshProfile();
+    } catch (e) {
+      console.error(e);
+      setCertApproveResult('fail');
+    }
+  };
+
   const handleRejectSubmit = async (
     item: CertificateItem,
-    payload: { reason: string; files: File[]; imagesBase64: string[] }
+    payload: { reason: string }
   ) => {
-    console.log('Reject submit:', item, payload);
-    setOpenManageCert(false);
-    setTimeout(() => {
-      setCertRejectResult(simulateCertRejectError ? 'fail' : 'ok');
-    }, 0);
+    try {
+      await dispatch(
+        patchSertifikatStatusThunk({
+          id: item.id,
+          status: 'rejected',
+          alasan_penolakan: payload.reason,
+        })
+      ).unwrap();
+
+      setOpenManageCert(false);
+      setCertRejectResult('ok');
+      doRefreshProfile();
+    } catch (e) {
+      console.error(e);
+      setCertRejectResult('fail');
+    }
   };
 
   // scrollspy
@@ -159,7 +346,6 @@ export default function ProfileTutorPage() {
       ['skills', skillsRef],
       ['classes', classesRef],
     ];
-
     const onScroll = () => {
       const offsets = sections.map(([k, r]) => {
         const el = r.current;
@@ -171,7 +357,6 @@ export default function ProfileTutorPage() {
       offsets.sort((a, b) => a.top - b.top);
       setActive(offsets[0].k);
     };
-
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -186,26 +371,18 @@ export default function ProfileTutorPage() {
     map[key].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const NavBtn: React.FC<{ k: NavKey; icon: React.ReactNode; label: string }> = ({
-    k,
-    icon,
-    label,
-  }) => {
+  const NavBtn: React.FC<{ k: NavKey; icon: React.ReactNode; label: string }> = ({ k, icon, label }) => {
     const isActive = active === k;
     return (
       <button
         onClick={() => goTo(k)}
         className={cls(
           'w-full flex items-center justify-between rounded-xl p-3 text-md transition',
-          isActive
-            ? 'bg-[var(--secondary-light-color)] border-none text-neutral-900'
-            : 'bg-white border-black/10 text-neutral-600 hover:bg-neutral-50'
+          isActive ? 'bg-[var(--secondary-light-color)] border-none text-neutral-900' : 'bg-white border-black/10 text-neutral-600 hover:bg-neutral-50'
         )}
       >
         <span className="inline-flex items-center gap-3">
-          <span className={cls(isActive ? 'text-[var(--secondary-color)]' : 'text-neutral-500')}>
-            {icon}
-          </span>
+          <span className={cls(isActive ? 'text-[var(--secondary-color)]' : 'text-neutral-500')}>{icon}</span>
           {label}
         </span>
       </button>
@@ -219,33 +396,52 @@ export default function ProfileTutorPage() {
         <div className="lg:col-span-7 space-y-6">
           {/* Top actions */}
           <section className="flex justify-between">
-            <button className="flex gap-3 bg-white border border-[var(--secondary-color)] text-[var(--secondary-color)] text-sm rounded-full py-1.5 px-4 items-center">
+            <button
+              onClick={() => typeof window !== 'undefined' && window.history.back()}
+              className="flex gap-3 bg-white border border-[var(--secondary-color)] text-[var(--secondary-color)] text-sm rounded-full py-1.5 px-4 items-center"
+            >
               <RiArrowLeftLine size={20} />
               <span>Kembali</span>
             </button>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setOpenVacation(true)}
-                className="bg-white border border-[var(--secondary-color)] text-[var(--secondary-color)] text-sm rounded-full py-1.5 px-4"
-              >
-                Beri Cuti
-              </button>
 
-              {/* Tombol aktif/non-aktif dinamis */}
-              {status === 'aktif' ? (
+            <div className="flex gap-3">
+              {showBeriCuti && (
                 <button
-                  onClick={openDeactivateAsk}
-                  className="bg-white border border-[var(--secondary-color)] text-[var(--secondary-color)] text-sm rounded-full py-1.5 px-4"
+                  onClick={() => setOpenVacation(true)}
+                  disabled={isUpdating}
+                  className={cls(
+                    'bg-white border border-[var(--secondary-color)] text-[var(--secondary-color)] text-sm rounded-full py-1.5 px-4',
+                    isUpdating && 'opacity-50 cursor-not-allowed'
+                  )}
                 >
-                  Non-Aktifkan
+                  Beri Cuti
                 </button>
-              ) : (
-                <button
-                  onClick={openActivateAsk}
-                  className="bg-white border border-[var(--secondary-color)] text-[var(--secondary-color)] text-sm rounded-full py-1.5 px-4"
-                >
-                  Aktifkan
-                </button>
+              )}
+
+              {showToggleAktif && (
+                status === 'aktif' ? (
+                  <button
+                    onClick={openDeactivateAsk}
+                    disabled={isUpdating}
+                    className={cls(
+                      'bg-white border border-[var(--secondary-color)] text-[var(--secondary-color)] text-sm rounded-full py-1.5 px-4',
+                      isUpdating && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    Non-Aktifkan
+                  </button>
+                ) : (
+                  <button
+                    onClick={openActivateAsk}
+                    disabled={isUpdating}
+                    className={cls(
+                      'bg-white border border-[var(--secondary-color)] text-[var(--secondary-color)] text-sm rounded-full py-1.5 px-4',
+                      isUpdating && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    Aktifkan
+                  </button>
+                )
               )}
             </div>
           </section>
@@ -259,35 +455,42 @@ export default function ProfileTutorPage() {
               <h2 className="text-lg font-semibold text-neutral-900">Profile Guru</h2>
             </div>
 
-            <div className="flex items-start gap-5">
-              <img
-                src={tutor.avatar}
-                alt={tutor.name}
-                className="h-20 w-20 rounded-full object-cover ring-2 ring-black/5"
-              />
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-neutral-900">{tutor.name}</h3>
-
-                <div className="mt-2 flex flex-wrap items-start gap-x-5 gap-y-2 text-md text-neutral-900">
-                  <div className="flex flex-col gap-2">
-                    <div className="inline-flex items-center gap-2">
-                      <RiMailLine />
-                      {tutor.email}
-                    </div>
-                    <div className="inline-flex items-center gap-2">
-                      <RiUserLocationLine className="text-[var(--secondary-color)]" />
-                      <div className="text-[var(--secondary-color)] hover:underline cursor-pointer">
-                        {tutor.location}
-                      </div>
-                    </div>
-                  </div>
-                  <span className="inline-flex items-center gap-2">
-                    <RiPhoneLine />
-                    {tutor.phone}
-                  </span>
+            {profile.status === 'loading' ? (
+              <div className="flex items-start gap-5">
+                <div className="h-20 w-20 rounded-full bg-black/10 animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-5 w-56 bg-black/10 rounded animate-pulse" />
+                  <div className="h-4 w-72 bg-black/10 rounded animate-pulse" />
+                  <div className="h-4 w-40 bg-black/10 rounded animate-pulse" />
                 </div>
               </div>
-            </div>
+            ) : profile.status === 'failed' ? (
+              <div className="text-red-600 text-sm">{profile.error}</div>
+            ) : (
+              <div className="flex items-start gap-5">
+                <img src={tutor.avatar} alt={tutor.name} className="h-20 w-20 rounded-full object-cover ring-2 ring-black/5" />
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-neutral-900">{tutor.name}</h3>
+
+                  <div className="mt-2 flex flex-wrap items-start gap-x-5 gap-y-2 text-md text-neutral-900">
+                    <div className="flex flex-col gap-2">
+                      <div className="inline-flex items-center gap-2">
+                        <RiMailLine />
+                        {tutor.email}
+                      </div>
+                      <div className="inline-flex items-center gap-2">
+                        <RiUserLocationLine className="text-[var(--secondary-color)]" />
+                        <div className="text-[var(--secondary-color)] hover:underline cursor-pointer">{tutor.location}</div>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-2">
+                      <RiPhoneLine />
+                      {tutor.phone}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Keahlian Guru */}
@@ -299,46 +502,85 @@ export default function ProfileTutorPage() {
               <h2 className="text-lg font-semibold text-neutral-900">Keahlian Guru</h2>
             </div>
 
-            <div className="space-y-5">
-              <div>
-                <div className="mb-2 text-md font-medium text-neutral-900">Instrumen Musik</div>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setOpenManageCert(true)}
-                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setOpenManageCert(true)}
-                  className="flex flex-wrap gap-2 items-center rounded-xl border border-neutral-300 hover:bg-neutral-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
-                >
-                  {tutor.instruments.map((ins) => (
-                    <Chip
-                      key={ins}
-                      label={ins}
-                      icon={
-                        ins.toLowerCase().includes('piano')
-                          ? '🎹'
-                          : ins.toLowerCase().includes('guitar')
-                          ? '🎸'
-                          : '🎤'
-                      }
-                    />
-                  ))}
-                  <RiArrowRightSLine size={25} className="ml-auto text-neutral-600" />
-                </div>
+            {profile.status !== 'succeeded' ? (
+              <div className="space-y-3">
+                <div className="h-6 w-40 bg-black/10 rounded animate-pulse" />
+                <div className="h-10 w-full bg-black/5 rounded-xl animate-pulse" />
+                <div className="h-6 w-24 bg-black/10 rounded animate-pulse" />
+                <div className="h-10 w-full bg-black/5 rounded-xl animate-pulse" />
               </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Instrumen Musik (klik -> modal, auto filter) */}
+                <div>
+                  <div className="mb-2 text-md font-medium text-neutral-900">Instrumen Musik</div>
+                  <div className="flex flex-wrap gap-2 items-center rounded-xl border border-neutral-300 p-1.5">
+                    {tutor.instruments.length ? (
+                      tutor.instruments.map((ins) => (
+                        <button
+                          key={`${ins.name}-${ins.instrumentId ?? 'noid'}`}
+                          type="button"
+                          onClick={() => {
+                            setSelectedInstrument(ins);
+                            setOpenManageCert(true);
+                          }}
+                          className="inline-flex items-center gap-2 px-3 py-2 text-sm text-black/80 rounded-lg hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
+                          title={ins.gradeName ? `${ins.name} • ${ins.gradeName}` : ins.name}
+                        >
+                          {ins.icon ? (
+                            <img src={ins.icon} alt={ins.name} className="h-5 w-5 object-contain" loading="lazy" />
+                          ) : null}
+                          <span>
+                            {ins.name}
+                            {ins.gradeName ? ` • ${ins.gradeName}` : ''}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <span className="px-3 py-2 text-sm text-black/50">—</span>
+                    )}
 
-              <div>
-                <div className="mb-2 text-md font-medium text-neutral-900">Bahasa</div>
-                <div className="flex flex-wrap gap-2 rounded-xl border border-neutral-300">
-                  {tutor.languages.map((lang) => (
-                    <Chip
-                      key={lang}
-                      label={lang}
-                      icon={lang === 'Bahasa' ? '🇲🇨' : lang === 'Jepang' ? '🇯🇵' : '🇬🇧'}
-                    />
-                  ))}
+                    {Boolean(allCertificates.length) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedInstrument(null);
+                          setOpenManageCert(true);
+                        }}
+                        className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-sm text-[var(--secondary-color)] rounded-lg hover:bg-neutral-50"
+                      >
+                        Lihat Semua <RiArrowRightSLine size={18} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bahasa */}
+                <div>
+                  <div className="mb-2 text-md font-medium text-neutral-900">Bahasa</div>
+                  <div className="flex flex-wrap gap-2 rounded-xl border border-neutral-300">
+                    {tutor.languages.length ? (
+                      tutor.languages.map((lang) => {
+                        const iconUrl = getLanguageIcon(lang || '');
+                        return (
+                          <Chip
+                            key={lang}
+                            label={lang}
+                            icon={
+                              iconUrl ? (
+                                <img src={iconUrl} alt={lang} className="h-5 w-5 object-contain" loading="lazy" />
+                              ) : null
+                            }
+                          />
+                        );
+                      })
+                    ) : (
+                      <span className="px-3 py-2 text-sm text-black/50">—</span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </section>
 
           {/* Detail Kelas */}
@@ -353,51 +595,66 @@ export default function ProfileTutorPage() {
             {/* Preview Kelas */}
             <div className="text-lg text-neutral-900 mb-2">Preview Kelas</div>
             <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-neutral-200 mb-5">
-              <img src={Landscape as string} alt="Preview kelas" className="h-full w-full object-cover" />
-              <div className="absolute inset-0 grid place-items-center">
-                <span className="inline-grid place-items-center w-14 h-14 rounded-full bg-black/40 backdrop-blur text-white">
-                  <RiPlayMiniFill size={36} />
-                </span>
-              </div>
+              {tutor.previewThumb ? (
+                <a
+                  href={tutor.previewHref ?? '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block w-full h-full"
+                  aria-label="Buka video intro di YouTube"
+                >
+                  <img src={tutor.previewThumb} alt="Thumbnail video intro" className="h-full w-full object-cover" loading="lazy" />
+                  <div className="absolute inset-0 grid place-items-center">
+                    <span className="inline-grid place-items-center w-14 h-14 rounded-full bg-black/40 backdrop-blur text-white">
+                      <RiPlayMiniFill size={36} />
+                    </span>
+                  </div>
+                </a>
+              ) : (
+                <>
+                  <img src={Landscape as string} alt="Preview kelas" className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 grid place-items-center">
+                    <span className="inline-grid place-items-center w-14 h-14 rounded-full bg-black/40 backdrop-blur text-white">
+                      <RiPlayMiniFill size={36} />
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Headline */}
             <div className="mb-3 border-y border-neutral-400 py-3">
               <div className="text-md font-semibold text-neutral-600 mb-1">Headline</div>
-              <p className="text-md font-semibold text-neutral-900">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum mollis nunc a molestie dictum.
-              </p>
+              <p className="text-md font-semibold text-neutral-900">{p?.detail?.title || '—'}</p>
             </div>
 
             {/* Tentang Guru */}
             <div className="mb-4 border-b border-neutral-400 pb-3">
               <div className="text-md font-semibold text-neutral-600 mb-1">Tentang Guru</div>
-              <p className="text-md leading-relaxed text-neutral-900">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum mollis nunc a molestie dictum.
-                Mauris venenatis, felis scelerisque aliquet lacinia, nulla nisl venenatis odio, id blandit mauris ipsum id sapien.
-                Vestibulum malesuada orci sit amet pretium facilisis. In lobortis congue augue, a commodo libero tincidunt
-                scelerisque. Donec tempor congue lacinia. Phasellus lacinia felis quis placerat commodo odio blandit
-                laoreet. Class aptent taciti sociosqu ad litora torquent per conubia nostra.
-              </p>
+              <p className="text-md leading-relaxed text-neutral-900">{p?.user?.bio || '—'}</p>
             </div>
 
             {/* Cocok untuk */}
             <div>
               <div className="text-md font-semibold text-neutral-700 mb-2">Cocok untuk</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                {[
-                  'Kamu yang mau jago musik',
-                  'Kamu yang ingin naik level',
-                  'Kamu yang mau jago gitar',
-                  'Kamu yang ingin meningkatkan skill',
-                  'Anak-anak yang mau belajar musik',
-                  'Kamu yang suka kopi',
-                ].map((txt, i) => (
-                  <div key={i} className="inline-flex items-start gap-2 text-md text-neutral-900 font-semibold">
-                    <RiCheckboxCircleFill size={25} className="mt-0.5 text-[var(--accent-green-color)]" />
-                    <span>{txt}</span>
-                  </div>
-                ))}
+                {(
+                  (p?.detail?.designed_for && p.detail.designed_for.length > 0
+                    ? p.detail.designed_for
+                    : p?.detail?.appropriate_list ?? [])
+                )
+                  .slice(0, 6)
+                  .map((txt, i) => (
+                    <div key={i} className="inline-flex items-start gap-2 text-md text-neutral-900 font-semibold">
+                      <RiCheckboxCircleFill size={25} className="mt-0.5 text-[var(--accent-green-color)]" />
+                      <span>{txt}</span>
+                    </div>
+                  ))}
+
+                {(!p?.detail?.designed_for || p.detail.designed_for.length === 0) &&
+                  (!p?.detail?.appropriate_list || p.detail.appropriate_list.length === 0) && (
+                    <div className="text-neutral-500">—</div>
+                  )}
               </div>
             </div>
           </section>
@@ -416,130 +673,92 @@ export default function ProfileTutorPage() {
         </aside>
       </div>
 
-      {/* ===== TeacherVacationModal ===== */}
-      <TeacherVacationModal
-        isOpen={openVacation}
-        onClose={() => setOpenVacation(false)}
-        onConfirm={handleVacationConfirm}
-      />
+      {/* ====== Modals & flows ====== */}
+      <TeacherVacationModal isOpen={openVacation} onClose={() => setOpenVacation(false)} onConfirm={handleVacationConfirm} />
 
-      {/* ===== Flow: aktif / non-aktif ===== */}
-      {flow === 'ask-deactivate' && (
-        <ConfirmationModal
-          isOpen
-          onClose={() => setFlow(null)}
-          align="center"
-          widthClass="max-w-lg"
-          icon={<RiQuestionFill />}
-          iconTone="warning"
-          title="Yakin…Mau Nonaktifkan Guru?"
-          texts={[
-            'Kalau dinonaktifkan, guru ini tidak akan muncul di landing page dan tidak bisa dipesan oleh murid.',
-          ]}
-          button2={{ label: 'Ga Jadi Deh', variant: 'outline', onClick: () => setFlow(null) }}
-          button1={{ label: 'Ya, Saya Yakin', variant: 'primary', onClick: confirmDeactivate }}
-        />
+      {/* Flows konfirmasi aktif/nonaktif */}
+      {['ask-deactivate','ok-deactivate','fail-deactivate','ask-activate','ok-activate','fail-activate'].includes(String(flow)) && (
+        <>
+          {flow === 'ask-deactivate' && (
+            <ConfirmationModal
+              isOpen
+              onClose={() => setFlow(null)}
+              align="center"
+              widthClass="max-w-lg"
+              icon={<RiQuestionFill />}
+              iconTone="warning"
+              title="Yakin…Mau Nonaktifkan Guru?"
+              texts={['Kalau dinonaktifkan, guru ini tidak akan muncul di landing page dan tidak bisa dipesan oleh murid.']}
+              button2={{ label: 'Ga Jadi Deh', variant: 'outline', onClick: () => setFlow(null) }}
+              button1={{ label: isUpdating ? 'Memproses…' : 'Ya, Saya Yakin', variant: 'primary', onClick: confirmDeactivate }}
+            />
+          )}
+          {flow === 'ok-deactivate' && (
+            <ConfirmationModal
+              isOpen onClose={() => setFlow(null)} align="center" widthClass="max-w-lg"
+              icon={<RiCheckboxCircleFill />} iconTone="success"
+              title="Guru Berhasil Dinonaktifkan"
+              texts={['Guru ini sudah tidak akan muncul di landing page dan tidak bisa dipesan oleh murid.']}
+              button1={{ label: 'Tutup', variant: 'primary', onClick: () => setFlow(null) }}
+            />
+          )}
+          {flow === 'fail-deactivate' && (
+            <ConfirmationModal
+              isOpen onClose={() => setFlow(null)} align="center" widthClass="max-w-md"
+              icon={<RiCloseLine />} iconTone="danger"
+              title="Guru Gagal Dinonaktifkan"
+              texts={['Terjadi kendala saat menonaktifkan guru ini. Silakan coba lagi beberapa saat lagi.']}
+              button1={{ label: 'Tutup', variant: 'primary', onClick: () => setFlow(null) }}
+            />
+          )}
+
+          {flow === 'ask-activate' && (
+            <ConfirmationModal
+              isOpen onClose={() => setFlow(null)} align="center" widthClass="max-w-lg"
+              icon={<RiQuestionFill />} iconTone="warning"
+              title="Yakin…Mau Aktifkan Guru?"
+              texts={['Kalau diaktifkan, guru ini akan muncul di landing page dan dapat dipesan oleh murid.']}
+              button2={{ label: 'Ga Jadi Deh', variant: 'outline', onClick: () => setFlow(null) }}
+              button1={{ label: isUpdating ? 'Memproses…' : 'Ya, Saya Yakin', variant: 'primary', onClick: confirmActivate }}
+            />
+          )}
+          {flow === 'ok-activate' && (
+            <ConfirmationModal
+              isOpen onClose={() => setFlow(null)} align="center" widthClass="max-w-md"
+              icon={<RiCheckboxCircleFill />} iconTone="success"
+              title="Guru Berhasil Diaktifkan"
+              texts={['Guru ini akan muncul di landing page dan dapat dipesan oleh murid.']}
+              button1={{ label: 'Tutup', variant: 'primary', onClick: () => setFlow(null) }}
+            />
+          )}
+          {flow === 'fail-activate' && (
+            <ConfirmationModal
+              isOpen onClose={() => setFlow(null)} align="center" widthClass="max-w-md"
+              icon={<RiCloseLine />} iconTone="danger"
+              title="Guru Gagal Diaktifkan"
+              texts={['Terjadi kendala saat mengaktifkan guru ini. Silakan coba lagi.']}
+              button1={{ label: 'Tutup', variant: 'primary', onClick: () => setFlow(null) }}
+            />
+          )}
+        </>
       )}
 
-      {flow === 'ok-deactivate' && (
-        <ConfirmationModal
-          isOpen
-          onClose={() => setFlow(null)}
-          align="center"
-          widthClass="max-w-lg"
-          icon={<RiCheckboxCircleFill />}
-          iconTone="success"
-          title="Guru Berhasil Dinonaktifkan"
-          texts={[
-            'Guru ini sudah tidak akan muncul di landing page dan tidak bisa dipesan oleh murid.',
-          ]}
-          button1={{ label: 'Tutup', variant: 'primary', onClick: () => setFlow(null) }}
-        />
-      )}
-
-      {flow === 'fail-deactivate' && (
-        <ConfirmationModal
-          isOpen
-          onClose={() => setFlow(null)}
-          align="center"
-          widthClass="max-w-md"
-          icon={<RiCloseLine />}
-          iconTone="danger"
-          title="Guru Gagal Dinonaktifkan"
-          texts={[
-            'Terjadi kendala saat menonaktifkan guru ini. Silakan coba lagi beberapa saat lagi.',
-          ]}
-          button1={{ label: 'Tutup', variant: 'primary', onClick: () => setFlow(null) }}
-        />
-      )}
-
-      {flow === 'ask-activate' && (
-        <ConfirmationModal
-          isOpen
-          onClose={() => setFlow(null)}
-          align="center"
-          widthClass="max-w-lg"
-          icon={<RiQuestionFill />}
-          iconTone="warning"
-          title="Yakin…Mau Aktifkan Guru?"
-          texts={[
-            'Kalau diaktifkan, guru ini akan muncul di landing page dan dapat dipesan oleh murid.',
-          ]}
-          button2={{ label: 'Ga Jadi Deh', variant: 'outline', onClick: () => setFlow(null) }}
-          button1={{ label: 'Ya, Saya Yakin', variant: 'primary', onClick: confirmActivate }}
-        />
-      )}
-
-      {flow === 'ok-activate' && (
-        <ConfirmationModal
-          isOpen
-          onClose={() => setFlow(null)}
-          align="center"
-          widthClass="max-w-md"
-          icon={<RiCheckboxCircleFill />}
-          iconTone="success"
-          title="Guru Berhasil Diaktifkan"
-          texts={['Guru ini akan muncul di landing page dan dapat dipesan oleh murid.']}
-          button1={{ label: 'Tutup', variant: 'primary', onClick: () => setFlow(null) }}
-        />
-      )}
-
-      {flow === 'fail-activate' && (
-        <ConfirmationModal
-          isOpen
-          onClose={() => setFlow(null)}
-          align="center"
-          widthClass="max-w-md"
-          icon={<RiCloseLine />}
-          iconTone="danger"
-          title="Guru Gagal Diaktifkan"
-          texts={['Terjadi kendala saat mengaktifkan guru ini. Silakan coba lagi.']}
-          button1={{ label: 'Tutup', variant: 'primary', onClick: () => setFlow(null) }}
-        />
-      )}
-
-      {/* ===== Hasil: cuti (success / error) ===== */}
       {vacationResult && (
         <ConfirmationModal
-          isOpen
-          onClose={() => setVacationResult(null)}
-          align="center"
-          widthClass="max-w-md"
+          isOpen onClose={() => setVacationResult(null)} align="center" widthClass="max-w-md"
           icon={vacationResult === 'ok' ? <RiCheckboxCircleFill /> : <RiCloseLine />}
           iconTone={vacationResult === 'ok' ? 'success' : 'danger'}
           title={vacationResult === 'ok' ? 'Guru Berhasil Dicutikan' : 'Guru Gagal Dicutikan'}
           texts={
             vacationResult === 'ok'
-              ? [
-                  'Guru ini tidak akan muncul di landing page dan tidak bisa dipesan murid selama periode cuti. Setelah periode berakhir, status guru akan otomatis aktif kembali.',
-                ]
+              ? ['Guru ini tidak akan muncul di landing page dan tidak bisa dipesan murid selama periode cuti. Setelah periode berakhir, status guru akan otomatis aktif kembali.']
               : ['Terjadi kendala saat mencutikan guru ini. Silakan coba lagi beberapa saat lagi.']
           }
           button1={{ label: 'Tutup', variant: 'primary', onClick: () => setVacationResult(null) }}
         />
       )}
 
-      {/* ===== Hasil: APPROVE SERTIFIKAT (success / error) ===== */}
+      {/* ====== Hasil Approve Sertifikat ====== */}
       {certApproveResult && (
         <ConfirmationModal
           isOpen
@@ -548,21 +767,17 @@ export default function ProfileTutorPage() {
           widthClass="max-w-md"
           icon={certApproveResult === 'ok' ? <RiCheckboxCircleFill /> : <RiCloseLine />}
           iconTone={certApproveResult === 'ok' ? 'success' : 'danger'}
-          title={
-            certApproveResult === 'ok'
-              ? 'Sertifikat Berhasil Disetujui'
-              : 'Sertifikat Gagal Disetujui'
-          }
+          title={certApproveResult === 'ok' ? 'Sertifikat Berhasil Disetujui' : 'Sertifikat Gagal Disetujui'}
           texts={
             certApproveResult === 'ok'
-              ? ['Instrumen yang diajukan akan tampil pada profil Guru & dapat mengajar instrumen tersebut']
-              : ['Maaf, terjadi kendala saat Menyetujui sertifikat. Silakan coba lagi dalam beberapa saat, atau hubungi admin']
+              ? ['Instrumen yang diajukan akan tampil pada profil Guru & dapat mengajar instrumen tersebut.']
+              : ['Maaf, terjadi kendala saat menyetujui sertifikat. Silakan coba lagi.']
           }
           button1={{ label: 'Tutup', variant: 'primary', onClick: () => setCertApproveResult(null) }}
         />
       )}
 
-      {/* ===== Hasil: REJECT SERTIFIKAT (success / error) ===== */}
+      {/* Hasil REJECT */}
       {certRejectResult && (
         <ConfirmationModal
           isOpen
@@ -574,21 +789,23 @@ export default function ProfileTutorPage() {
           title={certRejectResult === 'ok' ? 'Laporan Penolakan Terkirim' : 'Gagal Mengirim Laporan'}
           texts={
             certRejectResult === 'ok'
-              ? [
-                  'Laporan penolakan sudah terkirim ke guru.',
-                  'Instrumen tidak akan ditampilkan pada profil guru.',
-                ]
-              : ['Terjadi kendala saat mengirim laporan penolakan. Silakan coba lagi beberapa saat lagi.']
+              ? ['Status sertifikat telah diperbarui menjadi Ditolak dan alasan penolakan tersimpan.']
+              : ['Terjadi kendala saat menolak sertifikat. Silakan coba lagi.']
           }
           button1={{ label: 'Tutup', variant: 'primary', onClick: () => setCertRejectResult(null) }}
         />
       )}
 
+      {/* Modal ManageCertificate: pakai payload & icon */}
       <ManageCertificateModal
         isOpen={openManageCert}
-        onClose={() => setOpenManageCert(false)}
+        onClose={() => {
+          setOpenManageCert(false);
+          setSelectedInstrument(null);
+        }}
+        certificates={filteredCertificates}
         onApprove={handleApproveCertificate}
-        onRejectSubmit={handleRejectSubmit}  // ⬅️ penting untuk Phase 4
+        onRejectSubmit={handleRejectSubmit}
       />
     </div>
   );

@@ -13,6 +13,12 @@ export const ENDPOINTS = {
     DETAIL: (id: number | string) => `/guru/${id}`,
     SCHEDULES: (id: number | string) => `/guru/${id}/schedules`,
     CLASSES: (id: number | string) => `/guru/${id}/classes`,
+    CLASSES_SESSIONS: (guruId: number | string) => `/guru/${guruId}/classes/sessions`,
+    CLASSES_RATINGS: (guruId: number | string) => `/guru/${guruId}/classes/ratings`,
+    PROFILE: () => `/guru/profile`,
+    STATUS: (id?: number | string) => (id ? `/guru/status?id=${id}` : `/guru/status`),
+    UPDATE_IS_SHOW: (guruId?: number | string ) => `/guru/${guruId}/ratings/:ratingId/is_show`,
+    CREATE_FROM_ENTRY: `/guru/admin/guru`,
   },
   INSTRUMENTS: {
       LIST: '/instruments',
@@ -49,13 +55,17 @@ export const ENDPOINTS = {
     DELETE: (id: number|string) => `/programs/master/${id}`, // DELETE admin
   },
 
-  REGISTRASI_GURU: {
-    LIST: '/registrasi-guru',
-    DETAIL: (id: number|string) => `/registrasi-guru/${id}`,
-    CREATE: '/registrasi-guru',
-    UPDATE: (id: number|string) => `/registrasi-guru/${id}`,
-    DELETE: (id: number|string) => `/registrasi-guru/${id}`,
+  GURU_APPLICATION: {
+    LIST: '/guru-applications',
+    DETAIL: (id: number|string) => `/guru-applications/${id}`
   },
+  
+  RECRUITMENT: {
+      LIST: '/recruitment/applications',
+      DECIDE: (id: number | string) => `/recruitment/applications/${id}/decision`,
+      // (opsional) APPLY: '/recruitment/apply',
+    },
+
   SILABUS: {
     CREATE: '/silabus',
     UPDATE: (id: number | string) => `/silabus/${id}`,
@@ -79,8 +89,12 @@ export const ENDPOINTS = {
     },
   },
   RATING: {
-    PERFORMA_MENGAJAR: () => `/rating/guru/rating/performa-mengajar`,
+    LIST: () => `/rating`,
+    PERFORMA_MENGAJAR_ADMIN: (id: number | string) => `/rating/${id}/performa-mengajar`,
+    PERFORMA_MENGAJAR_GLOBAL: () => `/rating/performance-global`, 
+    PERFORMA_NILAI_GLOBAL_DAILY: () => `/rating/performance-global/daily`,
   },
+
   PROMO: {
     LIST: '/promo',
     DETAIL: (id: number | string) => `/promo/${id}`,
@@ -101,6 +115,7 @@ export const ENDPOINTS = {
     CLASS_HISTORY: (uuid: string, classId: string | number) => `/murid/by-uuid/${uuid}/classes/${classId}/history`, 
       // ⬇️ endpoint baru (per sesi) berbasis muridId
     CLASSES_BY_ID: (muridId: number | string) => `/murid/${muridId}/classes`,
+    CLASSES_RATINGS: (muridId: number | string) => `/murid/${muridId}/classes/ratings`,
   },
 
    TRANSAKSI: {
@@ -116,6 +131,10 @@ export const ENDPOINTS = {
 
   EARNINGS: {
     LIST: () => `/earnings/guru/chart`,
-  }
+  },
+
+  SERTIFIKAT: {
+    UPDATE: (id: number | string) => `/sertifikat/${id}/status`
+  },
 };
 

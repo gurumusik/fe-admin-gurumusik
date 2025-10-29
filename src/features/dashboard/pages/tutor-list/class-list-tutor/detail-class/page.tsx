@@ -5,7 +5,6 @@ import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   RiArrowLeftLine, RiStarFill, RiArrowRightUpLine, RiArrowRightDownLine, RiArrowRightLine,
-  RiCloseLine, RiCheckboxCircleFill
 } from 'react-icons/ri';
 
 import { useDispatch, useSelector } from 'react-redux';
@@ -16,38 +15,35 @@ import {
 } from '@/features/slices/rating/slice';
 import type { Trend, PerformaMengajar } from '@/features/slices/rating/types';
 
-import ConfirmationModal from '@/components/ui/common/ConfirmationModal';
 import { getStatusColor } from '@/utils/getStatusColor';
 import { getInstrumentIcon } from '@/utils/getInstrumentIcon';
 import TutorReportModal, { type TutorReportRow } from '@/features/dashboard/components/TutorReportModal';
 import TutorReviewModal from '@/features/dashboard/components/TutorReviewModal';
 import FeedbackTutorModal from '@/features/dashboard/components/FeedbackTutorModal';
 
-// KELAS
+// Data sesi per transaksi (tabel halaman) & ratings (modal)
 import {
-  listGuruClasses,
-  type GuruClassDTO,
+  listTransaksiSessions,
+  listTransaksiRatings,
   resolveAvatarUrl,
+  // ⬇️ pastikan ini tersambung (re-export dari guru.api atau definisikan di file ini)
+  updateRatingIsShow,
 } from '@/services/api/guruClasses.api';
 
+import type { GuruClassRow, RatingRow } from '@/features/slices/guru/classes/types';
+
 type LocationState = {
-  studentUuid?: string;
-  studentName?: string;
-  classId?: string;
   tutorUuid?: string;
   prev?: { page?: number; filters?: Record<string, unknown> };
-
   guruId?: number;
   transaksiId?: number;
   sesiId?: number;
-
-  // opsional: muridId bisa dikirim via state
   muridId?: number | string;
 };
 
 const PAGE_SIZE = 4 as const;
 
-/* ========== Helpers umum ========== */
+/* ===== helpers ===== */
 function pageWindow(total: number, current: number) {
   const out: (number | '…')[] = [];
   const push = (x: number | '…') => { if (out[out.length - 1] !== x) out.push(x); };
@@ -57,7 +53,6 @@ function pageWindow(total: number, current: number) {
   }
   return out;
 }
-
 const toNum = (v: string | null | undefined): number | undefined => {
   if (v == null) return undefined;
   const s = String(v).trim();
@@ -65,68 +60,55 @@ const toNum = (v: string | null | undefined): number | undefined => {
   const n = Number(s);
   return Number.isFinite(n) ? n : undefined;
 };
-
 const hhmm = (t?: string | null) => {
   if (!t) return '–';
-  const [h, m] = t.split(':');
+  const [h, m] = String(t).split(':');
   return [h ?? '00', m ?? '00'].slice(0, 2).join('.');
 };
-
 const dayName = (d?: number | string | null) => {
   if (d == null) return '–';
   if (typeof d === 'string') return d;
   const map = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
   return map[d] ?? String(d);
 };
-
-const toYYYYMM = (d: Date) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
-};
-
+const toYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`;
 const trendColor = (t: Trend) =>
-  t === 'naik'
-    ? 'text-[var(--accent-green-color)]'
-    : t === 'turun'
-    ? 'text-red-500'
-    : 'text-slate-500';
-
+  t === 'naik' ? 'text-[var(--accent-green-color)]' : t === 'turun' ? 'text-red-500' : 'text-slate-500';
 const TrendIcon: React.FC<{ trend: Trend; className?: string }> = ({ trend, className }) => {
   if (trend === 'naik') return <RiArrowRightUpLine className={className ?? ''} />;
   if (trend === 'turun') return <RiArrowRightDownLine className={className ?? ''} />;
   return <RiArrowRightLine className={className ?? ''} />;
 };
-
 const formatRating = (v: number | null | undefined) =>
   typeof v === 'number' && Number.isFinite(v) ? `${v.toFixed(1)}/5` : '−';
+const feFormatDelta = (d: number | null | undefined) => {
+  if (d == null) return { label: '—', trend: null as Trend };
+  const trend: Trend = d > 0 ? 'naik' : d < 0 ? 'turun' : 'tetap';
+  const sign = d > 0 ? '+' : d < 0 ? '' : '';
+  return { label: `${sign}${d}% (${trend})`, trend };
+};
 
-/* ========== Halaman ========== */
+/* ===== page ===== */
 const DetailClassTutorPage: React.FC = () => {
-  const tutorImage = 'test';
-  const tutorName = 'tutor-name';
   const navigate = useNavigate();
   const { state } = useLocation() as { state?: LocationState };
   const [searchParams] = useSearchParams();
 
-  // Ambil param utama
   const guruId = state?.guruId ?? toNum(searchParams.get('guru_id'));
   const transaksiId = state?.transaksiId ?? toNum(searchParams.get('transaksi_id'));
   const month = searchParams.get('month') ?? toYYYYMM(new Date());
 
-  // muridId: prioritas query → state → fallback dari data kelas (first.murid.id)
   const [muridId, setMuridId] = useState<number | undefined>(() => {
     const fromQuery = toNum(searchParams.get('murid_id'));
     const fromState = toNum((state as any)?.muridId);
     return fromQuery ?? fromState ?? undefined;
   });
 
-  // ------ DATA DARI API KELAS ------
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [trxRows, setTrxRows] = useState<GuruClassDTO[]>([]); // semua sesi pada transaksi ini
+  const [trxRows, setTrxRows] = useState<GuruClassRow[]>([]);
 
-  const fetchAll = useCallback(async () => {
+  const fetchSessions = useCallback(async () => {
     if (!guruId || !transaksiId) {
       setLoadError('Parameter tidak lengkap (guruId/transaksiId).');
       setLoading(false);
@@ -134,56 +116,59 @@ const DetailClassTutorPage: React.FC = () => {
     }
     setLoading(true);
     setLoadError(null);
-
     try {
-      const limit = 100;
-      let page = 1;
-      let hasNext = true;
-      const bag: GuruClassDTO[] = [];
-
-      while (hasNext) {
-        const resp = await listGuruClasses({
-          guruId: Number(guruId),
-          page,
-          limit,
-          sort_by: 'sesi_ke',
-          sort_dir: 'asc',
-        });
-        if (Array.isArray(resp.data)) bag.push(...resp.data);
-        hasNext = !!resp.has_next;
-        page += 1;
+      const resp = await listTransaksiSessions({ guruId: Number(guruId), transaksiId: Number(transaksiId) });
+      let rows = (resp?.data ?? []) as GuruClassRow[];
+      if (typeof muridId === 'number') {
+        rows = rows.filter((r) => Number(r?.murid?.id ?? -1) === Number(muridId));
       }
-
-      const onlyTrx = bag.filter((r) => r.transaksi_id === Number(transaksiId));
-      setTrxRows(onlyTrx);
+      rows.sort((a, b) => (a.sesi_ke ?? 0) - (b.sesi_ke ?? 0));
+      setTrxRows(rows);
     } catch (e: any) {
       setLoadError(e?.message || 'Gagal memuat data.');
     } finally {
       setLoading(false);
     }
-  }, [guruId, transaksiId]);
+  }, [guruId, transaksiId, muridId]);
+  useEffect(() => { fetchSessions(); }, [fetchSessions]);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  // ratings (modal)
+  const [ratingRaw, setRatingRaw] = useState<RatingRow[]>([]);
+  const [ratingStatus, setRatingStatus] = useState<'idle'|'loading'|'succeeded'|'failed'>('idle');
+  const [ratingError, setRatingError] = useState<string|null>(null);
+  const [guruInfo, setGuruInfo] = useState<{ id: number; nama: string | null; status_akun: string | null; profile_pic_url: string | null; } | null>(null);
 
-  // ------ HEADER: ambil dari data.murid (item pertama) ------
-  const first = trxRows[0];
-
-  // fallback muridId dari data kelas jika belum ada
-  useEffect(() => {
-    if (!muridId && first?.murid?.id) {
-      setMuridId(Number(first.murid.id));
+  const fetchRatings = useCallback(async () => {
+    if (!guruId || !transaksiId) return;
+    try {
+      setRatingStatus('loading');
+      setRatingError(null);
+      const r = await listTransaksiRatings({
+        guruId: Number(guruId),
+        transaksiId: Number(transaksiId),
+        muridId: typeof muridId === 'number' ? muridId : undefined,
+      });
+      setRatingRaw(r.data ?? []);
+      setGuruInfo(r.guru ?? null);
+      setRatingStatus('succeeded');
+    } catch (e: any) {
+      setRatingStatus('failed');
+      setRatingError(e?.message || 'Gagal memuat rating');
     }
+  }, [guruId, transaksiId, muridId]);
+  useEffect(() => { fetchRatings(); }, [fetchRatings]);
+
+  // header
+  const first = trxRows[0];
+  useEffect(() => {
+    if (!muridId && first?.murid?.id) setMuridId(Number(first.murid.id));
   }, [muridId, first?.murid?.id]);
 
-  const studentImage =
-    resolveAvatarUrl(first?.murid?.profile_pic_url ?? null) || '/assets/images/student.png';
+  const studentImage = resolveAvatarUrl(first?.murid?.profile_pic_url ?? null) || '/assets/images/student.png';
   const studentName = first?.murid?.nama || 'Murid';
-  const instrumentLabel =
-    ((first as any)?.detail_program?.instrument?.nama as string | undefined) ??
-    ((first as any)?.instrument?.nama as string | undefined) ??
-    '—';
+  const instrumentLabel = (first?.detail_program?.instrument?.nama as string | undefined) ?? '—';
+  const defaultTutorImage = (first as any)?.guru?.profile_pic_url || (first as any)?.teacher?.profile_pic_url || '/avatar-placeholder.png';
+  const defaultTutorName = (first as any)?.guru?.nama || (first as any)?.teacher?.nama || 'Guru';
 
   const pickedClass = useMemo(() => {
     if (!first) return undefined as any;
@@ -191,9 +176,7 @@ const DetailClassTutorPage: React.FC = () => {
     const start = hhmm(first?.jadwal?.waktu_mulai);
     const end = hhmm(first?.jadwal?.waktu_selesai);
     const schedule = hari !== '–' && start !== '–' && end !== '–'
-      ? `Setiap ${hari} | ${start} - ${end}`
-      : 'Setiap — | — - —';
-
+      ? `Setiap ${hari} | ${start} - ${end}` : 'Setiap — | — - —';
     return {
       id: `${first.transaksi_id}`,
       program: first?.program?.nama ?? '—',
@@ -202,65 +185,82 @@ const DetailClassTutorPage: React.FC = () => {
     };
   }, [first, instrumentLabel]);
 
-  // ------ RIWAYAT KELAS (map ke UI) ------
-  type StudentClassHistoryItem = {
-    session: string;
-    date: string;
-    startClock: string;
-    endClock: string;
-    status: string;
-  };
+  // performa
+  const dispatch = useDispatch<AppDispatch>();
+  const perfState = useSelector(selectPerformaMengajarAdmin);
+  const perfData = perfState.data;
 
-  const allHistory: StudentClassHistoryItem[] = useMemo(() => {
-    if (!trxRows.length) return [];
-    return [...trxRows]
-      .sort((a, b) => (a.sesi_ke ?? 0) - (b.sesi_ke ?? 0))
-      .map((r) => {
-        const date = (r as any).tanggal_sesi || '—';
-        return {
-          session: r.sesi_label ?? `${r.sesi_ke}`,
-          date,
-          startClock: hhmm(r?.waktu_mulai),
-          endClock: hhmm(r?.waktu_selesai),
-          status: (r as any).status ?? '—',
-        };
-      });
-  }, [trxRows]);
+  useEffect(() => {
+    if (!guruId) return;
+    const args: { guruId: number | string; month?: string; muridId?: number | string } = { guruId, month };
+    if (muridId != null) args.muridId = muridId;
+    dispatch(fetchPerformaMengajarAdminThunk(args as any));
+  }, [dispatch, guruId, month, muridId]);
 
-  // ------ State UI report/review/feedback ------
+  const perfSource = useMemo(() => {
+    if (!perfData) return null;
+    return (perfData.student_scope ?? perfData) as Pick<PerformaMengajar, 'average_rating' | 'class_rating' | 'categories'> & { murid_id?: number | string };
+  }, [perfData]);
+
+  const kelasVal = perfSource?.average_rating?.fake_rating ?? null;
+  const kelasDelta = perfSource?.average_rating?.delta_percent_fake ?? null;
+  const kelasFmt = feFormatDelta(kelasDelta);
+  const realVal = perfSource?.average_rating?.real_rating ?? null;
+
+  // rows untuk report modal
+  const reportRowsRatings = useMemo<TutorReportRow[]>(() => {
+    return (ratingRaw ?? []).map((r, idx) => ({
+      no: String(idx + 1),
+      nilai: r.rate != null ? String(r.rate) : '—',
+      date: (r.created_at ?? '').toString().slice(0, 19),
+      status: r.is_show ? 'Tampil' : 'Tidak Tampil',
+    }));
+  }, [ratingRaw]);
+
+  // modals
   const [reportOpen, setReportOpen] = useState(false);
   const [reportRows, setReportRows] = useState<TutorReportRow[]>([]);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [confirm, setConfirm] = useState<{ open: boolean; type: 'success' | 'error' }>({
-    open: false,
-    type: 'success',
-  });
-
-  const openReport = useCallback(() => {
-    setReportRows([
-      { no: 1, nilai: '4.5/5', date: '04/08/2025', status: 'Tampil' },
-      { no: 2, nilai: '4.5/5', date: '04/08/2025', status: 'Tampil' },
-    ]);
-    setReportOpen(true);
-  }, []);
-
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewRow, setReviewRow] = useState<TutorReportRow | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
+  const openReport = useCallback(() => {
+    setReportRows(reportRowsRatings);
+    setReportOpen(true);
+  }, [reportRowsRatings]);
+
   const handleReviewFromReport = useCallback((row: TutorReportRow) => {
     setReportOpen(false);
     setReviewRow(row);
     setReviewOpen(true);
   }, []);
 
+  const selectedIdx = React.useMemo(() => {
+    const n = Number(reviewRow?.no);
+    return Number.isFinite(n) ? Math.max(0, n - 1) : -1;
+  }, [reviewRow]);
 
-  // ------ Pagination ------
+  // baris rating mentah (punya is_show & id)
+  const selectedRating = selectedIdx >= 0 ? ratingRaw[selectedIdx] : null;
+
+
+  // pagination
   const [page, setPage] = useState(1);
+  const allHistory = useMemo(() => {
+    if (!trxRows.length) return [];
+    return trxRows.map((r) => ({
+      session: r.sesi_label ?? `${r.sesi_ke}`,
+      date: r.tanggal_sesi || '—',
+      startClock: hhmm(r?.waktu_mulai),
+      endClock: hhmm(r?.waktu_selesai),
+      status: r.status ?? '—',
+    }));
+  }, [trxRows]);
   const { totalPages, pageRows } = useMemo(() => {
     const totalPages = Math.max(1, Math.ceil(allHistory.length / PAGE_SIZE));
     const start = (page - 1) * PAGE_SIZE;
     return { totalPages, pageRows: allHistory.slice(start, start + PAGE_SIZE) };
   }, [allHistory, page]);
-
   const goTo = useCallback((p: number) => setPage(Math.min(Math.max(1, p), totalPages)), [totalPages]);
   const prev = useCallback(() => goTo(page - 1), [goTo, page]);
   const next = useCallback(() => goTo(page + 1), [goTo, page]);
@@ -275,32 +275,40 @@ const DetailClassTutorPage: React.FC = () => {
     }
   }, [navigate, state?.prev]);
 
+  const modalTutorName   = guruInfo?.nama || defaultTutorName;
+  const modalTutorImage  = resolveAvatarUrl(guruInfo?.profile_pic_url ?? null) || defaultTutorImage;
+  const modalStatusLabel = guruInfo?.status_akun || '-';
 
-  /* ========== ⬇️ FETCH PERFORMA MENGAJAR (NEW) ========== */
-  const dispatch = useDispatch<AppDispatch>();
-  const perfState = useSelector(selectPerformaMengajarAdmin);
-  const perfData = perfState.data;
+  // ⬇️ NEW: handler PUT is_show
+  const [setShowLoading, setSetShowLoading] = useState(false);
+  const [setShowError, setSetShowError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Admin: kirim guruId; Guru: biarkan undefined
-    const args: { guruId?: number | string; month?: string; muridId?: number | string } = {
-      guruId: guruId ?? undefined,
-      month,
-    };
-    if (muridId) args.muridId = muridId;
-    dispatch(fetchPerformaMengajarAdminThunk(args));
-  }, [dispatch, guruId, month, muridId]);
+  const handleSetShown = useCallback(
+    async (value: boolean) => {
+      try {
+        if (!guruId || !reviewRow) return;
+        setSetShowError(null);
+        setSetShowLoading(true);
 
-  // Sumber data untuk kartu: gunakan student_scope jika ada, kalau tidak fallback ke overall
-  const perfSource = useMemo(() => {
-    if (!perfData) return null;
-    return (perfData.student_scope ?? perfData) as Pick<
-      PerformaMengajar,
-      'average_rating' | 'class_rating' | 'categories'
-    > & { murid_id?: number };
-  }, [perfData]);
+        const idx = Math.max(0, (Number(reviewRow.no) || 1) - 1);
+        const current = ratingRaw[idx];
+        if (!current?.id) throw new Error('Rating tidak ditemukan');
 
-  /* ================= RENDER ================= */
+        await updateRatingIsShow(guruId, current.id, value);
+
+        // update state lokal agar UI langsung berubah
+        setRatingRaw((prev) => prev.map((r, i) => (i === idx ? { ...r, is_show: value } : r)));
+        setReviewRow((prev) => (prev ? { ...prev, status: value ? 'Tampil' : 'Tidak Tampil' } : prev));
+      } catch (e: any) {
+        setSetShowError(e?.message || 'Gagal mengubah status tampil rating');
+      } finally {
+        setSetShowLoading(false);
+      }
+    },
+    [guruId, reviewRow, ratingRaw]
+  );
+
+  // ===== render =====
   if (loadError) {
     return (
       <div className="rounded-2xl bg-white p-6">
@@ -335,7 +343,7 @@ const DetailClassTutorPage: React.FC = () => {
 
   return (
     <div className="w-full">
-      {/* ====== HEADER ====== */}
+      {/* ===== HEADER ===== */}
       <header className="sticky top-20 z-40 -m-6 mb-6 px-6 border-t bg-white border-black/10 rounded-b-3xl">
         <div className="py-3 flex items-center justify-between gap-4">
           <button
@@ -356,11 +364,7 @@ const DetailClassTutorPage: React.FC = () => {
               <div className="flex flex-col">
                 <div className="font-semibold text-md text-neutral-900">{studentName}</div>
                 <div className="mt-1 inline-flex items-center gap-2">
-                  <img
-                    src={getInstrumentIcon((instrumentLabel || '').toLowerCase())}
-                    alt={instrumentLabel}
-                    className="h-5 w-5"
-                  />
+                  <img src={getInstrumentIcon((instrumentLabel || '').toLowerCase())} alt={instrumentLabel} className="h-5 w-5" />
                   <span className="text-sm text-neutral-700">{instrumentLabel}</span>
                 </div>
               </div>
@@ -377,7 +381,7 @@ const DetailClassTutorPage: React.FC = () => {
         </div>
       </header>
 
-      {/* ===== Performa (DINAMIS dari endpoint) ===== */}
+      {/* ===== Performa ===== */}
       <section className="rounded-2xl bg-white p-4 md:p-6 mb-4">
         <div className="mb-4 flex items-center gap-2">
           <span className="inline-flex items-center justify-center rounded-full bg-[var(--primary-color)] text-white w-9 h-9">
@@ -386,7 +390,6 @@ const DetailClassTutorPage: React.FC = () => {
           <h2 className="text-lg font-semibold text-neutral-900">Performa Mengajar</h2>
         </div>
 
-        {/* Loading / error kecil khusus performa */}
         {perfState.status === 'loading' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             <div className="h-28 rounded-2xl bg-slate-100 animate-pulse" />
@@ -405,47 +408,36 @@ const DetailClassTutorPage: React.FC = () => {
         {perfState.status === 'succeeded' && perfSource && (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {[
-              // Nilai Kelas
               {
                 key: 'nilaiKelas',
-                title: perfData?.student_scope ? 'Nilai Kelas' : 'Nilai Kelas',
+                title: 'Nilai Kelas',
                 valueNode: (
                   <span className="inline-flex items-center gap-2">
                     <RiStarFill className="text-[var(--primary-color)]" />
-                    <span className="font-semibold">{formatRating(perfSource.class_rating.this_month)}</span>
+                    <span className="font-semibold">{formatRating(kelasVal)}</span>
                   </span>
                 ),
-                deltaLabel: perfSource.class_rating.delta_label,
-                trend: perfSource.class_rating.trend as Trend,
+                deltaLabel: kelasFmt.label,
+                trend: kelasFmt.trend as Trend,
                 bg: 'bg-[#E9F7F0]',
               },
-              // Kategori
               ...(['DISCIPLINE','COMMUNICATION','TEACHING'] as const).map((code) => {
                 const cat = perfSource.categories.find((c) => c.code === code);
-                const title =
-                  code === 'DISCIPLINE' ? 'Kedisiplinan' :
-                  code === 'COMMUNICATION' ? 'Komunikasi' :
-                  'Cara Mengajar';
-                const bg =
-                  code === 'DISCIPLINE' ? 'bg-[#FFE9EA]' :
-                  code === 'COMMUNICATION' ? 'bg-[#EEE9FF]' :
-                  'bg-[#E7F2FF]';
+                const title = code === 'DISCIPLINE' ? 'Kedisiplinan' : code === 'COMMUNICATION' ? 'Komunikasi' : 'Cara Mengajar';
+                const bg = code === 'DISCIPLINE' ? 'bg-[#FFE9EA]' : code === 'COMMUNICATION' ? 'bg-[#EEE9FF]' : 'bg-[#E7F2FF]';
+                const valueText = typeof cat?.this_month_percent === 'number' ? `${cat.this_month_percent}%` : '−';
                 return {
-                  key: code,
-                  title: perfData?.student_scope ? `${title}` : title,
-                  valueNode: <span className="font-semibold">{typeof cat?.this_month_percent === 'number' ? `${cat.this_month_percent}%` : '−'}</span>,
-                  deltaLabel: cat?.delta_label ?? null,
-                  trend: cat?.trend ?? null,
-                  bg,
+                  key: code, title, valueNode: <span className="font-semibold">{valueText}</span>,
+                  deltaLabel: cat?.delta_label ?? null, trend: (cat?.trend as Trend) ?? null, bg,
                 };
-              })
+              }),
             ].map((m) => (
               <div key={m.key} className={`rounded-2xl ${m.bg} p-4 shadow-[0_1px_0_rgba(0,0,0,0.03)]`}>
                 <div className="text-md text-neutral-900 mb-2">{m.title}</div>
                 <div className="text-2xl text-neutral-900">{m.valueNode}</div>
                 {m.deltaLabel ? (
                   <div className={`mt-1 inline-flex items-center text-[14px] ${trendColor(m.trend)}`}>
-                    <TrendIcon trend={m.trend} className="text-[20px]" />
+                    <TrendIcon trend={m.trend as any} className="text-[20px]" />
                     <span className="ml-1">{m.deltaLabel}</span>
                   </div>
                 ) : null}
@@ -455,12 +447,10 @@ const DetailClassTutorPage: React.FC = () => {
         )}
       </section>
 
-      {/* ====== RIWAYAT KELAS ====== */}
+      {/* ===== Riwayat Kelas ===== */}
       <section className="rounded-2xl bg-white p-4 md:p-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold text-neutral-900">Riwayat Kelas</h3>
-
-          {/* (Filter status dummy, tetap) */}
           <select className="rounded-xl border w-[200px] border-black/10 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-(--secondary-color)">
             <option>Pilih Status</option>
             <option>Selesai Tepat Waktu</option>
@@ -482,59 +472,53 @@ const DetailClassTutorPage: React.FC = () => {
                 <th className="p-5 font-medium">Aksi</th>
               </tr>
             </thead>
-
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="p-6 text-center text-neutral-500">memuat data…</td>
-                </tr>
+                <tr><td colSpan={6} className="p-6 text-center text-neutral-500">memuat data…</td></tr>
               ) : pageRows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-6 text-center text-neutral-500">
-                    Belum ada riwayat untuk kelas ini.
-                  </td>
-                </tr>
+                <tr><td colSpan={6} className="p-6 text-center text-neutral-500">Belum ada riwayat untuk kelas ini.</td></tr>
               ) : (
-                pageRows.map((h, idx) => (
-                  <tr key={`${transaksiId}-${page}-${idx}`} className="border-t border-black/5 text-md">
-                    <td className="px-4 py-4">{h.session}</td>
-                    <td className="px-4 py-4">{h.date}</td>
-                    <td className="px-4 py-4">{h.startClock}</td>
-                    <td className="px-4 py-4">{h.endClock}</td>
-                    <td className="px-4 py-4">
-                      <div className={`font-semibold ${getStatusColor(h.status)}`}>{h.status}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      {h.status === 'Belum Selesai' ? (
-                        <button
-                          type="button"
-                          className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
-                        >
-                          Aktifkan Kelas
-                        </button>
-                      ) : (
-                        (() => {
-                          const disabled = /dialihkan/i.test(String(h.status));
-                          return (
-                            <button
-                              type="button"
-                              onClick={!disabled ? openReport : undefined}
-                              disabled={disabled}
-                              className={`rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium ${
-                                disabled
-                                  ? 'text-(--secondary-color) opacity-50 cursor-not-allowed'
-                                  : 'text-(--secondary-color) hover:bg-(--secondary-light-color)'
-                              }`}
-                              title={disabled ? 'Laporan tidak tersedia untuk status Dialihkan' : 'Laporan'}
-                            >
-                              Laporan
-                            </button>
-                          );
-                        })()
-                      )}
-                    </td>
-                  </tr>
-                ))
+                pageRows.map((h, idx) => {
+                  const disabled = /dialihkan/i.test(String(h.status));
+                  return (
+                    <tr key={`${transaksiId}-${page}-${idx}`} className="border-t border-black/5 text-md">
+                      <td className="px-4 py-4">{h.session}</td>
+                      <td className="px-4 py-4">{h.date}</td>
+                      <td className="px-4 py-4">{h.startClock}</td>
+                      <td className="px-4 py-4">{h.endClock}</td>
+                      <td className="px-4 py-4">
+                        <div className={`font-semibold capitalize ${getStatusColor(h.status)}`}>{h.status}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {h.status === 'belum dimulai' ? (
+                          <button
+                            type="button"
+                            className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
+                          >
+                            Aktifkan Kelas
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={!disabled ? openReport : undefined}
+                            disabled={disabled || ratingStatus === 'loading'}
+                            className={`rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium ${
+                              (disabled || ratingStatus === 'loading')
+                                ? 'text-(--secondary-color) opacity-50 cursor-not-allowed'
+                                : 'text-(--secondary-color) hover:bg-(--secondary-light-color)'
+                            }`}
+                            title={
+                              disabled ? 'Laporan tidak tersedia untuk status Dialihkan'
+                                       : ratingStatus === 'loading' ? 'Memuat rating…' : 'Laporan'
+                            }
+                          >
+                            Laporan
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -542,57 +526,40 @@ const DetailClassTutorPage: React.FC = () => {
 
         {/* Pagination */}
         <div className="mt-4 flex items-center justify-center gap-2">
-          <button
-            onClick={prev}
-            disabled={page === 1 || loading}
-            className="px-3 py-2 text-md text-black/70 enabled:hover:bg-black/5 disabled:opacity-40"
-            aria-label="Previous page"
-          >
-            &lt;
-          </button>
-
+          <button onClick={prev} disabled={page === 1 || loading} className="px-3 py-2 text-md text-black/70 enabled:hover:bg-black/5 disabled:opacity-40" aria-label="Previous page">&lt;</button>
           {pageWindow(totalPages, page).map((p, i) =>
             p === '…' ? (
               <span key={`dots-${i}`} className="px-3 py-2 text-md text-black/40">…</span>
             ) : (
-              <button
-                key={p}
-                onClick={() => goTo(p)}
+              <button key={p} onClick={() => goTo(p)}
                 className={`rounded-xl border border-[var(--secondary-color)] px-3 py-1 text-md ${
-                  p === page
-                    ? 'border-(--secondary-color) bg-(--secondary-light-color) text-(--secondary-color)'
-                    : 'text-black/70 hover:bg-black/5'
+                  p === page ? 'border-(--secondary-color) bg-(--secondary-light-color) text-(--secondary-color)' : 'text-black/70 hover:bg-black/5'
                 }`}
-                aria-current={p === page ? 'page' : undefined}
-              >
+                aria-current={p === page ? 'page' : undefined}>
                 {p}
               </button>
             )
           )}
-
-          <button
-            onClick={next}
-            disabled={page === totalPages || loading}
-            className="px-3 py-2 text-md text-black/70 enabled:hover:bg-black/5 disabled:opacity-40"
-            aria-label="Next page"
-          >
-            &gt;
-          </button>
+          <button onClick={next} disabled={page === totalPages || loading} className="px-3 py-2 text-md text-black/70 enabled:hover:bg-black/5 disabled:opacity-40" aria-label="Next page">&gt;</button>
         </div>
+
+        {/* error kecil */}
+        {ratingStatus === 'failed' && <div className="mt-3 text-sm text-red-600">{ratingError}</div>}
+        {setShowError && <div className="mt-3 text-sm text-red-600">{setShowError}</div>}
       </section>
 
       {/* ===== Modals ===== */}
       <TutorReportModal
         open={reportOpen}
         onClose={() => setReportOpen(false)}
-        tutorImage={tutorImage}
-        tutorName={tutorName}
-        statusLabel="Aktif"
-        programLabel={pickedClass?.program ?? 'ABK'}
+        tutorImage={modalTutorImage}
+        tutorName={modalTutorName}
+        statusLabel={modalStatusLabel}
+        programLabel={pickedClass?.program ?? '—'}
         instrumentLabel={instrumentLabel}
-        schedule={pickedClass?.schedule ?? 'Setiap Kamis | 14.00 - 14.45'}
-        nilaiKelas="4.5/5"
-        nilaiAsli="4.5/5"
+        schedule={pickedClass?.schedule ?? '—'}
+        nilaiKelas={formatRating(kelasVal)}
+        nilaiAsli={formatRating(realVal)}
         rows={reportRows}
         onReview={handleReviewFromReport}
       />
@@ -600,33 +567,37 @@ const DetailClassTutorPage: React.FC = () => {
       <TutorReviewModal
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
-        tutorImage={tutorImage}
-        tutorName={tutorName}
+        tutorImage={modalTutorImage}
+        tutorName={modalTutorName}
         instrumentLabel={instrumentLabel}
-        schedule={pickedClass?.schedule ?? 'Setiap Kamis | 14.00 - 14.45'}
-        programLabel={pickedClass?.program ?? 'ABK'}
-        nilaiKelas="4.5/5"
-        nilaiAsli="4.5/5"
+        schedule={pickedClass?.schedule ?? '—'}
+        programLabel={pickedClass?.program ?? '—'}
+        nilaiKelas={formatRating(kelasVal)}
+        nilaiAsli={formatRating(realVal)}
         row={reviewRow}
+
+        // Toggle mengikuti nilai is_show terkini saat modal dibuka
+        defaultVisible={!!selectedRating?.is_show}
+
+        // ⬇️ PASS DATA BARU KE MODAL
+        selectedIndicators={selectedRating?.selected_indicator ?? []}
+        attachments={selectedRating?.rating_attachment ?? []}
+        feedbackText={selectedRating?.feedback ?? ''}
+
+        // (opsional) fallback PUT langsung di modal
+        guruId={guruId as number}
+        ratingId={selectedRating?.id}
+
+        // handler PUT dari parent (sudah ada)
+        onSetShown={handleSetShown}
+        submitting={setShowLoading}
+        errorText={setShowError}
       />
 
       <FeedbackTutorModal
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
-        onSubmit={async ()=>{ setFeedbackOpen(false); setConfirm({ open: true, type: 'success' }); }}
-      />
-
-      <ConfirmationModal
-        isOpen={confirm.open}
-        onClose={() => setConfirm((c) => ({ ...c, open: false }))}
-        icon={confirm.type === 'success' ? <RiCheckboxCircleFill /> : <RiCloseLine />}
-        iconTone={confirm.type === 'success' ? 'success' : 'danger'}
-        title={confirm.type === 'success' ? 'Masukan berhasil dikirim' : 'Masukan Berhasil Ditolak'}
-        texts={[
-          confirm.type === 'success'
-            ? 'Data berhasil disimpan dan notifikasi telah dikirim ke guru'
-            : 'Terjadi kendala saat mengirim masukan. Silakan coba lagi beberapa saat lagi.',
-        ]}
+        onSubmit={async ()=>{/* kirim feedback di sini */}}
       />
     </div>
   );

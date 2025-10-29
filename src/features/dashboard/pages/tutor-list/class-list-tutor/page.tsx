@@ -14,17 +14,17 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch } from '@/app/store';
 
-// ⬇️ UPDATED: import selector dari slice guru
+// ⬇️ Detail guru
 import { fetchGuruByIdThunk, selectGuruDetail } from '@/features/slices/guru/slice';
 import { getStatusColor } from '@/utils/getStatusColor';
 
-// performa admin (endpoint performa mengajar)
+// ⬇️ Performa mengajar (ADMIN endpoint: /rating/:guru_id/performa-mengajar)
 import {
   fetchPerformaMengajarAdminThunk,
   selectPerformaMengajarAdmin,
 } from '@/features/slices/rating/slice';
 
-// list kelas (redux)
+// ⬇️ List kelas (redux)
 import {
   fetchGuruClassesThunk,
   selectGuruClasses,
@@ -39,9 +39,9 @@ import {
 import ProgramAvatarBadge from '@/components/ui/badge/ProgramAvatarBadge';
 import { getInstrumentIcon } from '@/utils/getInstrumentIcon';
 
-// ————————————————————————
-// Helpers UI
-// ————————————————————————
+/* =========================================================
+   Helpers UI
+   ========================================================= */
 const fmtStar = (n: number | null | undefined) =>
   typeof n === 'number' && Number.isFinite(n) ? `${n.toFixed(1)}/5` : '–';
 
@@ -59,6 +59,14 @@ const TrendIcon = ({ trend }: { trend: 'naik' | 'turun' | 'tetap' | null | undef
   if (trend === 'turun') return <RiArrowRightDownLine size={20} />;
   if (trend === 'tetap') return <RiArrowRightSLine size={20} />;
   return <RiArrowRightUpLine size={20} />; // default 'naik' / null
+};
+
+// FE helper untuk membentuk label & trend dari angka delta (meniru backend)
+const feFormatDelta = (d: number | null | undefined) => {
+  if (d == null) return { label: '—', trend: null as 'naik' | 'turun' | 'tetap' | null };
+  const trend: 'naik' | 'turun' | 'tetap' = d > 0 ? 'naik' : d < 0 ? 'turun' : 'tetap';
+  const sign = d > 0 ? '+' : d < 0 ? '' : '';
+  return { label: `${sign}${d}% (${trend})`, trend };
 };
 
 const dayName = (d?: number | string | null) => {
@@ -91,50 +99,52 @@ const pageWindow = (total: number, current: number) => {
 
 type LocationState = { guruId?: number };
 
-// ————————————————————————
-// Component
-// ————————————————————————
+/* =========================================================
+   Component
+   ========================================================= */
 export default function ClassListTutorPage() {
   const { state } = useLocation() as { state?: LocationState };
   const dispatch = useDispatch<AppDispatch>();
 
-  // Ambil guruId dari state → query (?guru_id / ?id)
+  // Ambil guruId dari state → fallback query (?guru_id / ?id)
   const search =
     typeof window !== 'undefined'
       ? new URLSearchParams(window.location.search)
       : new URLSearchParams('');
   const guruIdFromQuery = Number(search.get('guru_id')) || Number(search.get('id')) || undefined;
   const monthFromQuery = search.get('month') || undefined;
-
   const guruId = state?.guruId ?? guruIdFromQuery;
 
-  // === Store: detail guru (UPDATED: pakai state.guru.detail via selector)
+  // Store: detail guru
   const guruDetail = useSelector(selectGuruDetail);
   const guru = guruDetail.item;
 
-  // === Store: performa admin (performa mengajar)
+  // Store: performa mengajar (ADMIN)
   const performa = useSelector(selectPerformaMengajarAdmin);
 
-  // === Store: list kelas (per sesi)
+  // Store: list kelas (per sesi)
   const kelas = useSelector(selectGuruClasses);
 
-  // ====== Local filter state (dropdown) ======
+  // Local filter (dropdown)
   const [instrumentId, setInstrumentId] = useState<number | 'all'>('all');
   const [programId, setProgramId] = useState<number | 'all'>('all');
 
-  // ===== bootstrap: set kontrol awal (tanpa fetch)
+  /* -------------------------------------------
+     Bootstrap
+     ------------------------------------------- */
   useEffect(() => {
     if (!guruId) return;
     dispatch(fetchGuruByIdThunk(Number(guruId)));
-    // Admin akan mengirim ?guru_id pada service; Guru tidak perlu (backend pakai req.user.id)
+    // ADMIN: panggil endpoint /rating/:guru_id/performa-mengajar
     dispatch(fetchPerformaMengajarAdminThunk({ guruId: Number(guruId), month: monthFromQuery }));
+    // List kelas defaults
     dispatch(setKelasLimit(5));
     dispatch(setKelasSortBy('jadwal_mulai'));
     dispatch(setKelasSortDir('asc'));
     dispatch(setKelasPage(1));
   }, [dispatch, guruId, monthFromQuery]);
 
-  // ===== fetch: sekali tiap kontrol berubah
+  // Fetch kelas saat kontrol berubah
   const lastKey = useRef<string>('');
   useEffect(() => {
     if (!guruId) return;
@@ -146,7 +156,7 @@ export default function ClassListTutorPage() {
       fetchGuruClassesThunk({
         guruId: Number(guruId),
         page: kelas.page,
-        limit: kelas.limit, // 5
+        limit: kelas.limit,
         q: kelas.q,
         sort_by: kelas.sort_by,
         sort_dir: kelas.sort_dir,
@@ -154,17 +164,20 @@ export default function ClassListTutorPage() {
     );
   }, [dispatch, guruId, kelas.page, kelas.limit, kelas.q, kelas.sort_by, kelas.sort_dir]);
 
-  // Cards performa — data dari endpoint performa mengajar
-  const nilaiAsli = performa.data?.average_rating?.this_month ?? null;
-  const nilaiAsliDelta = performa.data?.average_rating?.delta_label ?? '—';
-  const nilaiAsliTrend = performa.data?.average_rating?.trend ?? null;
+  /* -------------------------------------------
+     Cards Performa — mapping payload BARU
+     ------------------------------------------- */
+  // Nilai Asli (REAL) + delta
+  const avgRealVal = performa.data?.average_rating?.real_rating ?? null;
+  const avgRealDelta = performa.data?.average_rating?.delta_percent_real ?? null;
+  const avgRealFmt = feFormatDelta(avgRealDelta); // {label, trend}
 
-  const nilaiKelas = performa.data?.class_rating?.this_month ?? null;
-  const nilaiKelasDelta = performa.data?.class_rating?.delta_label ?? '—';
-  const nilaiKelasTrend = performa.data?.class_rating?.trend ?? null;
+  // ✅ Nilai Kelas pakai average_rating.fake_rating + delta_percent_fake (UI sama dgn Nilai Asli)
+  const kelasVal = performa.data?.average_rating?.fake_rating ?? null;
+  const kelasDeltaPct = performa.data?.average_rating?.delta_percent_fake ?? null;
+  const kelasFmt = feFormatDelta(kelasDeltaPct); // {label, trend}
 
   const findCat = (code: string) => performa.data?.categories?.find((c) => c.code === code);
-
   const discipline = findCat('DISCIPLINE');
   const comm = findCat('COMMUNICATION');
   const teach = findCat('TEACHING');
@@ -177,11 +190,12 @@ export default function ClassListTutorPage() {
         value: (
           <span className="inline-flex items-center gap-2">
             <RiStarFill className="text-[var(--primary-color)]" />
-            <span className="font-semibold">{fmtStar(nilaiKelas)}</span>
+            <span className="font-semibold">{fmtStar(kelasVal)}</span>
           </span>
         ),
-        delta: nilaiKelasDelta ?? '—',
-        trend: nilaiKelasTrend as any,
+        // UI delta & trend diformat sama seperti Nilai Asli
+        delta: kelasFmt.label,
+        trend: kelasFmt.trend as any,
         bg: 'bg-[#E9F7F0]',
       },
       {
@@ -190,11 +204,11 @@ export default function ClassListTutorPage() {
         value: (
           <span className="inline-flex items-center gap-2">
             <RiStarFill className="text-[var(--primary-color)]" />
-            <span className="font-semibold">{fmtStar(nilaiAsli)}</span>
+            <span className="font-semibold">{fmtStar(avgRealVal)}</span>
           </span>
         ),
-        delta: nilaiAsliDelta ?? '—',
-        trend: nilaiAsliTrend as any,
+        delta: avgRealFmt.label,
+        trend: avgRealFmt.trend as any,
         bg: 'bg-[#FFF3E1]',
       },
       {
@@ -202,7 +216,8 @@ export default function ClassListTutorPage() {
         title: 'Kedisiplinan',
         value: <span className="font-semibold">{fmtPct(discipline?.this_month_percent)}</span>,
         delta:
-          discipline?.delta_label ?? (discipline?.delta_percent == null ? '—' : `${discipline.delta_percent}%`),
+          discipline?.delta_label ??
+          (discipline?.delta_percent == null ? '—' : `${discipline.delta_percent}%`),
         trend: (discipline?.trend as any) ?? null,
         bg: 'bg-[#FFE9EA]',
       },
@@ -224,36 +239,24 @@ export default function ClassListTutorPage() {
       },
     ];
   }, [
-    nilaiAsli,
-    nilaiAsliDelta,
-    nilaiAsliTrend,
-    nilaiKelas,
-    nilaiKelasDelta,
-    nilaiKelasTrend,
-    discipline?.this_month_percent,
-    discipline?.delta_label,
-    discipline?.delta_percent,
-    discipline?.trend,
-    comm?.this_month_percent,
-    comm?.delta_label,
-    comm?.delta_percent,
-    comm?.trend,
-    teach?.this_month_percent,
-    teach?.delta_label,
-    teach?.delta_percent,
-    teach?.trend,
+    // ✅ dependensi baru utk Nilai Kelas
+    kelasVal, kelasFmt.label, kelasFmt.trend,
+    avgRealVal, avgRealFmt.label, avgRealFmt.trend,
+    discipline?.this_month_percent, discipline?.delta_label, discipline?.delta_percent, discipline?.trend,
+    comm?.this_month_percent, comm?.delta_label, comm?.delta_percent, comm?.trend,
+    teach?.this_month_percent, teach?.delta_label, teach?.delta_percent, teach?.trend,
   ]);
 
-  // Status (UPDATED: pakai guruDetail dari state.guru.detail)
+  // Status
   const headerLoading = guruDetail.status === 'loading';
   const headerError = guruDetail.status === 'failed' ? guruDetail.error : null;
 
   const perfLoading = performa.status === 'loading';
   const perfError = performa.status === 'failed' ? performa.error : null;
 
-  const statusLabel = (guru as any)?.status_label ?? 'Aktif';
-
-  // ===== Derived options untuk filter dropdown =====
+  /* -------------------------------------------
+     Derived options untuk filter dropdown
+     ------------------------------------------- */
   const { instrumentOptions, programOptions } = useMemo(() => {
     const iMap = new Map<number, string>();
     const pMap = new Map<number, string>();
@@ -271,7 +274,9 @@ export default function ClassListTutorPage() {
     };
   }, [kelas.items]);
 
-  // ===== Filtering FE (AND) =====
+  /* -------------------------------------------
+     Filtering FE (AND)
+     ------------------------------------------- */
   const pageRows = useMemo(() => {
     let rows: any[] = kelas.items || [];
     if (instrumentId !== 'all') {
@@ -285,12 +290,15 @@ export default function ClassListTutorPage() {
     return rows;
   }, [kelas.items, instrumentId, programId]);
 
-  // ===== Pagination footer =====
+  /* -------------------------------------------
+     Pagination footer
+     ------------------------------------------- */
   const totalPages = useMemo(() => {
     const total = kelas.total || 0;
     const lim = Math.max(1, kelas.limit || 5);
     return Math.max(1, Math.ceil(total / lim));
   }, [kelas.total, kelas.limit]);
+
   const hasPrev = kelas.page > 1;
   const hasNext = kelas.page < totalPages;
 
@@ -305,13 +313,15 @@ export default function ClassListTutorPage() {
   const prev = () => hasPrev && dispatch(setKelasPage(kelas.page - 1));
   const next = () => hasNext && dispatch(setKelasPage(kelas.page + 1));
 
-  // ===== Handlers filter: update q untuk bantu server =====
+  /* -------------------------------------------
+     Handlers filter
+     ------------------------------------------- */
   const onInstrumentChange = (val: string) => {
     const v = val === 'all' ? 'all' : Number(val);
     setInstrumentId(v as any);
     dispatch(setKelasPage(1));
     const insName = v === 'all' ? '' : instrumentOptions.find((op) => op.id === v)?.nama ?? '';
-    const progName = programId === 'all' ? '' : programOptions.find((op) => op.id === programId)?.nama ?? '';
+    const progName = programId === 'all' ? '' : programOptions.find((op) => op.id === v)?.nama ?? '';
     dispatch(setKelasQuery([insName, progName].filter(Boolean).join(' ')));
   };
 
@@ -324,16 +334,10 @@ export default function ClassListTutorPage() {
     dispatch(setKelasQuery([insName, progName].filter(Boolean).join(' ')));
   };
 
-  const renderRating = (v: number | null) =>
-    typeof v === 'number' && Number.isFinite(v) ? (
-      <span className="inline-flex items-center gap-1 text-black/80">
-        <RiStarFill size={20} className="text-[var(--primary-color)]" />
-        {v.toFixed(1)} <span className="text-black/60">/5</span>
-      </span>
-    ) : (
-      <span className="text-black/70">-</span>
-    );
 
+  /* -------------------------------------------
+     Render
+     ------------------------------------------- */
   return (
     <div className="w-full">
       {/* ================= HEADER ================= */}
@@ -367,8 +371,8 @@ export default function ClassListTutorPage() {
                 />
                 <div className="flex flex-col">
                   <div className="font-semibold text-md text-neutral-900">{(guru as any).nama}</div>
-                  <span className={`inline-block text-sm font-semibold ${getStatusColor(statusLabel)}`}>
-                    {statusLabel}
+                  <span className={`inline-block text-sm font-semibold ${getStatusColor((guru as any).status_label ?? 'Aktif')}`}>
+                    {(guru as any).status_label ?? 'Aktif'}
                   </span>
                 </div>
               </div>
@@ -500,12 +504,12 @@ export default function ClassListTutorPage() {
 
               {kelas.status !== 'loading' &&
                 pageRows.map((row: any) => {
-                  const instr = row?.detail_program?.instrument || row?.instrument || null;
+                  const instr = row?.detail_program?.instrument || null;
                   const instrName = instr?.nama ?? '';
                   const instrIcon = getInstrumentIcon(instrName);
 
                   return (
-                    <tr key={row.sesi_id} className="border-b border-black/5">
+                    <tr key={row.transaksi_id} className="border-b border-black/5">
                       <td className="px-4 py-4">
                         <ProgramAvatarBadge
                           src={row.murid.profile_pic_url || '/avatar-placeholder.png'}
@@ -514,6 +518,7 @@ export default function ClassListTutorPage() {
                           size={55}
                         />
                       </td>
+
                       <td className="px-4 py-4">
                         <div className="flex flex-col">
                           <span className="font-medium text-black">{row.murid.nama || '—'}</span>
@@ -529,18 +534,33 @@ export default function ClassListTutorPage() {
                           </div>
                         </div>
                       </td>
+
                       <td className="px-4 py-4 text-black/80">
                         {`Setiap ${dayName(row.jadwal.hari)} | ${timeRange(
                           row.jadwal.waktu_mulai,
                           row.jadwal.waktu_selesai
                         )}`}
                       </td>
+
+                      {/* ✅ "Sesi": selesai/total */}
                       <td className="px-4 py-4 text-black">{row.sesi_label}</td>
-                      <td className="px-4 py-4">{renderRating(row.rating.value)}</td>
+
+                      {/* ✅ "Nilai Kelas": AVG(rate) per transaksi */}
+                      <td className="px-4 py-4">
+                        {typeof row.rating?.value === 'number' ? (
+                          <span className="inline-flex items-center gap-1 text-black/80">
+                            <RiStarFill size={20} className="text-[var(--primary-color)]" />
+                            {row.rating.value.toFixed(1)} <span className="text-black/60">/5</span>
+                          </span>
+                        ) : (
+                          <span className="text-black/70">-</span>
+                        )}
+                      </td>
+
                       <td className="px-4 py-4">
                         <Link
                           to={`/dashboard-admin/tutor-list/class-list-tutor/detail-class`}
-                          state={{ guruId, transaksiId: row.transaksi_id, sesiId: row.sesi_id }}
+                          state={{ guruId, transaksiId: row.transaksi_id }} // ⬅️ sesiId dihapus
                           className="inline-block rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
                         >
                           Detail Class

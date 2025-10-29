@@ -12,23 +12,16 @@ import {
 } from "react-icons/ri";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "@/app/store";
-import {
-  fetchRegistrasiGuruThunk,
-  setRegPage,
-  setRegLimit,
-  updateRegistrasiGuruThunk,
-  deleteRegistrasiGuruThunk,
-} from "@/features/slices/registrasiGuru/slice";
-import type {
-  RegistrasiGuru,
-  RegistrasiStatus,
-  ApproveConfirmKind,
-  ApproveConfirmContext,
-} from "@/features/slices/registrasiGuru/types";
 
-// ⬇️ ambil daftar instruments dari slice yang sama dengan AdminInstrumentPage
-import { fetchInstrumentsThunk } from "@/features/slices/instruments/slice";
-import { resolveIconUrl } from "@/services/api/instrument.api";
+import {
+  fetchGuruApplicationsThunk,
+  setGAPage,
+  setGALimit,
+  setGAStatus,
+  approveApplicationThunk,   // ✅ thunk approve
+  rejectApplicationThunk,    // ✅ thunk reject
+} from "@/features/slices/guruApplication/slice";
+import type { GuruApplicationDTO } from "@/features/slices/guruApplication/types";
 
 import ConfirmationModal from "@/components/ui/common/ConfirmationModal";
 import ApproveTeacherModal, {
@@ -40,12 +33,9 @@ const cls = (...xs: Array<string | false | null | undefined>) =>
   xs.filter(Boolean).join(" ");
 
 const PAGE_SIZE = 5;
-const PLACEHOLDER_ICON = "/assets/icons/instruments/placeholder.svg";
-const EMPTY_ARR: any[] = []; // ⬅️ referensi stabil (tidak berubah antar render)
-const norm = (s?: string | null) =>
-  (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+const EMPTY_ARR: any[] = [];
 
-/* ======================== Subcomponents ======================== */
+/* ======================== Subcomponents (UI sama persis) ======================== */
 
 const Header: React.FC = () => (
   <div className="flex items-center gap-3 mb-5">
@@ -70,7 +60,7 @@ const TableHeader: React.FC = () => {
         <th className={headCls}>No Telepon</th>
         <th className={headCls}>Asal Kota</th>
         <th className={headCls}>Tanggal</th>
-        <th className={headCls}>Alat Musik</th>
+        <th className={headCls}>Mengajar ABK</th>
         <th className={headCls}>Aksi</th>
       </tr>
     </thead>
@@ -105,13 +95,11 @@ const ActionButtons: React.FC<{
 );
 
 const RowItem: React.FC<{
-  row: RegistrasiGuru;
-  iconUrl: string;
+  row: GuruApplicationDTO;
   onApprove: () => void;
   onReject: () => void;
-}> = ({ row, iconUrl, onApprove, onReject }) => {
-  const instrument = row.preferensi_instrumen || "unknown";
-  const profileUrl = "/assets/images/teacher-demo.png";
+}> = ({ row, onApprove, onReject }) => {
+  const profileUrl = row.user?.profile_pic_url || "/assets/images/teacher-demo.png";
 
   const createdAt = row.created_at
     ? new Date(row.created_at).toLocaleDateString("id-ID", {
@@ -120,6 +108,10 @@ const RowItem: React.FC<{
         day: "2-digit",
       })
     : "-";
+
+  const abk = !!row.is_abk;
+  const abkLabel = abk ? "Bersedia" : "Tidak Bersedia";
+  const abkColorVar = abk ? "var(--accent-green-color)" : "var(--accent-red-color)";
 
   return (
     <tr>
@@ -141,12 +133,12 @@ const RowItem: React.FC<{
 
       {/* Phone */}
       <td className="py-3 px-4">
-        <span className="text-[#202020] text-md">{row.no_telp}</span>
+        <span className="text-[#202020] text-md">{row.no_telp ?? "-"}</span>
       </td>
 
       {/* Kota */}
       <td className="py-3 px-4">
-        <span className="text-[#202020] text-md">{row.alamat ?? "-"}</span>
+        <span className="text-[#202020] text-md">{row.domisili ?? "-"}</span>
       </td>
 
       {/* Tanggal */}
@@ -154,18 +146,11 @@ const RowItem: React.FC<{
         <span className="text-[#202020] text-md">{createdAt}</span>
       </td>
 
-      {/* Instrument (icon dari DB) */}
-      <td className="py-3 px-2">
-        <div className="flex items-center gap-2">
-          <div className="grid place-items-center">
-            <img
-              src={iconUrl}
-              alt={`${instrument} icon`}
-              className="h-[25px] w-[25px] object-contain"
-            />
-          </div>
-          <span className="text-[#202020] text-md capitalize">{instrument}</span>
-        </div>
+      {/* Mengajar ABK */}
+      <td className="py-3 px-4">
+        <span className="text-md" style={{ color: abkColorVar }}>
+          {abkLabel}
+        </span>
       </td>
 
       {/* Aksi */}
@@ -253,84 +238,57 @@ const Pagination: React.FC<{
 const VerifiedTutorPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
 
-  // registrasi guru slice
-  const reg = useSelector((s: RootState) => (s as any).registrasiGuru);
-  const items: RegistrasiGuru[] = Array.isArray(reg?.items) ? reg.items : EMPTY_ARR;
-  const total: number = typeof reg?.total === "number" ? reg.total : 0;
-  const status: RegistrasiStatus = reg?.status ?? "idle";
-  const errorMsg: string | null = reg?.error ?? null;
+  const gaList = useSelector((s: RootState) => s.guruApplication.list);
+  const itemsAll: GuruApplicationDTO[] = Array.isArray(gaList?.rows) ? gaList.rows : EMPTY_ARR;
+  const total: number = typeof gaList?.total === "number" ? gaList.total : 0;
+  const loading: boolean = !!gaList?.loading;
+  const errorMsg: string | null = gaList?.error ?? null;
 
-  // instrument slice
-  const instrumentItemsRaw =
-    useSelector((s: RootState) => (s as any).instrument?.items) || undefined;
+  const [page, setPage] = useState<number>(gaList?.page || 1);
 
-  // local page
-  const [page, setPage] = useState<number>(reg?.page || 1);
-
-  // modals
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ApproveMode>("approved");
-  const [selected, setSelected] = useState<RegistrasiGuru | null>(null);
+  const [selected, setSelected] = useState<GuruApplicationDTO | null>(null);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmKind, setConfirmKind] = useState<ApproveConfirmKind>("success");
-  const [confirmCtx, setConfirmCtx] =
-    useState<ApproveConfirmContext>("approved");
+  const [confirmKind, setConfirmKind] = useState<"success" | "error">("success");
+  const [confirmCtx, setConfirmCtx] = useState<"approved" | "rejected">("approved");
 
-  // Fetch registrasi
+  // Load awal: hanya status 'proses'
   useEffect(() => {
-    dispatch(setRegPage(page));
-    dispatch(setRegLimit(PAGE_SIZE));
-    dispatch(fetchRegistrasiGuruThunk({ page, limit: PAGE_SIZE }));
+    dispatch(setGALimit(PAGE_SIZE));
+    dispatch(setGAPage(page));
+    dispatch(setGAStatus("proses"));
+    dispatch(fetchGuruApplicationsThunk());
   }, [dispatch, page]);
 
-  // ✅ Dependensi boolean saja → stabil
-  const needInstruments = (instrumentItemsRaw?.length ?? 0) === 0;
+  // Filter client-side juga (untuk berjaga)
+  const items = useMemo(
+    () => itemsAll.filter((r) => r.status === "proses"),
+    [itemsAll]
+  );
 
-  useEffect(() => {
-    if (needInstruments) {
-      dispatch(fetchInstrumentsThunk({ q: "", page: 1, limit: 500 }));
-    }
-  }, [dispatch, needInstruments]);
-
-  // Build map nama -> iconUrl; depend on items RAW (bukan array fallback)
-  const iconMap = useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const it of instrumentItemsRaw ?? EMPTY_ARR) {
-      const key = norm((it as any)?.nama_instrumen);
-      if (!key) continue;
-      const url = resolveIconUrl((it as any)?.icon);
-      if (url) m[key] = url;
-    }
-    return m;
-  }, [instrumentItemsRaw]);
-
-  const getIconForInstrument = (name?: string | null) =>
-    iconMap[norm(name)] || PLACEHOLDER_ICON;
-
-  const openModal = (mode: ApproveMode, row: RegistrasiGuru) => {
+  const openModal = (mode: ApproveMode, row: GuruApplicationDTO) => {
     setSelected(row);
     setModalMode(mode);
     setModalOpen(true);
   };
 
+  // ⬇️ INI YANG MEMANGGIL ENDPOINT APPROVE/REJECT via thunk
   const handleSubmitModal = async (payload: ApproveTeacherPayload) => {
     if (!selected) return;
     setModalOpen(false);
 
     try {
       if (payload.mode === "approved") {
-        await dispatch(deleteRegistrasiGuruThunk(selected.id)).unwrap();
+        await dispatch(
+          approveApplicationThunk({ id: selected.id, note: (payload as any)?.notes })
+        ).unwrap();
       } else {
         const reason =
-          (payload as any)?.reason ||
-          (payload as any)?.notes ||
-          "Ditolak oleh admin";
+          (payload as any)?.reason || (payload as any)?.notes || "Ditolak oleh admin";
         await dispatch(
-          updateRegistrasiGuruThunk({
-            id: selected.id,
-            patch: { alasan_penolakan: reason },
-          })
+          rejectApplicationThunk({ id: selected.id, note: reason })
         ).unwrap();
       }
       setConfirmKind("success");
@@ -340,7 +298,8 @@ const VerifiedTutorPage: React.FC = () => {
       setConfirmCtx(payload.mode);
       setConfirmOpen(true);
       setSelected(null);
-      dispatch(fetchRegistrasiGuruThunk({ page, limit: PAGE_SIZE }));
+      // refresh list agar item yang sudah diputuskan hilang dari status 'proses'
+      dispatch(fetchGuruApplicationsThunk());
     }
   };
 
@@ -366,7 +325,7 @@ const VerifiedTutorPage: React.FC = () => {
     <div className="p-4 sm:p-6 bg-white rounded-2xl">
       <Header />
 
-      {status === "failed" && errorMsg && (
+      {errorMsg && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">
           {errorMsg}
         </div>
@@ -376,7 +335,7 @@ const VerifiedTutorPage: React.FC = () => {
         <table className="w-full">
           <TableHeader />
           <tbody>
-            {status === "loading" && (
+            {loading && (
               <tr>
                 <td colSpan={7} className="p-6 text-sm text-neutral-600">
                   Memuat data...
@@ -384,7 +343,7 @@ const VerifiedTutorPage: React.FC = () => {
               </tr>
             )}
 
-            {status !== "loading" && items.length === 0 && (
+            {!loading && items.length === 0 && (
               <tr>
                 <td colSpan={7} className="p-8 text-center text-neutral-600">
                   Belum ada pendaftar.
@@ -392,15 +351,15 @@ const VerifiedTutorPage: React.FC = () => {
               </tr>
             )}
 
-            {items.map((row) => (
-              <RowItem
-                key={row.id}
-                row={row}
-                iconUrl={getIconForInstrument(row.preferensi_instrumen)}
-                onApprove={() => openModal("approved", row)}
-                onReject={() => openModal("rejected", row)}
-              />
-            ))}
+            {!loading &&
+              items.map((row) => (
+                <RowItem
+                  key={row.id}
+                  row={row}
+                  onApprove={() => openModal("approved", row)}
+                  onReject={() => openModal("rejected", row)}
+                />
+              ))}
           </tbody>
         </table>
       </div>
@@ -409,25 +368,23 @@ const VerifiedTutorPage: React.FC = () => {
         <Pagination total={total} page={page} onChange={setPage} />
       </div>
 
-      {/* Form modal */}
+      {/* Modal */}
       <ApproveTeacherModal
         open={modalOpen}
         mode={modalMode}
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmitModal}
         data={{
-          image: "/assets/images/teacher-demo.png",
+          image: selected?.user?.profile_pic_url || "/assets/images/teacher-demo.png",
           name: selected?.nama ?? undefined,
           phone: selected?.no_telp ?? undefined,
-          city: selected?.alamat ?? "-",
-          videoUrl: selected?.path_video_url ?? undefined,
-          cvUrl: selected?.file_cv_url ?? undefined,
-          certificateUrl: selected?.file_sertifikasi_url ?? undefined,
+          city: selected?.domisili ?? "-",
+          videoUrl: selected?.demo_url ?? undefined,
+          cvUrl: selected?.cv_url ?? undefined,
+          certificateUrl: selected?.portfolio_url ?? undefined,
         }}
       />
 
-
-      {/* Confirmation modal */}
       <ConfirmationModal
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}

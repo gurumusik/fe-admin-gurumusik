@@ -1,3 +1,4 @@
+// src/features/dashboard/components/StudentReportModal.tsx
 'use client';
 
 import React from 'react';
@@ -6,29 +7,31 @@ import { getInstrumentIcon } from '@/utils/getInstrumentIcon';
 import { getPackageColor } from '@/utils/getPackageColor';
 import { getStatusColor } from '@/utils/getStatusColor';
 
-export type TutorReportRow = {
+export type StudentReportRow = {
   no: number | string;
-  nilai: string;
-  date: string;
-  status: string;
+  nilai: string;      // contoh: "4.5/5" atau "−"
+  date: string;       // ISO/yyy-mm-dd juga boleh (akan diformat dd/mm/yyyy)
+  status: string;     // contoh: "Tampil" | "Tidak Tampil"
 };
 
-type TutorReportModalProps = {
+type StudentReportModalProps = {
   open: boolean;
   onClose: () => void;
 
-  tutorImage: string;
-  tutorName: string;
-  statusLabel?: string;
+  /** header kelas (guru & kelas) */
+  teacherImage: string;
+  teacherName: string;
+  statusLabel?: string;      // status murid (mis. "Aktif"), boleh dikosongkan
   programLabel?: string;
   instrumentLabel?: string;
   schedule?: string;
-  nilaiKelas?: string;
-  nilaiAsli?: string;
+  nilaiKelas?: string;       // opsional, kalau mau tampilkan ringkas rata-rata
+  nilaiAsli?: string;        // opsional
 
-  rows?: TutorReportRow[];
+  rows?: StudentReportRow[];
+  loading?: boolean;         // ⬅️ NEW: tampilkan “Memuat data…”
 
-  onReview?: (row: TutorReportRow) => void;
+  onReview?: (row: StudentReportRow) => void;
 };
 
 /** Format ke dd/mm/yyyy dari berbagai input aman (ISO, Date, dst). */
@@ -58,22 +61,18 @@ function toDDMMYYYY(input?: string | Date | null) {
   return `${dd}/${mm}/${yy}`;
 }
 
-const TutorReportModal: React.FC<TutorReportModalProps> = ({
+const StudentReportModal: React.FC<StudentReportModalProps> = ({
   open,
   onClose,
-  tutorImage,
-  tutorName,
+  teacherImage,
+  teacherName,
   statusLabel = 'Aktif',
   programLabel = 'ABK',
   instrumentLabel = 'Piano',
   schedule = 'Setiap Kamis | 14.00 - 14.45',
-  nilaiKelas = '4.5/5',
   nilaiAsli = '4.5/5',
-  rows = [
-    { no: 1, nilai: '4.5/5', date: '2025-08-04T10:22:00Z', status: 'Tampil' },
-    { no: 2, nilai: '4.5/5', date: '2025-08-04', status: 'Tampil' },
-  ],
-  onReview,
+  rows = [],
+  loading = false,
 }) => {
   if (!open) return null;
 
@@ -94,29 +93,25 @@ const TutorReportModal: React.FC<TutorReportModalProps> = ({
         </div>
 
         <div className="px-6 pt-5 pb-6">
+          {/* Header guru & ringkasan nilai */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <img
-                src={tutorImage}
-                alt={tutorName}
+                src={teacherImage}
+                alt={teacherName}
                 className="h-16 w-16 rounded-full object-cover ring-2 ring-black/5"
               />
               <div className="flex flex-col">
-                <div className="text-xl font-semibold text-neutral-900 leading-5">{tutorName}</div>
-                <div className={`text-md font-medium capitalize ${getStatusColor(statusLabel)} mt-1`}>
-                  {statusLabel}
-                </div>
+                <div className="text-xl font-semibold text-neutral-900 leading-5">{teacherName}</div>
+                {!!statusLabel && (
+                  <div className={`text-md font-medium capitalize ${getStatusColor(statusLabel)} mt-1`}>
+                    {statusLabel}
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="flex flex-col rounded-xl bg-[#EAF8F1] px-4 py-3 text-md font-semibold text-neutral-900 inline-flex items-center gap-2">
-                <span className="opacity-80">Nilai Kelas</span>
-                <span className="inline-flex items-center gap-1">
-                  <RiStarFill className="text-[var(--primary-color)]" />
-                  {nilaiKelas}
-                </span>
-              </div>
               <div className="flex flex-col rounded-xl bg-[#FFF3E1] px-4 py-3 text-md font-semibold text-neutral-900 inline-flex items-center gap-2">
                 <span className="opacity-80">Nilai Asli</span>
                 <span className="inline-flex items-center gap-1">
@@ -127,6 +122,7 @@ const TutorReportModal: React.FC<TutorReportModalProps> = ({
             </div>
           </div>
 
+          {/* Ringkas program / alat musik / jadwal */}
           <div className="mt-5 rounded-2xl border border-black/10 overflow-hidden">
             <div className="px-4 pt-4 pb-3">
               <div className="flex justify-between gap-4">
@@ -166,6 +162,7 @@ const TutorReportModal: React.FC<TutorReportModalProps> = ({
               </div>
             </div>
 
+            {/* Tabel riwayat penilaian */}
             <div className="p-4">
               <table className="w-full table-fixed">
                 <thead>
@@ -174,11 +171,16 @@ const TutorReportModal: React.FC<TutorReportModalProps> = ({
                     <th className="p-5 font-medium">Nilai</th>
                     <th className="p-5 font-medium">Tanggal</th>
                     <th className="p-5 font-medium">Status</th>
-                    <th className="w-[120px] p-5 font-medium">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
+                  {loading && (
+                    <tr>
+                      <td colSpan={4} className="p-6 text-center text-neutral-500">Memuat data…</td>
+                    </tr>
+                  )}
+
+                  {!loading && rows.map((r) => (
                     <tr key={`row-${r.no}`} className="border-t border-black/5 text-md">
                       <td className="px-4 py-4">{r.no}</td>
                       <td className="px-4 py-4 inline-flex items-center gap-2">
@@ -191,21 +193,12 @@ const TutorReportModal: React.FC<TutorReportModalProps> = ({
                           {r.status}
                         </span>
                       </td>
-                      <td className="px-4 py-4">
-                        <button
-                          type="button"
-                          onClick={() => onReview?.(r)}
-                          className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
-                        >
-                          Review
-                        </button>
-                      </td>
                     </tr>
                   ))}
 
-                  {rows.length === 0 && (
+                  {!loading && rows.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-6 text-center text-neutral-500">
+                      <td colSpan={4} className="p-6 text-center text-neutral-500">
                         Tidak ada data.
                       </td>
                     </tr>
@@ -214,10 +207,11 @@ const TutorReportModal: React.FC<TutorReportModalProps> = ({
               </table>
             </div>
           </div>
+          {/* /ringkas */}
         </div>
       </div>
     </div>
   );
 };
 
-export default TutorReportModal;
+export default StudentReportModal;

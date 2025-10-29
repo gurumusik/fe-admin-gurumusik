@@ -2,6 +2,8 @@ export function getStatusColor(status: string): string {
   switch (status) {
     case 'Menunggu Verifikasi':
       return 'text-(--accent-orange-color)';
+    case 'Tampil':
+      return 'text-(--accent-green-color)';
     case 'aktif':
       return 'text-(--accent-green-color)';
     case 'Aktif':
@@ -11,6 +13,8 @@ export function getStatusColor(status: string): string {
     case 'Finished':
       return 'text-(--accent-green-color)';
     case 'Selesai Tepat Waktu':
+      return 'text-(--accent-green-color)';
+    case 'kelas selesai':
       return 'text-(--accent-green-color)';
     case 'Selesai':
       return 'text-(--accent-green-color)';
@@ -24,11 +28,15 @@ export function getStatusColor(status: string): string {
       return 'text-(--accent-red-color)';
     case 'Belum Selesai':
       return 'text-(--accent-red-color)';
+    case 'belum dimulai':
+      return 'text-(--accent-red-color)';
     case 'Dibatalkan':
       return 'text-(--accent-red-color)';
     case 'Terlewat':
       return 'text-(--accent-red-color)';
     case 'Tidak Disetujui':
+      return 'text-(--accent-red-color)';
+    case 'Tidak Tampil':
       return 'text-(--accent-red-color)';
     case 'Dialihkan Ke Guru Lain':
       return 'text-(--accent-purple-color)';
@@ -37,6 +45,8 @@ export function getStatusColor(status: string): string {
     case 'Pending':
       return 'text-(--primary-color)';
     case 'Cuti':
+      return 'text-(--primary-color)';
+    case 'cuti':
       return 'text-(--primary-color)';
     case 'On Going':
       return 'text-(--primary-color)';

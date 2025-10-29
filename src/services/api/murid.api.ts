@@ -207,7 +207,7 @@ export async function listMuridClassesById(args: {
   limit?: number;
   instrument?: string;
   program?: string;
-  view?: 'per_session' | 'latest_done';  // ⬅️ tambahkan
+  view?: 'per_session' | 'latest_done';
 }) {
   const muridId = args.muridId ?? 0;
   const qs = new URLSearchParams();
@@ -216,7 +216,7 @@ export async function listMuridClassesById(args: {
   if (args.limit) qs.set('limit', String(args.limit));
   if (args.instrument) qs.set('instrument', args.instrument);
   if (args.program) qs.set('program', args.program);
-  if (args.view) qs.set('view', args.view); // ⬅️ tambahkan
+  if (args.view) qs.set('view', args.view);
   const qstr = qs.toString() ? `?${qs.toString()}` : '';
 
   return baseUrl.request<MuridClassSessionListResp>(
@@ -235,4 +235,45 @@ export async function listMuridClassesLatestDone(args: {
   program?: string;
 }) {
   return listMuridClassesById({ ...args, view: 'latest_done' });
+}
+
+/* =============== NEW: Daftar rating per transaksi (untuk StudentReportModal) =============== */
+
+export type StudentRatingRow = {
+  id: number;
+  id_guru: number;
+  id_murid: number;
+  id_transaksi: number;
+  rate: number | string;     
+  is_show: boolean;
+  created_at: string;
+};
+
+export type ListMuridTransaksiRatingsResp = {
+  meta: { murid_id: number; transaksi_id: number; total: number };
+  data: StudentRatingRow[];
+};
+
+/**
+ * GET /murid/:muridId/classes/ratings?transaksi_id=...(&uuid=...)
+ * Mengambil daftar rating (rate, created_at, is_show) dari tabel `rating`
+ * untuk satu transaksi milik murid tertentu.
+ *
+ * Catatan:
+ * - Kirim `muridId` atau cukup `uuid` (jika `muridId` tidak ada, set muridId=0).
+ * - Endpoint backend: ENDPOINTS.MURID.CLASSES_RATINGS(muridId)
+ */
+export async function listMuridTransaksiRatings(args: {
+  muridId?: number | string; // opsional — bila tidak ada, kirim 0 & gunakan uuid
+  uuid?: string;             // opsional — bila pakai ini, server akan resolve ke id
+  transaksiId: number | string;
+}) {
+  const muridId = args.muridId ?? 0;
+  const qs = new URLSearchParams({ transaksi_id: String(args.transaksiId) });
+  if (args.uuid) qs.set('uuid', args.uuid);
+
+  return baseUrl.request<ListMuridTransaksiRatingsResp>(
+    `${ENDPOINTS.MURID.CLASSES_RATINGS(muridId)}?${qs.toString()}`,
+    { method: 'GET' }
+  );
 }

@@ -1,17 +1,29 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RiUser2Fill, RiSearchLine, RiStarFill } from 'react-icons/ri';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/app/store';
 
-import { fetchGuruListThunk, setGuruPage } from '@/features/slices/guru/slice';
-import type { GuruListItem } from '@/features/slices/guru/slice';
+import {
+  fetchGuruListThunk,
+  setGuruPage,
+  setGuruLimit,
+  setGuruQuery,
+  setGuruCity,
+  setGuruStatus,
+  setGuruRatingBelow4,
+  clearGuruFilters,
+} from '@/features/slices/guru/slice';
+import type { GuruListItem } from '@/features/slices/guru/types';
 import { getStatusColor } from '@/utils/getStatusColor';
-import defaultUser from '@/assets/images/default-user.png'
+import defaultUser from '@/assets/images/default-user.png';
 
-// Komponen StatCard tetap sama
+/* =========================
+   KOMONEN KECIL
+   ========================= */
 const StatCard: React.FC<{
   label: string;
   value: number | string;
@@ -32,7 +44,7 @@ const StatCard: React.FC<{
   );
 };
 
-// page window (elipsis) tetap
+// window pagination (ellipsis)
 function pageWindow(total: number, current: number) {
   const out: (number | '…')[] = [];
   const push = (x: number | '…') => { if (out[out.length - 1] !== x) out.push(x); };
@@ -43,25 +55,91 @@ function pageWindow(total: number, current: number) {
   return out;
 }
 
+/* =========================
+   PAGE
+   ========================= */
 export default function TutorListPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
 
-  const { items, status, error, recap, page, totalPages } = useSelector(
-    (s: RootState) => s.guru.list
-  );
-  // Ikuti UI lama: 5 baris per halaman
+  const {
+    items, status, error, recap,
+    page, totalPages, hasPrev, hasNext,
+    lastQuery,
+  } = useSelector((s: RootState) => s.guru.list);
+
+  // Konsisten 5 baris / page (server-side)
   const PAGE_SIZE = 5;
 
-  // Fetch saat mount & saat ganti page
+  // Set limit sekali saat mount (tidak memicu fetch)
   useEffect(() => {
-    dispatch(fetchGuruListThunk({ page, limit: PAGE_SIZE }));
-     
-  }, [dispatch, page]);
+    dispatch(setGuruLimit(PAGE_SIZE));
+  }, [dispatch]);
 
-  const rows: GuruListItem[] = useMemo(() => items, [items]);
+  // Ambil nilai filter terakhir (pakai primitif agar dep effect stabil)
+  const q = lastQuery?.q ?? '';
+  const city = lastQuery?.city ?? '';
+  const statusFilterRaw = (lastQuery?.status ?? '') as '' | 'aktif' | 'non_aktif' | 'cuti';
+  const ratingBelow4 = !!lastQuery?.ratingBelow4;
 
-  const goTo = (p: number) => dispatch(setGuruPage(Math.min(Math.max(1, p), totalPages || 1)));
+  // ==== Deduplicate request (StrictMode & rerender) ====
+  // ratingBelow4 ikut key agar refetch saat toggle
+  const sentKeyRef = useRef<string>('');
+  useEffect(() => {
+    const key = `${page}|${PAGE_SIZE}|${q}|${city}|${statusFilterRaw}|${ratingBelow4 ? 'rb4' : 'all'}`;
+    if (sentKeyRef.current === key) return;
+    sentKeyRef.current = key;
+
+    dispatch(
+      fetchGuruListThunk({
+        q: q || undefined,
+        city: city || undefined,
+        status: statusFilterRaw || undefined, // raw backend: 'aktif' | 'non_aktif' | 'cuti'
+        // kirim ke server supaya server yang filter & paginate ulang
+        rating_lt: ratingBelow4 ? 4 : undefined,
+        page,
+        limit: PAGE_SIZE,
+      }) as any
+    );
+  }, [dispatch, page, PAGE_SIZE, q, city, statusFilterRaw, ratingBelow4]);
+
+  // ==== Search input dengan debounce ====
+  const [searchText, setSearchText] = useState<string>(q ?? '');
+  const debounceRef = useRef<number | null>(null);
+  useEffect(() => {
+    setSearchText(q ?? '');
+  }, [q]);
+
+  const onSearchChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const val = e.target.value;
+    setSearchText(val);
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      dispatch(setGuruPage(1));
+      dispatch(setGuruQuery(val));
+    }, 350) as unknown as number;
+  };
+
+  // ==== Opsi kota (diambil dari data tampil saat ini) ====
+  const cityOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) {
+      if (it.city && it.city.trim()) set.add(it.city.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
+  // ==== Rows: fallback client-side filter jika backend belum support ====
+  const rows: GuruListItem[] = useMemo(() => {
+    if (!ratingBelow4) return items;
+    return items.filter(it => typeof it.rating === 'number' && it.rating < 4);
+  }, [items, ratingBelow4]);
+
+  // Helpers pindah halaman
+  const goTo = (p: number) => {
+    const safe = Math.min(Math.max(1, p), totalPages || 1);
+    if (safe !== page) dispatch(setGuruPage(safe));
+  };
   const prev = () => goTo(page - 1);
   const next = () => goTo(page + 1);
 
@@ -133,7 +211,7 @@ export default function TutorListPage() {
               <button
                 onClick={() =>
                   navigate('/dashboard-admin/tutor-list/class-list-tutor', {
-                    state: { guruId: t.id }, // ganti ke id guru
+                    state: { guruId: t.id },
                   })
                 }
                 className="rounded-full cursor-pointer border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
@@ -167,40 +245,77 @@ export default function TutorListPage() {
 
       {/* SECTION: List Guru */}
       <section className="mt-6 rounded-2xl bg-white p-4 md:p-6">
-        {/* Header + Filters (UI only) */}
+        {/* Header + Filters */}
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <h3 className="text-lg font-semibold text-black">List Guru</h3>
 
           <div className="flex flex-1 items-center gap-3 md:justify-end text-md">
+            {/* Search by name */}
             <label className="relative w-full max-w-[460px]">
               <RiSearchLine className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-black/50" />
               <input
                 className="w-full rounded-xl border border-black/10 bg-white py-2 pl-10 pr-3 outline-none placeholder:text-black/40 focus:border-(--secondary-color)"
                 placeholder="| Cari Nama Guru, cth: Dicka Taksa"
-                readOnly
+                value={searchText}
+                onChange={onSearchChange}
               />
             </label>
 
+            {/* Filter Kota */}
             <select
               className="rounded-xl border border-black/10 bg-white px-4 py-2 text-sm text-neutral-900 focus:border-(--secondary-color)"
-              defaultValue=""
-              disabled
+              value={city}
+              onChange={(e) => {
+                dispatch(setGuruPage(1));
+                dispatch(setGuruCity(e.target.value || undefined));
+              }}
             >
-              <option value="">Pilih Asal Kota</option>
+              <option value="">Semua Kota</option>
+              {cityOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
 
+            {/* Filter Status (pakai RAW backend value) */}
             <select
               className="rounded-xl border border-black/10 bg-white px-4 py-2 text-sm text-neutral-900 focus:border-(--secondary-color)"
-              defaultValue=""
-              disabled
+              value={statusFilterRaw}
+              onChange={(e) => {
+                dispatch(setGuruPage(1));
+                dispatch(setGuruStatus((e.target.value as any) || undefined));
+              }}
             >
-              <option value="">Pilih Status</option>
+              <option value="">Semua Status</option>
+              <option value="aktif">Aktif</option>
+              <option value="non_aktif">Non-Aktif</option>
+              <option value="cuti">Cuti</option>
             </select>
 
+            {/* Checkbox rating < 4 */}
             <label className="flex select-none items-center gap-2 rounded-xl px-2 py-1 text-md 60">
-              <input type="checkbox" className="h-4 w-4 accent-(--secondary-color)" disabled />
-              <span className="text-black">Rating dibawah 4</span>
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-(--secondary-color)"
+                checked={ratingBelow4}
+                onChange={(e) => {
+                  dispatch(setGuruPage(1));                // balik ke page 1
+                  dispatch(setGuruRatingBelow4(e.target.checked));
+                }}
+              />
+              <span className="text-black">Rating di bawah 4</span>
             </label>
+
+            {/* Clear */}
+            <button
+              onClick={() => {
+                dispatch(setGuruPage(1));
+                dispatch(clearGuruFilters());
+              }}
+              className="rounded-xl border border-black/15 px-3 py-2 text-sm text-black hover:bg-black/5"
+              type="button"
+            >
+              Reset
+            </button>
           </div>
         </div>
 
@@ -218,16 +333,15 @@ export default function TutorListPage() {
                 <th className="w-[120px] p-4 font-semibold">Aksi</th>
               </tr>
             </thead>
-
             {renderBody()}
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* Pagination (server-side) */}
         <div className="mt-4 flex items-center justify-center gap-2">
           <button
             onClick={prev}
-            disabled={page === 1}
+            disabled={!hasPrev}
             className="px-3 py-2 text-md text-black/70 enabled:hover:bg-black/5 disabled:opacity-40"
             aria-label="Previous page"
           >
@@ -257,7 +371,7 @@ export default function TutorListPage() {
 
           <button
             onClick={next}
-            disabled={page === totalPages}
+            disabled={!hasNext}
             className="px-3 py-2 text-md text-black/70 enabled:hover:bg-black/5 disabled:opacity-40"
             aria-label="Next page"
           >

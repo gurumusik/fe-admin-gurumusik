@@ -1,17 +1,21 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
-import {
-  RiCloseLine,
-  RiStarFill,
-  RiCalendar2Line,
-  RiInformationLine,
-} from 'react-icons/ri';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { RiCloseLine, RiStarFill, RiCalendar2Line, RiInformationLine } from 'react-icons/ri';
 import { getInstrumentIcon } from '@/utils/getInstrumentIcon';
 import type { TutorReportRow } from './TutorReportModal';
-import Landscape from '@/assets/images/Landscape.png';
 import teacherFallback from '@/assets/images/teacher-demo.png';
 import ProgramAvatarBadge from '@/components/ui/badge/ProgramAvatarBadge';
+import { updateRatingIsShow } from '@/services/api/guruClasses.api';
+
+// ⬇️ util untuk lampiran
+import { resolveImageUrl } from '@/utils/resolveImageUrl';
+
+// ⬇️ tipe bantu (sesuai types.ts)
+import type {
+  RatingSelectedIndicatorItem,
+  RatingAttachmentItem,
+} from '@/features/slices/guru/classes/types';
 
 type TutorReviewModalProps = {
   open: boolean;
@@ -21,13 +25,29 @@ type TutorReviewModalProps = {
   tutorName: string;
   instrumentLabel?: string;
   schedule?: string;
-  programLabel?: string; // <-- dipakai ProgramAvatarBadge
+  programLabel?: string;
 
   nilaiKelas?: string;
   nilaiAsli?: string;
 
   row?: TutorReportRow | null;
+
+  // kontrol toggle
+  onSetShown?: (next: boolean) => Promise<void> | void;
+  submitting?: boolean;
+  errorText?: string | null;
+
+  // fallback PUT
+  guruId?: number | string;
+  ratingId?: number | string;
+
+  // toggle state awal (datang dari page -> selectedRating?.is_show)
   defaultVisible?: boolean;
+
+  // ⬇️ DATA BARU
+  selectedIndicators?: RatingSelectedIndicatorItem[];
+  attachments?: RatingAttachmentItem[];
+  feedbackText?: string | null;
 };
 
 const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
@@ -39,9 +59,18 @@ const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
   schedule = 'Setiap Kamis | 14.00 - 14.45',
   programLabel = 'ABK',
   row,
-  defaultVisible = true,
+  onSetShown,
+  submitting = false,
+  guruId,
+  ratingId,
+  defaultVisible = false,
+
+  // data baru
+  selectedIndicators = [],
+  attachments = [],
+  feedbackText = '',
 }) => {
-  // Hooks harus selalu dipanggil sebelum return kondisional
+  // rating bintang (UI tetap)
   const ratingValue = useMemo(() => {
     const s = String(row?.nilai ?? '4/5').split('/')[0] || '4';
     const n = parseFloat(s);
@@ -50,22 +79,62 @@ const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
   }, [row?.nilai]);
   const fullStars = Math.round(ratingValue);
 
-  const [isVisible, setIsVisible] = useState(defaultVisible);
+  // visible dari props (prioritas defaultVisible)
+  const propVisible = useMemo(() => {
+    if (typeof defaultVisible === 'boolean') return defaultVisible;
+    const label = (row?.status ?? '').toLowerCase();
+    return /tampil/.test(label);
+  }, [defaultVisible, row?.status]);
 
+  const [isVisible, setIsVisible] = useState<boolean>(propVisible);
+  const [savingLocal, setSavingLocal] = useState<boolean>(false);
+
+  // sync saat modal dibuka / nilai sumber berubah
   useEffect(() => {
-    if (open) setIsVisible(defaultVisible);
-  }, [open, defaultVisible]);
+    if (open) setIsVisible(propVisible);
+  }, [open, propVisible]);
 
-  const reasons = useMemo(
-    () => [
-      { label: 'Tepat Waktu', selected: false },
-      { label: 'Komunikasi Jelas & Tanggap', selected: true },
-      { label: 'Cara Mengajar Efektif', selected: true },
-    ],
-    []
+  const handleToggle = useCallback(async () => {
+    if (submitting || savingLocal) return;
+    const next = !isVisible;
+
+    setIsVisible(next);          // optimistic
+    setSavingLocal(true);
+    try {
+      if (onSetShown) {
+        await onSetShown(next);
+      } else if (guruId != null && ratingId != null) {
+        await updateRatingIsShow(guruId, ratingId, next);
+      } else {
+        setIsVisible(!next);     // revert jika tidak ada handler/id
+      }
+    } catch {
+      setIsVisible(!next);       // revert jika gagal
+    } finally {
+      setSavingLocal(false);
+    }
+  }, [isVisible, submitting, savingLocal, onSetShown, guruId, ratingId]);
+
+  // ====== DATA BARU: reasons dari selectedIndicators (pakai label)
+  const reasonLabels = useMemo(
+    () =>
+      (selectedIndicators ?? [])
+        .map((it) => it?.indicator?.label)
+        .filter((lbl): lbl is string => !!lbl && !!String(lbl).trim()),
+    [selectedIndicators]
   );
 
-  const thumbs = useMemo(() => [Landscape, Landscape, Landscape], []);
+  // ====== DATA BARU: thumbs dari rating_attachment (resolve URL)
+  const thumbs = useMemo(
+    () =>
+      (attachments ?? [])
+        .map((a) => resolveImageUrl(a?.url ?? null))
+        .filter((u): u is string => !!u),
+    [attachments]
+  );
+
+  // ====== DATA BARU: feedback untuk deskripsi
+  const description = (feedbackText ?? '').trim();
 
   if (!open) return null;
 
@@ -78,14 +147,12 @@ const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
       <div className="relative z-[131] w-[min(720px,95vw)] rounded-3xl bg-white shadow-2xl border border-black/10">
         {/* header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/10">
-          {/* left: avatar + name + instrument + schedule */}
           <div className="flex items-center gap-3">
-            {/* ✅ gunakan ProgramAvatarBadge */}
             <ProgramAvatarBadge
               src={tutorImage || teacherFallback}
               alt={tutorName}
               pkg={programLabel}
-              size={56} // ~h-14 w-14
+              size={56}
             />
 
             <div className="flex flex-col">
@@ -107,7 +174,6 @@ const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
             </div>
           </div>
 
-          {/* right: close */}
           <button
             onClick={onClose}
             className="inline-flex items-center justify-center rounded-full p-2 hover:bg-black/5"
@@ -136,11 +202,14 @@ const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
               <span className="text-sm text-neutral-700">Tampilkan</span>
               <button
                 type="button"
-                onClick={() => setIsVisible((v) => !v)}
+                onClick={handleToggle}
+                disabled={submitting || savingLocal}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
                   isVisible ? 'bg-(--secondary-color)' : 'bg-neutral-300'
-                }`}
+                } disabled:opacity-50`}
                 aria-pressed={isVisible}
+                aria-busy={submitting || savingLocal}
+                title={submitting || savingLocal ? 'Menyimpan…' : isVisible ? 'Sembunyikan' : 'Tampilkan'}
               >
                 <span
                   className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
@@ -152,42 +221,44 @@ const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
             </label>
           </div>
 
-          {/* reasons chips */}
+          {/* ====== Alasan: dari selectedIndicators */}
           <div className="mt-5">
             <div className="text-lg font-semibold text-neutral-900 mb-2">Alasan:</div>
             <div className="flex flex-wrap gap-2">
-              {reasons.map((r) => (
-                <span
-                  key={r.label}
-                  className={`rounded-full px-5 py-2 text-sm border bg-white text-(--secondary-color) border-neutral-300 ${
-                    r.selected ? 'opacity-100' : 'opacity-50'
-                  }`}
-                >
-                  {r.label}
-                </span>
-              ))}
+              {reasonLabels.length > 0 ? (
+                reasonLabels.map((label) => (
+                  <span
+                    key={label}
+                    className="rounded-full px-5 py-2 text-sm border bg-white text-(--secondary-color) border-neutral-300"
+                  >
+                    {label}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-neutral-500">—</span>
+              )}
             </div>
           </div>
 
-          {/* thumbnails */}
-          <div className="mt-4 flex items-center gap-3 overflow-x-auto">
-            {thumbs.map((src, i) => (
-              <img
-                key={i}
-                src={src}
-                alt={`thumb-${i + 1}`}
-                className="h-24 w-38 rounded-xl object-cover ring-1 ring-black/10"
-              />
-            ))}
-          </div>
+          {/* ====== Lampiran: dari rating_attachment (gambar) */}
+          {thumbs.length > 0 && (
+            <div className="mt-4 flex items-center gap-3 overflow-x-auto">
+              {thumbs.map((src, i) => (
+                <img
+                  key={i}
+                  src={src}
+                  alt={`lampiran-${i + 1}`}
+                  className="h-24 w-38 rounded-xl object-cover ring-1 ring-black/10"
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          )}
 
-          {/* note box */}
+          {/* ====== Deskripsi: dari feedback */}
           <div className="mt-4 rounded-xl border border-black/10 bg-white p-3">
-            <p className="text-md text-neutral-700 leading-relaxed">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum mollis nunc a molestie
-              dictum. Mauris venenatis, felis scelerisque aliquet lacinia, nulla nisi venenatis odio,
-              id blandit mauris ipsum id sapien. Vestibulum malesuada orci sit amet pretium facilisis.
-              In lobortis congue augue, a commodo libero tincidunt scelerisque.
+            <p className="text-md text-neutral-700 leading-relaxed whitespace-pre-wrap">
+              {description || '—'}
             </p>
           </div>
         </div>

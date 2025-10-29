@@ -1,4 +1,4 @@
-// src/utils/resolveImageurl.ts
+// src/utils/resolveImageUrl.ts
 export function resolveImageUrl(icon: string | null): string | null {
   if (!icon) return null;
   if (/^https?:\/\//i.test(icon)) return icon;

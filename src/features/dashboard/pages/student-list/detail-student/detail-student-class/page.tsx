@@ -11,11 +11,14 @@ import type { AppDispatch } from '@/app/store';
 import { resolveIconUrl } from '@/utils/resolveIconUrl';
 import defaultUser from '@/assets/images/default-user.png';
 import ProgramAvatarBadge from '@/components/ui/badge/ProgramAvatarBadge';
+import { getStatusColor } from '@/utils/getStatusColor';
 
 import { fetchStudentHeaderThunk, selectStudentDetail } from '@/features/slices/murid/slice';
+import StudentReportModal, { type StudentReportRow } from '@/features/dashboard/components/studentReportModal';
 
 import {
   listMuridClassesById,
+  listMuridTransaksiRatings, // ⬅️ NEW: ambil data rating per transaksi
   type MuridClassSessionRow,
 } from '@/services/api/murid.api';
 
@@ -38,38 +41,7 @@ function pageWindow(total: number, current: number) {
   return out;
 }
 
-// Pewarnaan status mirip contoh (bisa kamu sesuaikan dengan token warna project)
-function statusClass(s?: string) {
-  const x = (s || '').toLowerCase();
-  if (x.includes('tepat')) return 'text-(--accent-green-color)';        // Selesai Tepat Waktu
-  if (x.includes('terlambat')) return 'text-(--accent-orange-color)';   // Selesai Terlambat
-  if (x.includes('dialihkan')) return 'text-(--accent-purple-color)';   // Dialihkan Ke Guru Lain
-  if (x.includes('belum')) return 'text-(--accent-red-color)';          // Belum Selesai
-  return 'text-black/70';
-}
-
 const isBelumSelesai = (s?: string) => (s || '').toLowerCase().includes('belum selesai');
-
-// (opsional) handler tombol aksi – sambungkan ke route/API milikmu
-function useRowActions(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _navigate: ReturnType<typeof useNavigate>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _ctx: { studentUuid?: string; classId: string }
-) {
-  const onReport = (row: { sesi_id: number; sesi_ke: number }) => {
-    // TODO: arahkan ke halaman laporan / panggil API laporan
-    // navigate(`/dashboard-admin/student-list/detail-student/detail-class/${ctx.classId}/session/${row.sesi_id}/report`, { state: { studentUuid: ctx.studentUuid }});
-    console.log('Laporan sesi', row.sesi_id, '(sesi_ke:', row.sesi_ke, ')');
-  };
-
-  const onActivate = (row: { sesi_id: number; sesi_ke: number }) => {
-    // TODO: panggil API aktivasi atau arahkan ke flow aktivasi
-    console.log('Aktifkan kelas untuk sesi', row.sesi_id, '(sesi_ke:', row.sesi_ke, ')');
-  };
-
-  return { onReport, onActivate };
-}
 
 /* ===================== Page ===================== */
 const DetailStudentClassPage: React.FC = () => {
@@ -108,7 +80,10 @@ const DetailStudentClassPage: React.FC = () => {
   const [histPage, setHistPage] = useState<number>(1);
   const HIST_PAGE_SIZE = 6;
 
-  const { onReport, onActivate } = useRowActions(navigate, { studentUuid, classId });
+  // ====== modal report (murid) ======
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportRows, setReportRows] = useState<StudentReportRow[]>([]);
+  const [reportLoading, setReportLoading] = useState<boolean>(false);
 
   // header murid
   useEffect(() => {
@@ -200,7 +175,7 @@ const DetailStudentClassPage: React.FC = () => {
           avgRating,
         });
 
-        // set history
+        // set history (untuk tabel sesi)
         setHistory(rowsThisTx);
         setHistPage(1);
 
@@ -217,6 +192,44 @@ const DetailStudentClassPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [studentUuid, classId]);
 
+  // ketika modal Laporan dibuka, ambil rating dari DB (tabel rating) untuk transaksi ini
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchRatings() {
+      if (!reportOpen) return;
+      if (!studentUuid || !hdr?.transaksiId) return;
+
+      setReportLoading(true);
+      try {
+        const resp = await listMuridTransaksiRatings({
+          uuid: studentUuid,
+          transaksiId: hdr.transaksiId,
+        });
+
+        if (cancelled) return;
+
+      const mapped: StudentReportRow[] = (resp.data || []).map((r, idx) => {
+        const rateNum = typeof r.rate === 'string' ? parseFloat(r.rate) : r.rate;
+        const nilai = Number.isFinite(rateNum as number) ? `${(rateNum as number).toFixed(1)}/5` : '−';
+        return {
+          no: idx + 1,
+          nilai,
+          date: r.created_at,
+          status: r.is_show ? 'Tampil' : 'Tidak Tampil',
+        };
+      });
+
+        setReportRows(mapped);
+      } catch {
+        if (!cancelled) setReportRows([]);
+      } finally {
+        if (!cancelled) setReportLoading(false);
+      }
+    }
+    fetchRatings();
+    return () => { cancelled = true; };
+  }, [reportOpen, studentUuid, hdr?.transaksiId]);
+
   const handleBack = useCallback(() => {
     if (window.history.length > 1) navigate(-1);
     else navigate('/dashboard-admin/student-list', { replace: true });
@@ -224,7 +237,7 @@ const DetailStudentClassPage: React.FC = () => {
 
   const student = detail.item;
 
-  // pagination client-side untuk history
+  // pagination client-side untuk history (sesi)
   const totalHistPages = Math.max(1, Math.ceil(history.length / HIST_PAGE_SIZE));
   const histPageRows = useMemo(() => {
     const start = (histPage - 1) * HIST_PAGE_SIZE;
@@ -339,7 +352,7 @@ const DetailStudentClassPage: React.FC = () => {
                   <td className="px-4 py-4">{r.startClock}</td>
                   <td className="px-4 py-4">{r.endClock}</td>
                   <td className="px-4 py-4">
-                    <span className={`font-semibold capitalize ${statusClass(r.status)}`}>
+                    <span className={`font-semibold capitalize ${getStatusColor(r.status || '-')}`}>
                       {r.status || '-'}
                     </span>
                   </td>
@@ -347,7 +360,7 @@ const DetailStudentClassPage: React.FC = () => {
                     {isBelumSelesai(r.status) ? (
                       <button
                         type="button"
-                        onClick={() => onActivate({ sesi_id: r.sesi_id, sesi_ke: r.sesi_ke })}
+                        onClick={() => console.log('Aktifkan kelas untuk sesi', r.sesi_id, '(sesi_ke:', r.sesi_ke, ')')}
                         className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
                       >
                         Aktifkan Kelas
@@ -355,7 +368,7 @@ const DetailStudentClassPage: React.FC = () => {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => onReport({ sesi_id: r.sesi_id, sesi_ke: r.sesi_ke })}
+                        onClick={() => setReportOpen(true)}
                         className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
                       >
                         Laporan
@@ -410,6 +423,22 @@ const DetailStudentClassPage: React.FC = () => {
           </div>
         )}
       </section>
+
+      {/* ===== Modal: Riwayat Penilaian (Murid) ===== */}
+      <StudentReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        teacherImage={hdr?.teacherAvatar || defaultUser}
+        teacherName={hdr?.teacherName || 'Guru'}
+        statusLabel={String((detail.item?.status ?? '') || '')}    // status murid (opsional)
+        programLabel={hdr?.programName || '—'}
+        instrumentLabel={hdr?.instrumentName || '—'}
+        schedule={hdr?.schedule || '—'}
+        nilaiKelas={hdr?.avgRating != null ? `${hdr.avgRating.toFixed(1)}/5` : '−'}
+        nilaiAsli={hdr?.avgRating != null ? `${hdr.avgRating.toFixed(1)}/5` : '−'}
+        rows={reportRows}
+        loading={reportLoading} // ⬅️ NEW
+      />
     </div>
   );
 };

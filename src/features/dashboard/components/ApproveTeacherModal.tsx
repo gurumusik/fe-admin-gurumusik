@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import {
   RiCloseLine,
-  RiUploadLine,
   RiDownloadLine,
 } from 'react-icons/ri';
 
@@ -42,7 +41,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   onSubmit,
   data,
 }) => {
-  const [file, setFile] = useState<File | null>(null);
+  const [file] = useState<File | null>(null);
   const [reason, setReason] = useState('');
 
   if (!open) return null;
@@ -162,40 +161,12 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                 </p>
               </div>
 
-              {/* Upload */}
-              <div className="mb-6">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 h-9 px-3 rounded-full border border-[var(--secondary-color)] text-sm text-[var(--secondary-color)] bg-[#F5F9FF]"
-                  onClick={() => {
-                    const input = document.getElementById('reject-file') as HTMLInputElement;
-                    input?.click();
-                  }}
-                >
-                  <RiUploadLine size={20} /> Upload Foto
-                </button>
-                <input
-                  id="reject-file"
-                  type="file"
-                  accept=".png,.jpg,.jpeg,.heic,image/*"
-                  className="hidden"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                />
-                <p className="mt-1 text-xs text-neutral-500">
-                  Format (Max 5mb): PNG, JPG, JPEG, HEIC
-                </p>
-                {file && (
-                  <p className="mt-1 text-[12px] text-neutral-700">
-                    Terpilih: <span className="font-medium">{file.name}</span>
-                  </p>
-                )}
-              </div>
 
               {/* Reason */}
               <div className="mt-3">
                 <textarea
                   className="w-full min-h-[120px] rounded-lg border border-[var(--secondary-color)] px-3 py-2 text-md outline-none"
-                  placeholder="Masukkan keterangan Penolakan Pencairan Komisi"
+                  placeholder="Masukkan keterangan Penolakan Calon Tutor"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                 />
