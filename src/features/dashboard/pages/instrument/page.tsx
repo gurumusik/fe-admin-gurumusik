@@ -1,18 +1,17 @@
-// src/features/instrument/pages/AdminInstrumentPage.tsx
 import React from "react";
 import {
   RiPencilFill,
-  RiDeleteBinFill,
   RiQuestionFill,
   RiCheckboxCircleFill,
   RiCloseLine,
+  RiCloseFill,
 } from "react-icons/ri";
 import ConfirmationModal from "@/components/ui/common/ConfirmationModal";
 import AddInstrumentModal from "@/features/dashboard/components/AddInstrumentModal";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "@/app/store";
-import { fetchInstrumentsThunk, deleteInstrumentThunk } from "@/features/slices/instruments/slice";
+import { fetchInstrumentsThunk, setInstrumentActiveThunk } from "@/features/slices/instruments/slice"; // ⬅️ perhatikan path slice-mu
 import { resolveIconUrl } from "@/services/api/instrument.api";
 import { countByInstrument } from "@/services/api/detailProgram.api";
 import { startDraft, prefillFromInstrumentThunk } from "@/features/slices/instrumentWizard/slice";
@@ -42,15 +41,12 @@ export const AdminInstrumentPage: React.FC = () => {
 
   const { items, status, error, page, limit, q } = useSelector((s: RootState) => s.instrument);
 
-  // fetch on mount & when page/q changes
   React.useEffect(() => {
     dispatch(fetchInstrumentsThunk({ q, page, limit }));
   }, [dispatch, q, page, limit]);
 
-  // NEW: level counts state (instrumentId -> count grade)
   const [levelCounts, setLevelCounts] = React.useState<LevelCountMap>({});
 
-  // fetch counts setelah items tersedia
   React.useEffect(() => {
     const loadCounts = async () => {
       if (!items || items.length === 0) return;
@@ -71,23 +67,26 @@ export const AdminInstrumentPage: React.FC = () => {
   const [modalType, setModalType] = React.useState<ModalKind | null>(null);
   const [selectedId, setSelectedId] = React.useState<number | null>(null);
   const [selectedName, setSelectedName] = React.useState<string>("");
+  const [targetActive, setTargetActive] = React.useState<boolean | null>(null);
 
   const closeModal = () => {
     setModalType(null);
     setSelectedId(null);
     setSelectedName("");
+    setTargetActive(null);
   };
 
-  const onDelete = (id: number, name: string) => {
+  const onToggleActive = (id: number, name: string, currentActive?: boolean) => {
     setSelectedId(id);
     setSelectedName(name);
+    setTargetActive(!currentActive);
     setModalType("confirm");
   };
 
-  const reallyDelete = async () => {
-    if (!selectedId) return;
+  const reallyToggle = async () => {
+    if (selectedId == null || targetActive == null) return;
     try {
-      await dispatch(deleteInstrumentThunk(selectedId)).unwrap();
+      await dispatch(setInstrumentActiveThunk({ id: selectedId, is_active: targetActive })).unwrap();
       setModalType("success");
     } catch {
       setModalType("error");
@@ -99,9 +98,7 @@ export const AdminInstrumentPage: React.FC = () => {
       <div className="px-6 sm:px-8 lg:px-10 py-6">
         {/* Header */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-xl font-semibold text-neutral-800">
-            Kelola Instrumen Guru Musik
-          </h1>
+          <h1 className="text-xl font-semibold text-neutral-800">Kelola Instrumen Guru Musik</h1>
 
           <div className="w-full sm:w-[520px] flex gap-3 sm:justify-end">
             <button
@@ -132,6 +129,7 @@ export const AdminInstrumentPage: React.FC = () => {
                 const name = toTitle(it.nama_instrumen);
                 const slug = slugify(it.nama_instrumen);
                 const totalLevel = levelCounts[it.id] ?? 0;
+                const active = it.is_active !== false; // default true bila undefined
 
                 return (
                   <div
@@ -141,33 +139,33 @@ export const AdminInstrumentPage: React.FC = () => {
                     <div className="flex flex-col text-left">
                       <div className="flex items-center gap-2 mb-2 pl-2">
                         {iconUrl ? (
-                          <img
-                            src={iconUrl}
-                            alt={`${name} Icon`}
-                            className="h-6 w-6 object-contain"
-                            loading="lazy"
-                          />
+                          <img src={iconUrl} alt={`${name} Icon`} className="h-6 w-6 object-contain" loading="lazy" />
                         ) : (
                           <div className="h-6 w-6 rounded bg-neutral-200" />
                         )}
                         <p className="text-md font-semibold text-[#0F172A]">{name}</p>
                       </div>
-                      <p className="pl-2 text-md font-semibold text-[#6B7E93]">
-                        Total Level: {totalLevel}
-                      </p>
+
+                      <div className="flex items-center gap-2 pl-2">
+                        <p className="text-md font-semibold text-[#6B7E93]">Total Level: {totalLevel}</p>
+                        <span
+                          className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            active ? "bg-[var(--accent-green-light-color)] text-[var(--accent-green-color)]" : "bg-[var(--primary-light-color)] text-[var(--accent-red-color)]"
+                          }`}
+                          title={active ? "Aktif" : "Nonaktif"}
+                        >
+                          {active ? "Aktif" : "Nonaktif"}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-1">
+                      {/* Edit */}
                       <button
                         type="button"
                         onClick={async (e) => {
                           e.stopPropagation();
-                          // Prefill wizard dari data existing, lalu arahkan ke halaman detail edit
-                          try {
                             await dispatch(prefillFromInstrumentThunk({ instrumentId: it.id })).unwrap();
-                          } catch {
-                            // kalau gagal, tetap lanjutkan ke halaman; user bisa perbaiki manual
-                          }
                           navigate(`/dashboard-admin/instrument/${slug}?edit=1&id=${it.id}`);
                         }}
                         className="h-10 w-10 rounded-xl border border-[#C9D9EA] grid place-items-center hover:bg-[#F4F8FC] transition cursor-pointer"
@@ -177,17 +175,22 @@ export const AdminInstrumentPage: React.FC = () => {
                         <RiPencilFill className="text-[22px] text-[var(--secondary-color,#0682DF)]" />
                       </button>
 
+                      {/* Toggle Aktif/Nonaktif */}
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDelete(it.id, name);
+                          onToggleActive(it.id, name, active);
                         }}
-                        className="h-11 w-11 grid place-items-center cursor-pointer"
-                        aria-label={`Delete ${name}`}
-                        title="Delete"
+                        className="h-10 w-10 rounded-xl border border-[#C9D9EA] grid place-items-center hover:bg-[#F4F8FC] transition cursor-pointer"
+                        aria-label={active ? `Nonaktifkan ${name}` : `Aktifkan ${name}`}
+                        title={active ? "Nonaktifkan" : "Aktifkan"}
                       >
-                        <RiDeleteBinFill className="text-[22px] text-[#FF437B]" />
+                        {active ? (
+                          <RiCloseFill className="text-[25px] text-[#FF437B]" /> // nonaktifkan
+                        ) : (
+                          <RiCheckboxCircleFill className="text-[25px] text-[#10B981]" /> // aktifkan
+                        )}
                       </button>
                     </div>
                   </div>
@@ -203,40 +206,41 @@ export const AdminInstrumentPage: React.FC = () => {
       </div>
 
       {/* Modals */}
-
-      {/* Add Instrumen */}
       <AddInstrumentModal
         open={showAdd}
         onClose={() => setShowAdd(false)}
         onSubmit={async (payload: AddInstrumentSubmitPayload) => {
           const n = (payload.name || "").trim();
           if (!n) return;
-
           let base64: string | undefined = undefined;
           if (payload.file) base64 = await fileToDataUrl(payload.file);
-
-          // simpan ke redux wizard (mode create)
           dispatch(startDraft({ name: n, iconBase64: base64 }));
-
           const slug = slugify(n);
           setShowAdd(false);
-          // tambahkan query ?new=1 supaya detail tahu ini mode create
           navigate(`/dashboard-admin/instrument/${slug}?new=1`);
         }}
       />
 
-      {/* Confirm delete */}
+      {/* Confirm toggle */}
       <ConfirmationModal
         isOpen={modalType === "confirm"}
         onClose={closeModal}
         icon={<RiQuestionFill />}
         iconTone="warning"
-        title={`Yakin hapus instrumen "${selectedName}"?`}
-        texts={[<>Jika instrumen dihapus, data terkait bisa ikut terdampak.</>]}
+        title={
+          targetActive
+            ? `Aktifkan instrumen "${selectedName}"?`
+            : `Nonaktifkan instrumen "${selectedName}"?`
+        }
+        texts={[
+          targetActive
+            ? <>Instrumen akan <b>Aktif</b> dan bisa dipakai di fitur lain.</>
+            : <>Instrumen akan <b>Nonaktif</b> dan disembunyikan dari pemakaian baru.</>,
+        ]}
         align="center"
         widthClass="max-w-lg"
         button2={{ label: "Batal", onClick: closeModal, variant: "outline" }}
-        button1={{ label: "Hapus", onClick: reallyDelete, variant: "primary" }}
+        button1={{ label: targetActive ? "Aktifkan" : "Nonaktifkan", onClick: reallyToggle, variant: "primary" }}
       />
 
       {/* Success */}
@@ -245,8 +249,12 @@ export const AdminInstrumentPage: React.FC = () => {
         onClose={closeModal}
         icon={<RiCheckboxCircleFill />}
         iconTone="success"
-        title="Instrumen Berhasil Dihapus"
-        texts={[`Instrumen sudah dihapus.`]}
+        title="Status Instrumen Diperbarui"
+        texts={[
+          targetActive
+            ? `Instrumen berhasil diaktifkan.`
+            : `Instrumen berhasil dinonaktifkan.`,
+        ]}
         align="center"
         widthClass="max-w-lg"
         button1={{ label: "Tutup", onClick: closeModal, variant: "primary" }}
@@ -259,8 +267,8 @@ export const AdminInstrumentPage: React.FC = () => {
         onClose={closeModal}
         icon={<RiCloseLine />}
         iconTone="danger"
-        title="Instrumen Gagal Dihapus!"
-        texts={[`Terjadi kendala saat menghapus instrumen. Coba lagi.`]}
+        title="Gagal Memperbarui Status!"
+        texts={[`Terjadi kendala saat memperbarui status instrumen. Coba lagi.`]}
         align="center"
         widthClass="max-w-lg"
         button1={{ label: "Tutup", onClick: closeModal, variant: "primary" }}

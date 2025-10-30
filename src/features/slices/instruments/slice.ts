@@ -6,8 +6,9 @@ import type {
   InstrumentState,
   ListInstrumentsParams,
   ListInstrumentsResponse,
-  DeleteInstrumentResult,
 } from '@/features/slices/instruments/types';
+
+/* ========================= INITIAL ========================= */
 
 const initialState: InstrumentState = {
   items: [],
@@ -19,6 +20,8 @@ const initialState: InstrumentState = {
   error: null,
 };
 
+/* ========================= THUNKS ========================= */
+
 export const fetchInstrumentsThunk = createAsyncThunk<
   ListInstrumentsResponse,
   ListInstrumentsParams | undefined,
@@ -26,24 +29,31 @@ export const fetchInstrumentsThunk = createAsyncThunk<
 >('instrument/fetchList', async (params, { rejectWithValue }) => {
   try {
     const res = await API.listInstruments(params);
-    return res as ListInstrumentsResponse;
+    // cast ke tipe ListInstrumentsResponse (shape-nya sama)
+    return res as unknown as ListInstrumentsResponse;
   } catch (e: any) {
     return rejectWithValue(e?.message ?? 'Gagal memuat instrumen');
   }
 });
 
-export const deleteInstrumentThunk = createAsyncThunk<
-  DeleteInstrumentResult,
-  number | string,
+/**
+ * Toggle/Set aktif/nonaktif instrumen via PUT /instruments/master/:id
+ * Hanya mengubah kolom is_active
+ */
+export const setInstrumentActiveThunk = createAsyncThunk<
+  { id: number | string; is_active: boolean },
+  { id: number | string; is_active: boolean },
   { rejectValue: string }
->('instrument/delete', async (id, { rejectWithValue }) => {
+>('instrument/setActive', async ({ id, is_active }, { rejectWithValue }) => {
   try {
-    const res = await API.deleteInstrument(id);
-    return { id, message: res.message } as DeleteInstrumentResult;
+    await API.setInstrumentActive(id, is_active);
+    return { id, is_active };
   } catch (e: any) {
-    return rejectWithValue(e?.message ?? 'Gagal menghapus instrumen');
+    return rejectWithValue(e?.message ?? 'Gagal memperbarui status instrumen');
   }
 });
+
+/* ========================= SLICE ========================= */
 
 const slice = createSlice({
   name: 'instrument',
@@ -66,28 +76,28 @@ const slice = createSlice({
     b.addCase(fetchInstrumentsThunk.pending, (s) => {
       s.status = 'loading';
       s.error = null;
-    })
-      .addCase(fetchInstrumentsThunk.fulfilled, (s, a) => {
-        s.status = 'succeeded';
-        s.items = a.payload.data;
-        s.total = a.payload.total;
-        s.page = a.payload.page;
-        s.limit = a.payload.limit;
-      })
-      .addCase(fetchInstrumentsThunk.rejected, (s, a) => {
-        s.status = 'failed';
-        s.error = (a.payload as string) ?? 'Terjadi kesalahan';
-      })
-      .addCase(deleteInstrumentThunk.fulfilled, (s, a) => {
-        const removedId = a.payload.id;
-        s.items = s.items.filter((it) => {
-          // antisipasi perbedaan tipe id (number|string)
-          const left = (it as any).id?.toString?.() ?? String((it as any).id);
-          const right = removedId?.toString?.() ?? String(removedId);
-          return left !== right;
-        });
-        s.total = Math.max(0, s.total - 1);
+    });
+    b.addCase(fetchInstrumentsThunk.fulfilled, (s, a) => {
+      s.status = 'succeeded';
+      s.items = a.payload.data;
+      s.total = a.payload.total;
+      s.page = a.payload.page;
+      s.limit = a.payload.limit;
+    });
+    b.addCase(fetchInstrumentsThunk.rejected, (s, a) => {
+      s.status = 'failed';
+      s.error = (a.payload as string) ?? 'Terjadi kesalahan';
+    });
+
+    // Update is_active pada item yang bersangkutan
+    b.addCase(setInstrumentActiveThunk.fulfilled, (s, a) => {
+      const { id, is_active } = a.payload;
+      s.items = s.items.map((it) => {
+        const left = (it as any).id?.toString?.() ?? String((it as any).id);
+        const right = id?.toString?.() ?? String(id);
+        return left === right ? { ...it, is_active } : it;
       });
+    });
   },
 });
 

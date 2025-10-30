@@ -8,6 +8,7 @@ export type InstrumentDTO = {
   id: number;
   nama_instrumen: string;
   icon: string | null;
+  is_active?: boolean; // ⬅️ ditambahkan
   created_at?: string;
   updated_at?: string;
 };
@@ -27,13 +28,14 @@ export type CreateInstrumentPayload = {
 
 /**
  * Payload untuk PUT /instruments/master/:id
- * - Bisa hanya update nama/icon
+ * - Bisa update parsial (nama/icon/is_active saja)
  * - Atau sekaligus jalankan “wizard sync” bila kirim program_id + rows
  */
 export type UpdateInstrumentPayload = {
   nama_instrumen?: string;
   icon_base64?: string | null;
   icon_url?: string | null;
+  is_active?: boolean; // ⬅️ ditambahkan
 
   // Optional wizard fields (sinkronisasi detail_program)
   program_id?: number;
@@ -41,15 +43,6 @@ export type UpdateInstrumentPayload = {
     nama_grade: string;
     base_harga: number;
   }>;
-};
-
-/** (Opsional) Payload khusus jika tetap ingin pakai endpoint wizard terpisah */
-export type UpdateInstrumentWizardPayload = {
-  instrument_id: number;
-  nama_instrumen: string;
-  icon_base64?: string | null;
-  program_id: number;
-  rows: Array<{ nama_grade: string; base_harga: number }>;
 };
 
 /* ========================= API CALLS ========================= */
@@ -60,6 +53,7 @@ export async function listInstruments(params?: { q?: string; page?: number; limi
   if (params?.page) qs.set('page', String(params.page));
   if (params?.limit) qs.set('limit', String(params.limit));
   const qstr = qs.toString() ? `?${qs.toString()}` : '';
+
   return baseUrl.request<ListInstrumentsResp>(
     `${ENDPOINTS.INSTRUMENTS.LIST}${qstr}`,
     { method: 'GET' }
@@ -87,6 +81,10 @@ export async function updateInstrument(id: number | string, payload: UpdateInstr
   );
 }
 
+/**
+ * (Opsional) masih ada di backend — tidak dipakai kalau kamu sudah meniadakan hapus.
+ * Biarkan untuk kompatibilitas, atau hapus bila tidak dipakai di mana pun.
+ */
 export async function deleteInstrument(id: number | string) {
   return baseUrl.request<{ message: string }>(
     ENDPOINTS.INSTRUMENTS.DELETE(id),
@@ -94,16 +92,9 @@ export async function deleteInstrument(id: number | string) {
   );
 }
 
-/**
- * (Opsional) Endpoint wizard terpisah.
- * Rekomendasi saat ini: gunakan `updateInstrument(id, payload)` saja,
- * karena backend-mu sudah mendukung wizard via PUT /master/:id.
- */
-export async function updateInstrumentWizard(payload: UpdateInstrumentWizardPayload) {
-  return baseUrl.request<{ message: string; data?: { id: number } }>(
-    ENDPOINTS.INSTRUMENTS.WIZARD,
-    { method: 'PUT', json: payload }
-  );
+/** Helper spesifik: set kolom is_active saja (reuse PUT yang sama) */
+export async function setInstrumentActive(id: number | string, is_active: boolean) {
+  return updateInstrument(id, { is_active });
 }
 
 /* ========================= HELPERS ========================= */
