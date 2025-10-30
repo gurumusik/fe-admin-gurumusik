@@ -1,10 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  RiCloseLine,
-  RiDownloadLine,
-} from 'react-icons/ri';
+import { RiCloseLine, RiDownloadLine } from 'react-icons/ri';
+import { resolveImageUrl } from '@/utils/resolveImageUrl'; // ✅ pakai util resolver
 
 export type ApproveMode = 'approved' | 'rejected';
 
@@ -34,6 +32,11 @@ const inputCls =
   'w-full h-11 rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 text-sm text-neutral-800 outline-none';
 const labelCls = 'text-md text-neutral-900 mb-1 block';
 
+// ✅ style badge/link
+const pillBase = 'inline-flex items-center gap-2 h-8 px-3 rounded-full border text-sm';
+const pillEnabled = 'border-[var(--secondary-color)] text-[var(--secondary-color)] bg-white';
+const pillDisabled = 'border-neutral-300 text-neutral-400 bg-neutral-100 cursor-not-allowed pointer-events-none';
+
 const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   open,
   mode,
@@ -49,23 +52,23 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   const submitApproved = () => onSubmit({ mode: 'approved' });
   const submitRejected = () => onSubmit({ mode: 'rejected', reason, attachment: file });
 
+  // ✅ resolve URL backend (contoh: http://localhost:3000/uploads/cv/xxx.pdf)
+  const cvResolved = resolveImageUrl(data?.cvUrl ?? null);
+  const certResolved = resolveImageUrl(data?.certificateUrl ?? null);
+  const cvDisabled = !cvResolved;
+  const certDisabled = !certResolved;
+
   return (
     <div className="fixed inset-0 z-[80]">
       {/* overlay */}
-      <div
-        className="absolute inset-0 bg-[#0B1220]/60"
-        onClick={onClose}
-        aria-hidden
-      />
+      <div className="absolute inset-0 bg-[#0B1220]/60" onClick={onClose} aria-hidden />
       {/* dialog */}
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
           {/* header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#E6EAF0]">
             <h3 className="text-lg font-semibold text-neutral-900">
-              {mode === 'approved'
-                ? 'Formulir Calon Tutor'
-                : 'Formulir Penolakan Calon Tutor'}
+              {mode === 'approved' ? 'Formulir Calon Tutor' : 'Formulir Penolakan Calon Tutor'}
             </h3>
             <button
               type="button"
@@ -108,21 +111,34 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                   <input className={inputCls} value={data?.city ?? ''} readOnly />
                 </div>
 
-                {/* File Pendukung */}
+                {/* ✅ File Pendukung */}
                 <div className="mt-1">
                   <label className={labelCls}>File Pendukung</label>
                   <div className="flex items-center gap-3">
+                    {/* CV */}
                     <a
-                      href={data?.cvUrl ?? '#'}
-                      onClick={(e) => !data?.cvUrl && e.preventDefault()}
-                      className="inline-flex items-center gap-2 h-8 px-3 rounded-full border border-[var(--secondary-color)] text-sm text-[var(--secondary-color)] bg-white"
+                      href={cvResolved || '#'}
+                      target={cvDisabled ? undefined : '_blank'}
+                      rel={cvDisabled ? undefined : 'noopener noreferrer'}
+                      aria-disabled={cvDisabled}
+                      onClick={(e) => {
+                        if (cvDisabled) e.preventDefault();
+                      }}
+                      className={`${pillBase} ${cvDisabled ? pillDisabled : pillEnabled}`}
                     >
                       <RiDownloadLine /> CV
                     </a>
+
+                    {/* Sertifikat */}
                     <a
-                      href={data?.certificateUrl ?? '#'}
-                      onClick={(e) => !data?.certificateUrl && e.preventDefault()}
-                      className="inline-flex items-center gap-2 h-8 px-3 rounded-full border border-[var(--secondary-color)] text-sm text-[var(--secondary-color)] bg-white"
+                      href={certResolved || '#'}
+                      target={certDisabled ? undefined : '_blank'}
+                      rel={certDisabled ? undefined : 'noopener noreferrer'}
+                      aria-disabled={certDisabled}
+                      onClick={(e) => {
+                        if (certDisabled) e.preventDefault();
+                      }}
+                      className={`${pillBase} ${certDisabled ? pillDisabled : pillEnabled}`}
                     >
                       <RiDownloadLine /> Sertifikat
                     </a>
@@ -132,11 +148,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                 {/* Video */}
                 <div>
                   <label className={labelCls}>Video Demo</label>
-                  <input
-                    className={inputCls}
-                    value={data?.videoUrl ?? 'Youtube.com'}
-                    readOnly
-                  />
+                  <input className={inputCls} value={data?.videoUrl ?? ''} readOnly />
                 </div>
               </div>
 
@@ -160,7 +172,6 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                   <span className="font-medium">Hasil Seleksi Calon Tutor Guru Musik</span>
                 </p>
               </div>
-
 
               {/* Reason */}
               <div className="mt-3">

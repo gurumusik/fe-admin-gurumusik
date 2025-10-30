@@ -28,6 +28,8 @@ import ApproveTeacherModal, {
   type ApproveMode,
   type ApproveTeacherPayload,
 } from "../../components/ApproveTeacherModal";
+import LoadingScreen from "@/components/ui/common/LoadingScreen"; // ✅ tambahkan ini
+import defaultUser from "@/assets/images/default-user.png";
 
 const cls = (...xs: Array<string | false | null | undefined>) =>
   xs.filter(Boolean).join(" ");
@@ -99,7 +101,7 @@ const RowItem: React.FC<{
   onApprove: () => void;
   onReject: () => void;
 }> = ({ row, onApprove, onReject }) => {
-  const profileUrl = row.user?.profile_pic_url || "/assets/images/teacher-demo.png";
+  const profileUrl = row.user?.profile_pic_url || defaultUser;
 
   const createdAt = row.created_at
     ? new Date(row.created_at).toLocaleDateString("id-ID", {
@@ -254,6 +256,9 @@ const VerifiedTutorPage: React.FC = () => {
   const [confirmKind, setConfirmKind] = useState<"success" | "error">("success");
   const [confirmCtx, setConfirmCtx] = useState<"approved" | "rejected">("approved");
 
+  // ✅ state untuk overlay loading submit decide
+  const [deciding, setDeciding] = useState(false);
+
   // Load awal: hanya status 'proses'
   useEffect(() => {
     dispatch(setGALimit(PAGE_SIZE));
@@ -274,10 +279,11 @@ const VerifiedTutorPage: React.FC = () => {
     setModalOpen(true);
   };
 
-  // ⬇️ INI YANG MEMANGGIL ENDPOINT APPROVE/REJECT via thunk
+  // ⬇️ Panggil endpoint APPROVE/REJECT via thunk + tampilkan LoadingScreen
   const handleSubmitModal = async (payload: ApproveTeacherPayload) => {
     if (!selected) return;
     setModalOpen(false);
+    setDeciding(true); // ✅ mulai overlay
 
     try {
       if (payload.mode === "approved") {
@@ -296,10 +302,11 @@ const VerifiedTutorPage: React.FC = () => {
       setConfirmKind("error");
     } finally {
       setConfirmCtx(payload.mode);
-      setConfirmOpen(true);
       setSelected(null);
       // refresh list agar item yang sudah diputuskan hilang dari status 'proses'
-      dispatch(fetchGuruApplicationsThunk());
+      await dispatch(fetchGuruApplicationsThunk());
+      setDeciding(false); // ✅ matikan overlay setelah semua selesai
+      setConfirmOpen(true);
     }
   };
 
@@ -323,6 +330,9 @@ const VerifiedTutorPage: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 bg-white rounded-2xl">
+      {/* Overlay loading approve/reject */}
+      {deciding && <LoadingScreen />}
+
       <Header />
 
       {errorMsg && (
@@ -375,7 +385,7 @@ const VerifiedTutorPage: React.FC = () => {
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmitModal}
         data={{
-          image: selected?.user?.profile_pic_url || "/assets/images/teacher-demo.png",
+          image: selected?.user?.profile_pic_url || defaultUser,
           name: selected?.nama ?? undefined,
           phone: selected?.no_telp ?? undefined,
           city: selected?.domisili ?? "-",

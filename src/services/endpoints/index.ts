@@ -63,7 +63,6 @@ export const ENDPOINTS = {
   RECRUITMENT: {
       LIST: '/recruitment/applications',
       DECIDE: (id: number | string) => `/recruitment/applications/${id}/decision`,
-      // (opsional) APPLY: '/recruitment/apply',
     },
 
   SILABUS: {
