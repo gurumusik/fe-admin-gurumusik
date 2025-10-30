@@ -24,6 +24,7 @@ import {
   saveModuleAdminThunk,
 } from '@/features/slices/module/detailSlice';
 import defaultUser from '@/assets/images/default-user.png';
+import { resolveImageUrl } from '@/utils/resolveImageUrl';
 
 /* ================== utils ================== */
 const cls = (...xs: Array<string | false | null | undefined>) => xs.filter(Boolean).join(' ');
@@ -279,9 +280,7 @@ export default function EditModulePage() {
     ?? '';
 
   const ownerAvatar =
-    headerGuru?.profile_pic_url
-    ?? guru.item?.profile_pic_url
-    ?? state?.avatar
+    resolveImageUrl(headerGuru?.profile_pic_url)
     ?? defaultUser;
 
   const [form, setForm] = useState<ModuleForm>({
@@ -329,7 +328,7 @@ export default function EditModulePage() {
     setForm({
       title: detail.judul ?? '',
       basePrice: typeof detail.harga === 'number' ? detail.harga : '',
-      salePrice: typeof detail.harga_bid === 'number' ? detail.harga_bid : '',
+      salePrice: typeof detail.harga_bid === 'number' ? detail.harga_bid : '',  
       promoPrice: typeof detail.harga_discount === 'number' ? detail.harga_discount : '',
       instrument: toInstrumentOption((detail as any).instrument?.nama),
       previewUrl: detail.preview_class ?? '',

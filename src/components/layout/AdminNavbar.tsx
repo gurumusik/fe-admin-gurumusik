@@ -7,6 +7,7 @@ import { meThunk, logoutThunk } from "@/features/slices/auth/slice";
 import defaultUser from "@/assets/images/default-user.png";
 import { RiArrowDownSFill, RiLogoutBoxRLine } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
+import { resolveImageUrl } from "@/utils/resolveImageUrl";
 
 const AdminNavbar: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -24,7 +25,7 @@ const AdminNavbar: React.FC = () => {
   }, [dispatch, user]);
 
   const name = user?.nama || "Admin";
-  const photoUrl = user?.profile_pic_url || (defaultUser as unknown as string);
+  const photoUrl = resolveImageUrl(user?.profile_pic_url) || (defaultUser as unknown as string);
 
   // Dropdown state
   const [open, setOpen] = useState(false);

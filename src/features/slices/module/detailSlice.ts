@@ -103,8 +103,8 @@ const formToBody = (form: ModuleForm) => {
     preview_class: form.previewUrl ?? '',
     appropriate_module: form.audience ?? '',
     harga: typeof form.basePrice === 'number' ? form.basePrice : undefined,
-    harga_bid: typeof form.salePrice === 'number' ? form.salePrice : undefined,
-    harga_discount: typeof form.promoPrice === 'number' ? form.promoPrice : 0,
+    harga_bid: typeof form.salePrice === 'number' ? form.salePrice : undefined,  
+    harga_discount: typeof form.promoPrice === 'number' ? form.promoPrice : undefined,
     percent_discount: calcPercentDiscount(form.salePrice, form.promoPrice),
     playlists: sanitizePlaylists(form.playlists),
   };
