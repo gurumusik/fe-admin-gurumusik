@@ -46,6 +46,8 @@ const nfIDR = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n);
 
+const HIDE_CUPLIKAN_DAN_EBOOK = true as const;
+
 type ConfirmKind = 'approved-ok' | 'approved-fail' | 'rejected-ok' | 'rejected-fail';
 
 // Path list request module
@@ -370,7 +372,7 @@ export default function DetailRequestModulePage() {
             </div>
 
             {/* E-Books */}
-            <div>
+            <div className={HIDE_CUPLIKAN_DAN_EBOOK ? 'hidden' : ''}>
               <div className="mb-2 text-md font-semibold text-neutral-800">E-Book Pendukung</div>
               {ebookThumbs.length === 0 ? (
                 <p className="text-sm text-neutral-500">Tidak ada file.</p>
@@ -406,7 +408,7 @@ export default function DetailRequestModulePage() {
           </div>
 
           {/* ✅ Cuplikan Modul (pakai previews.file_path) */}
-          <div>
+          <div className={HIDE_CUPLIKAN_DAN_EBOOK ? 'hidden' : ''}>
             <div className="mb-2 text-lg font-semibold text-neutral-800">Cuplikan Modul</div>
             {previewThumbs.length === 0 ? (
               <p className="text-sm text-neutral-500">Tidak ada file.</p>

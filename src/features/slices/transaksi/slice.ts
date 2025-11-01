@@ -145,25 +145,27 @@ export const fetchAllTxThunk = createAsyncThunk<
   { rejectValue: string; state: any }
 >('transaksi/all/fetchList', async (overrideParams, { rejectWithValue, getState }) => {
   try {
-    const s = (getState() as any).transaksi as TransaksiByPromoState;
+    const root = getState() as any;
+    // Bisa mounted di 'transaksi' atau 'transaksiByPromo'
+    const s = (root.transaksi ?? root.transaksiByPromo ?? {}) as Partial<TransaksiByPromoState>;
 
-    // Tab "Modul" => kirim 'modul'; selain itu => 'all'
-    const rawCategory: 'paket' | 'modul' | 'all' = s.category === 'Modul' ? 'modul' : 'all';
+    const rawCategory: 'paket' | 'modul' | 'all' =
+      s?.category === 'Modul' ? 'modul' : 'all';
 
     const req: any = {
-      page: s.page,
-      limit: s.limit,
-      q: s.q || undefined,
-      category: rawCategory,
-      status: labelToRawStatus(s.statusFilter),
-      date_from: s.date_from || undefined,
-      date_to: s.date_to || undefined,
-      ...(overrideParams || {}),
+      page: overrideParams?.page ?? s?.page ?? 1,
+      limit: overrideParams?.limit ?? s?.limit ?? 10,
+      q: (overrideParams?.q ?? s?.q) || undefined,
+      category: overrideParams?.category ?? rawCategory,
+      status: overrideParams?.status ?? (s?.statusFilter ? labelToRawStatus(s.statusFilter) : undefined),
+      date_from: overrideParams?.date_from ?? (s?.date_from || undefined),
+      date_to: overrideParams?.date_to ?? (s?.date_to || undefined),
     };
 
     // bersihkan kosong
     Object.keys(req).forEach((k) => {
-      if (req[k] == null || (typeof req[k] === 'string' && req[k].trim() === '')) delete req[k];
+      const v = req[k];
+      if (v == null || (typeof v === 'string' && v.trim() === '')) delete req[k];
     });
 
     const res = await listAllTransactions(req);
@@ -172,7 +174,6 @@ export const fetchAllTxThunk = createAsyncThunk<
     return rejectWithValue(e?.message ?? 'Gagal memuat semua transaksi');
   }
 });
-
 /* ========================= SLICE ========================= */
 
 const slice = createSlice({
@@ -272,26 +273,18 @@ const slice = createSlice({
       s.allStatus = 'succeeded';
       s.allItems = a.payload.data ?? [];
       s.allTotal = a.payload.total ?? 0;
-
-      // rekap agregat
       s.allRecap = (a.payload as any).recap ?? null;
 
-      // === monthly recap (compat handling)
       const p: any = a.payload as any;
-
       let monthlyFromPayload: MonthlyRecapPoint[] | null =
         p.monthlyRecap ?? p.recap?.monthly ?? p.recap?.by_month ?? null;
 
       if (!monthlyFromPayload) {
         const box = p?.monthlyrecap?.['this year'] || p?.monthlyrecap?.thisYear;
         if (box && typeof box === 'object') {
-          const MONTHS = [
-            'januari','februari','maret','april','mei','juni',
-            'juli','agustus','september','oktober','november','desember'
-          ] as const;
+          const MONTHS = ['januari','februari','maret','april','mei','juni','juli','agustus','september','oktober','november','desember'] as const;
           const year = new Date().getFullYear();
-
-          const arr: MonthlyRecapPoint[] = MONTHS.map((name, i) => {
+          monthlyFromPayload = MONTHS.map((name, i) => {
             const agg = box[name] || {};
             const course_count = Number(agg?.course_count ?? 0);
             const module_count = Number(agg?.module_count ?? 0);
@@ -299,24 +292,19 @@ const slice = createSlice({
             const count = Number(
               agg?.course_and_module_count ?? (course_count + module_count)
             );
-            return {
-              year,
-              month: i + 1,
-              count,
-              course_count,
-              module_count,
-              promo_tx_count,
-            };
+            return { year, month: i + 1, count, course_count, module_count, promo_tx_count };
           });
-
-          monthlyFromPayload = arr;
         }
       }
-
       s.allMonthlyRecap = Array.isArray(monthlyFromPayload) ? monthlyFromPayload : null;
 
-      if (p.page) s.page = p.page;
-      if (p.limit) s.limit = p.limit;
+      if ((p as any).page) s.page = (p as any).page;
+      if ((p as any).limit) s.limit = (p as any).limit;
+    });
+    b.addCase(fetchAllTxThunk.rejected, (s, a) => {
+      s.allStatus = 'failed';
+      s.allError = (a.payload as string) ?? 'Terjadi kesalahan';
+      s.allItems = [];
     });
   },
 });

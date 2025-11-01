@@ -801,7 +801,7 @@ const DetailPromoPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-4">
                           <button
-                            onClick={() => navigate(`/invoice/${t.id}`)}
+                            onClick={() => navigate(`/dashboard-admin/invoice/${t.id}?promoId=${promoId}`)}
                             className="rounded-full border px-3 py-1.5 text-sm flex items-center gap-1 border-[var(--secondary-color)] text-[var(--secondary-color)] hover:bg-[var(--secondary-color)]/20"
                           >
                             <RiDownloadLine /> Invoice
@@ -851,7 +851,7 @@ const DetailPromoPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-4">
                         <button
-                          onClick={() => navigate(`/invoice/${t.id}`)}
+                          onClick={() => navigate(`/dashboard-admin/invoice/${t.id}?promoId=${promoId}`)}
                           className="rounded-full border px-3 py-1.5 text-sm flex items-center gap-1 border-[var(--secondary-color)] text-[var(--secondary-color)] hover:bg-[var(--secondary-color)]/20"
                         >
                           <RiDownloadLine /> Invoice

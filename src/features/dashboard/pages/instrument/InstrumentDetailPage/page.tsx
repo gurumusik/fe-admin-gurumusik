@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/features/instrument/pages/InstrumentDetailPage.tsx
+// src/features/dashboard/pages/instrument/InstrumentDetailPage/page.tsx
 import React from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -16,7 +16,10 @@ import {
   submitWizardEditThunk,
   patchDraft,
   setSyllabusDraft,
+  hydrateRowsAndSyllabus,
+  loadRowsForInstrumentProgramThunk,
 } from "@/features/slices/instrumentWizard/slice";
+
 import {
   RiArrowLeftLine,
   RiBookOpenLine,
@@ -24,19 +27,26 @@ import {
   RiPencilFill,
   RiDeleteBinLine,
 } from "react-icons/ri";
+
 import SylabusModal from "@/features/dashboard/components/SylabusModal";
 import AddInstrumentModal from "@/features/dashboard/components/AddInstrumentModal";
+
+// ✅ Gunakan tipe SyllabusDraft dari wizard sebagai sumber kebenaran
+import type {
+  SyllabusDraft as WizardSyllabusDraft,
+  WizardRow,
+} from "@/features/slices/instrumentWizard/types";
+
+// Tipe rute dan payload edit (biarkan dari modul instruments)
 import type {
   InstrumentRouteParams,
   EditInstrumentPayload,
-  SyllabusDraft,
 } from "@/features/slices/instruments/types";
 
 const toTitle = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-const slugify = (s: string) =>
-  s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+const slugify = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
-const hasValidSyllabus = (d?: SyllabusDraft) =>
+const hasValidSyllabus = (d?: WizardSyllabusDraft) =>
   !!(d && d.title?.trim() && (d.file_base64 || d.file_url || d.link_url));
 
 const InstrumentDetailPage: React.FC = () => {
@@ -80,22 +90,35 @@ const InstrumentDetailPage: React.FC = () => {
   // Dropdown program
   const [programMenuOpen, setProgramMenuOpen] = React.useState(false);
 
-  // 1) load programs
+  // ===== Program cache per id_program (rows & drafts) =====
+  // Agar ketika user pindah program lalu balik lagi, data lokal tidak hilang.
+  const programCacheRef = React.useRef<
+    Record<number, { rows: WizardRow[]; drafts: (WizardSyllabusDraft | undefined)[]; deleted?: Record<number, boolean> }>
+  >({});
+
+  // 1) load list program
   React.useEffect(() => { dispatch(fetchProgramsThunk()); }, [dispatch]);
 
-  // 2) EDIT → prefill
+  // 2) EDIT → prefill instrument (akan set existingProgramId & rows awal)
   React.useEffect(() => {
     if (isEdit) dispatch(prefillFromInstrumentThunk({ instrumentId }));
   }, [dispatch, isEdit, instrumentId]);
 
-  // 3) CREATE → tambah row default jika kosong
+  // 3) CREATE → default program ABK + baris default
   React.useEffect(() => {
-    if (!isEdit && (!wizard.rows || wizard.rows.length === 0)) {
-      dispatch(addRow());
+    if (!isEdit && wizard.programs.length > 0) {
+      const alreadyChosen = wizard.programId != null;
+      if (!alreadyChosen) {
+        const abk = wizard.programs.find((p) => p.nama_program?.toLowerCase() === "abk");
+        if (abk) dispatch(setProgramId(abk.id));
+      }
+      // siapkan minimal 1 row
+      if (wizard.rows.length === 0) dispatch(addRow());
     }
-  }, [dispatch, isEdit, wizard.rows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, isEdit, wizard.programs.length]);
 
-  // tutup dropdown di luar klik
+  // 4) Tutup dropdown saat klik di luar
   React.useEffect(() => {
     if (!programMenuOpen) return;
     const onDocClick = (e: MouseEvent) => {
@@ -111,15 +134,26 @@ const InstrumentDetailPage: React.FC = () => {
     navigate("/dashboard-admin/instrument", { replace: true });
   }, [navigate]);
 
+  // === Mode submit ===
+  // - isCreatingBrandNewInstrument: halaman NEW (buat instrumen baru + programnya)
+  // - isCreatingNewProgramForExistingInstrument: halaman EDIT tapi program dipilih berbeda/baru → tambah program untuk instrumen ini
+  const isCreatingBrandNewInstrument = !isEdit;
+  const isCreatingNewProgramForExistingInstrument =
+    isEdit && (
+      wizard.existingProgramId == null ||
+      (wizard.programId != null && wizard.programId !== wizard.existingProgramId)
+    );
+
   const handleSubmit = React.useCallback(async () => {
-    const thunkPromise = isEdit
-      ? dispatch(submitWizardEditThunk({ instrumentId }))
-      : dispatch(submitWizardThunk());
+    // Gunakan instrumen saat ini ketika sedang menambah program baru di halaman edit
+    const thunkPromise = isCreatingBrandNewInstrument
+      ? dispatch(submitWizardThunk()) // Buat instrumen BARU + DPs
+      : dispatch(submitWizardEditThunk({ instrumentId })); // Tambah/ubah di instrumen sekarang → hindari error "nama instrumen sudah dipakai"
 
     const ok = await thunkPromise.unwrap().catch(() => null);
     if (!ok) return;
     okNavigateHome();
-  }, [dispatch, isEdit, instrumentId, okNavigateHome]);
+  }, [dispatch, instrumentId, isCreatingBrandNewInstrument, okNavigateHome]);
 
   const resolveType = (payload: EditInstrumentPayload) => {
     const t = payload?.type?.trim();
@@ -142,7 +176,7 @@ const InstrumentDetailPage: React.FC = () => {
     setShowSylabus(true);
   };
 
-  const handleSaveSylabusDraft = (draft: SyllabusDraft) => {
+  const handleSaveSylabusDraft = (draft: WizardSyllabusDraft) => {
     if (currentRowIndex < 0) return;
     const title =
       draft.title?.trim() ||
@@ -171,6 +205,58 @@ const InstrumentDetailPage: React.FC = () => {
       ),
     [wizard.rows, wizard.syllabusDrafts, wizard.deletedDraftRows]
   );
+
+  // ======= PROGRAM CHANGE FLOW =======
+  const onChooseProgram = async (newProgramId: number) => {
+    const prevProgramId = wizard.programId ?? undefined;
+
+    // 1) simpan cache program sebelumnya (kalau ada)
+    if (prevProgramId !== undefined) {
+      programCacheRef.current[prevProgramId] = {
+        rows: [...wizard.rows],
+        drafts: [...wizard.syllabusDrafts],
+        deleted: { ...wizard.deletedDraftRows },
+      };
+    }
+
+    // 2) set pilihan program baru
+    dispatch(setProgramId(newProgramId));
+    setProgramMenuOpen(false);
+
+    // 3) muat data utk program baru
+    const cached = programCacheRef.current[newProgramId];
+    if (cached) {
+      // gunakan cache lokal jika sudah pernah diisi
+      dispatch(
+        hydrateRowsAndSyllabus({
+          rows: cached.rows,
+          drafts: cached.drafts,
+          deletedDraftRows: cached.deleted,
+        })
+      );
+    } else if (isEdit) {
+      // di mode edit → fetch dari server berdasarkan (instrumentId, programId)
+      await dispatch(
+        loadRowsForInstrumentProgramThunk({ instrumentId, programId: newProgramId })
+      );
+      // Cache akan di-update otomatis via effect di bawah ketika state wizard berubah
+    } else {
+      // mode create & belum ada cache → mulai kosong (isi 1 row default)
+      dispatch(hydrateRowsAndSyllabus({ rows: [], drafts: [], deletedDraftRows: {} }));
+      dispatch(addRow());
+    }
+  };
+
+  // Auto-cache: setiap kali rows/drafts berubah untuk program aktif, simpan ke cache lokal
+  React.useEffect(() => {
+    if (wizard.programId != null) {
+      programCacheRef.current[wizard.programId] = {
+        rows: [...wizard.rows],
+        drafts: [...wizard.syllabusDrafts],
+        deleted: { ...wizard.deletedDraftRows },
+      };
+    }
+  }, [wizard.programId, wizard.rows, wizard.syllabusDrafts, wizard.deletedDraftRows]);
 
   return (
     <div className="rounded-2xl">
@@ -228,10 +314,7 @@ const InstrumentDetailPage: React.FC = () => {
                   wizard.programs.map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => {
-                        dispatch(setProgramId(p.id));
-                        setProgramMenuOpen(false);
-                      }}
+                      onClick={() => onChooseProgram(p.id)}
                       className={`w-full text-left px-4 py-2 hover:bg-neutral-50 ${
                         p.id === wizard.programId ? "font-semibold" : ""
                       }`}
@@ -251,7 +334,13 @@ const InstrumentDetailPage: React.FC = () => {
               className="inline-flex items-center justify-center rounded-full bg-[#F6C437] text-[#0B0B0B] font-semibold px-6 h-10 hover:brightness-95 disabled:opacity-60"
               title={!allSyllabusReady ? "Lengkapi silabus untuk semua grade terlebih dahulu" : undefined}
             >
-              {isSubmitting ? "Menyimpan..." : "Simpan"}
+              {isSubmitting
+                ? "Menyimpan..."
+                : isCreatingBrandNewInstrument
+                ? "Simpan (Buat Instrumen)"
+                : isCreatingNewProgramForExistingInstrument
+                ? "Simpan (Tambah Program)"
+                : "Simpan (Perbarui)"}
             </button>
           </div>
         </div>

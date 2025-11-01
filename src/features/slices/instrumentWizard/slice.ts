@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// src/features/slices/instrumentWizard/slice.ts
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import * as InstrumentAPI from '@/services/api/instrument.api';
 import * as GradeAPI from '@/services/api/grade.api';
@@ -6,7 +7,6 @@ import * as DPAPI from '@/services/api/detailProgram.api';
 import * as ProgramAPI from '@/services/api/program.api';
 import * as SilabusAPI from '@/services/api/silabus.api';
 
-/* ========================= TYPES (import) ========================= */
 import type {
   WizardRow,
   SyllabusDraft,
@@ -15,30 +15,41 @@ import type {
   WizardState,
 } from './types';
 
-const initialState: WizardState = {
+/* ========================= INITIAL ========================= */
+const initialState: WizardState & {
+  existingProgramId: number | null;
+} = {
+  // mode
   isEditMode: false,
 
+  // instrument
   draftName: '',
   draftIconBase64: null,
   existingIconUrl: null,
 
+  // program/rows
   programId: null,
   rows: [],
   programs: [],
 
-  syllabusDrafts: {},
-  rowMetas: {},
+  // per-row
+  syllabusDrafts: [],
+  rowMetas: [],
 
+  // edit helpers
   deletedDraftRows: {},
   pendingDeletes: [],
 
+  // meta
   status: 'idle',
   error: null,
   createdInstrumentId: null,
+
+  // track program yang “asli” saat masuk ke halaman edit
+  existingProgramId: null,
 };
 
 /* ========================= HELPERS ========================= */
-
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
 const hasValidSyllabus = (d?: SyllabusDraft) =>
   !!(d && d.title?.trim() && (d.file_base64 || d.file_url || d.link_url));
@@ -59,11 +70,113 @@ export const fetchProgramsThunk = createAsyncThunk<
   }
 });
 
-/** CREATE (NEW) */
+/**
+ * Muat rows & silabus berdasarkan kombinasi (instrumentId, programId).
+ * Draft silabus diikat per-index ke DP terkait via dpId (BUKAN nama grade).
+ */
+export const loadRowsForInstrumentProgramThunk = createAsyncThunk<
+  {
+    programId: number;
+    rows: WizardRow[];
+    drafts: (SyllabusDraft | undefined)[];
+    rowMetas: (RowMeta | undefined)[];
+    isExisting: boolean;
+  },
+  { instrumentId: number; programId: number },
+  { rejectValue: string }
+>('instrumentWizard/loadRowsForInstrumentProgram', async ({ instrumentId, programId }, { rejectWithValue }) => {
+  try {
+    const dpResp = await DPAPI.listByInstrument(instrumentId);
+    type DpItem = {
+      id: number;
+      id_program: number;
+      id_grade: number;
+      base_harga?: number;
+      grade?: { id: number; nama_grade: string };
+    };
+    const dpItems: DpItem[] = (dpResp as any)?.items ?? [];
+
+    const related = dpItems.filter((it) => Number(it?.id_program) === Number(programId));
+    const isExisting = related.length > 0;
+
+    if (!isExisting) {
+      return {
+        programId,
+        rows: [],
+        drafts: [],
+        rowMetas: [],
+        isExisting: false,
+      };
+    }
+
+    // Bentuk rows dari DP (urutannya SELARAS dengan 'related')
+    const rows: WizardRow[] = related.map((it, idx) => ({
+      id_grade: Number(it?.id_grade) || Number(it?.grade?.id) || null,
+      nama_grade: it?.grade?.nama_grade ?? `Grade ${idx + 1}`,
+      base_harga: Number((it as any)?.base_harga) || 0,
+    }));
+
+    const drafts: (SyllabusDraft | undefined)[] = [];
+    const rowMetas: (RowMeta | undefined)[] = [];
+
+    // Ambil silabus per row, filter tegas berdasarkan dpId terkait baris itu
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const gradeId = Number(row.id_grade);
+      const dpIdForRow = Number(related[i]?.id) || null; // KUNCI: pakai DP.id per-index
+
+      if (!Number.isFinite(gradeId)) {
+        drafts[i] = undefined;
+        rowMetas[i] = { dpId: dpIdForRow ?? null, silabusId: null };
+        continue;
+      }
+
+      try {
+        const res = await SilabusAPI.listPublicByInstrumentGrade(instrumentId, gradeId);
+        const items: any[] = Array.isArray((res as any).items) ? (res as any).items : [];
+
+        const mine = dpIdForRow
+          ? items.filter((x) => Number(x.id_detail_program) === Number(dpIdForRow))
+          : items;
+
+        const s0 = mine[0] ?? items[0];
+        if (s0) {
+          drafts[i] = {
+            id: Number(s0.id),
+            id_detail_program: Number(s0.id_detail_program),
+            title: s0.title || `Silabus - ${row.nama_grade}`,
+            completion_pts: Array.isArray(s0.completion_pts) ? (s0.completion_pts as string[]) : [],
+            ...(s0.link_url
+              ? { link_url: s0.link_url as string }
+              : s0.file_path
+              ? { file_url: s0.file_path as string }
+              : {}),
+          };
+          rowMetas[i] = {
+            dpId: drafts[i]!.id_detail_program ?? dpIdForRow ?? null,
+            silabusId: drafts[i]!.id ?? null,
+          };
+        } else {
+          drafts[i] = undefined;
+          rowMetas[i] = { dpId: dpIdForRow ?? null, silabusId: null };
+        }
+      } catch {
+        drafts[i] = undefined;
+        rowMetas[i] = { dpId: dpIdForRow ?? null, silabusId: null };
+      }
+    }
+
+    return { programId, rows, drafts, rowMetas, isExisting: true };
+  } catch (e: any) {
+    return rejectWithValue(e?.message ?? 'Gagal memuat detail program');
+  }
+});
+
+/** CREATE (instrumen baru) */
 export const submitWizardThunk = createAsyncThunk<
   { instrumenId: number },
   void,
-  { state: { instrumentWizard: WizardState }; rejectValue: string }
+  { state: { instrumentWizard: WizardState & { existingProgramId: number | null } }; rejectValue: string }
 >('instrumentWizard/submit', async (_: void, { getState, rejectWithValue }) => {
   try {
     const s = getState().instrumentWizard;
@@ -73,7 +186,6 @@ export const submitWizardThunk = createAsyncThunk<
       return rejectWithValue('Minimal satu grade');
     }
 
-    // hanya baris aktif
     const allHasSyllabus = s.rows.every((_, idx) =>
       s.deletedDraftRows[idx] ? true : hasValidSyllabus(s.syllabusDrafts[idx])
     );
@@ -81,7 +193,7 @@ export const submitWizardThunk = createAsyncThunk<
       return rejectWithValue('Silabus wajib diisi untuk setiap grade sebelum menyimpan.');
     }
 
-    // 1) instrument
+    // 1) Buat instrument
     const ins = await InstrumentAPI.createInstrument({
       nama_instrumen: s.draftName.trim(),
       icon_base64: s.draftIconBase64 || undefined,
@@ -89,18 +201,18 @@ export const submitWizardThunk = createAsyncThunk<
     const instrumenId = (ins as any).data?.id ?? (ins as any).id;
     if (!instrumenId) return rejectWithValue('Gagal membuat instrumen');
 
-    // 2) resolve grade ids
+    // 2) Resolve/buat grade IDs
     const inputNames = s.rows
       .filter((_, i) => !s.deletedDraftRows[i])
       .map((r) => (r?.nama_grade ?? '').toString().trim())
       .filter(Boolean);
     const nameToIdMap = await GradeAPI.resolveOrCreateGradeIds(inputNames);
 
-    // 3) create DPs (hindari duplikat)
+    // 3) Buat DetailProgram (hindari duplikat grade di program yang sama)
     const dpIdByRow: Record<number, number> = {};
     const seen = new Set<number>();
     for (const [idx, r] of s.rows.entries()) {
-      if (s.deletedDraftRows[idx]) continue; // baris dihapus di draft
+      if (s.deletedDraftRows[idx]) continue;
       const key = norm((r?.nama_grade ?? '').toString());
       const id_grade = nameToIdMap[key];
       if (!id_grade || seen.has(id_grade)) continue;
@@ -119,7 +231,7 @@ export const submitWizardThunk = createAsyncThunk<
       if (dpId) dpIdByRow[idx] = Number(dpId);
     }
 
-    // 4) create silabus
+    // 4) Buat Silabus
     await Promise.all(
       Object.entries(dpIdByRow).map(async ([idxStr, dpId]) => {
         const idx = Number(idxStr);
@@ -143,17 +255,19 @@ export const submitWizardThunk = createAsyncThunk<
   }
 });
 
-/** PREFILL EDIT */
+/** PREFILL EDIT (ambil state dari instrumen + pilih program awal) */
 export const prefillFromInstrumentThunk = createAsyncThunk<
   { ok: true },
   { instrumentId: number },
   { rejectValue: string }
 >('instrumentWizard/prefillFromInstrument', async ({ instrumentId }, { dispatch, rejectWithValue }) => {
   try {
+    // program list
     const proms = await ProgramAPI.listPrograms();
     const programs = Array.isArray(proms) ? proms : (proms as any).data ?? [];
     dispatch(setPrograms(programs as ProgramLite[]));
 
+    // instrument + semua DP
     const [ins, dpResp] = await Promise.all([
       InstrumentAPI.getInstrument(instrumentId),
       DPAPI.listByInstrument(instrumentId),
@@ -168,18 +282,24 @@ export const prefillFromInstrumentThunk = createAsyncThunk<
     };
     const dpItems: DpItem[] = (dpResp as any)?.items ?? [];
 
+    // Kelompokkan DP per program (urut tambah = stabil → bisa index-align)
     const byProgram = new Map<number, WizardState['rows']>();
+    const dpByProgram = new Map<number, DpItem[]>();
     for (const it of dpItems) {
       const pid = Number(it?.id_program);
       if (!Number.isFinite(pid)) continue;
 
-      const arr = byProgram.get(pid) ?? [];
-      arr.push({
+      const rowsArr = byProgram.get(pid) ?? [];
+      rowsArr.push({
         id_grade: Number(it?.id_grade) || Number(it?.grade?.id) || null,
-        nama_grade: it?.grade?.nama_grade ?? `Grade ${arr.length + 1}`,
+        nama_grade: it?.grade?.nama_grade ?? `Grade ${rowsArr.length + 1}`,
         base_harga: Number((it as any)?.base_harga) || 0,
       });
-      byProgram.set(pid, arr);
+      byProgram.set(pid, rowsArr);
+
+      const dpsArr = dpByProgram.get(pid) ?? [];
+      dpsArr.push(it);
+      dpByProgram.set(pid, dpsArr);
     }
 
     const firstProgramId = byProgram.size > 0 ? [...byProgram.keys()][0] : null;
@@ -201,31 +321,27 @@ export const prefillFromInstrumentThunk = createAsyncThunk<
     dispatch(resetRowMetas());
     dispatch(clearPendingDeletes());
     dispatch(clearDeletedFlags());
+    dispatch(setExistingProgramId(firstProgramId ?? null));
 
-    // Prefill silabus utk program aktif
+    // Prefill silabus utk program aktif (index-align ke DP program tsb)
     if (firstProgramId && rows.length) {
-      const mapGradeToDpId = new Map<string, number>();
-      for (const it of dpItems) {
-        if (Number(it.id_program) !== Number(firstProgramId)) continue;
-        const gname = it?.grade?.nama_grade?.trim()?.toLowerCase();
-        if (!gname) continue;
-        mapGradeToDpId.set(gname, Number(it.id));
-      }
+      const dps = dpByProgram.get(firstProgramId) ?? [];
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const gradeId = Number(row.id_grade);
-        if (!Number.isFinite(gradeId)) continue;
+        const dpIdForRow = Number(dps[i]?.id) || null; // KUNCI: pakai DP.id per-index
 
-        const desiredDpId = mapGradeToDpId.get(String(row.nama_grade).trim().toLowerCase());
-        if (desiredDpId) dispatch(setRowMeta({ index: i, meta: { dpId: desiredDpId } }));
+        if (dpIdForRow) dispatch(setRowMeta({ index: i, meta: { dpId: dpIdForRow } }));
+
+        if (!Number.isFinite(gradeId)) continue;
 
         try {
           const res = await SilabusAPI.listPublicByInstrumentGrade(instrumentId, gradeId);
-          const items: any[] = Array.isArray(res.items) ? res.items : [];
+          const items: any[] = Array.isArray((res as any).items) ? (res as any).items : [];
 
-          const mine = desiredDpId
-            ? items.filter((x) => Number(x.id_detail_program) === Number(desiredDpId))
+          const mine = dpIdForRow
+            ? items.filter((x) => Number(x.id_detail_program) === Number(dpIdForRow))
             : items;
 
           const s0 = mine[0] ?? items[0];
@@ -244,9 +360,14 @@ export const prefillFromInstrumentThunk = createAsyncThunk<
           };
 
           dispatch(setSyllabusDraft({ index: i, draft }));
-          dispatch(setRowMeta({ index: i, meta: { dpId: draft.id_detail_program ?? desiredDpId ?? null, silabusId: draft.id ?? null } }));
+          dispatch(
+            setRowMeta({
+              index: i,
+              meta: { dpId: draft.id_detail_program ?? dpIdForRow, silabusId: draft.id ?? null },
+            })
+          );
         } catch {
-          // biarkan kosong kalau gagal fetch
+          // optional
         }
       }
     }
@@ -257,11 +378,11 @@ export const prefillFromInstrumentThunk = createAsyncThunk<
   }
 });
 
-/** EDIT (PUT) + upsert rows, update/create silabus, eksekusi pending delete */
+/** EDIT: update instrument + upsert silabus ke DP yang tepat (berdasarkan dpId/gradeId) */
 export const submitWizardEditThunk = createAsyncThunk<
   { instrumenId: number },
   { instrumentId: number },
-  { state: { instrumentWizard: WizardState }; rejectValue: string }
+  { state: { instrumentWizard: WizardState & { existingProgramId: number | null } }; rejectValue: string }
 >('instrumentWizard/submitEdit', async ({ instrumentId }, { getState, rejectWithValue }) => {
   try {
     const s = getState().instrumentWizard;
@@ -273,13 +394,13 @@ export const submitWizardEditThunk = createAsyncThunk<
     );
     if (!allHasSyllabus) throw new Error('Silabus wajib diisi untuk setiap grade sebelum menyimpan.');
 
-    // 1) Update instrument (+rows untuk upsert DP di backend jika kamu dukung)
+    // 1) Update instrument (tetap instrumen yang sama → hindari "nama instrumen sudah dipakai")
     const body: any = { nama_instrumen: s.draftName.trim() };
     if (s.draftIconBase64) body.icon_base64 = s.draftIconBase64;
     if (s.programId && Array.isArray(s.rows) && s.rows.length > 0) {
       body.program_id = s.programId;
       body.rows = s.rows
-        .filter((_, i) => !s.deletedDraftRows[i]) // kirim hanya row aktif
+        .filter((_, i) => !s.deletedDraftRows[i])
         .map((r) => ({
           nama_grade: (r?.nama_grade ?? '').toString().trim() || 'Grade',
           base_harga: Number(r?.base_harga) || 0,
@@ -287,24 +408,37 @@ export const submitWizardEditThunk = createAsyncThunk<
     }
     await InstrumentAPI.updateInstrument(instrumentId, body);
 
-    // 2) Ambil ulang DP utk program aktif → map gradeName→dpId
+    // 2) Ambil ulang DP utk program aktif → buat map gradeId → dpId
     const dp = await DPAPI.listByInstrument(instrumentId);
-    const mapGradeToDpId = new Map<string, number>();
-    for (const it of ((dp as any).items ?? []) as any[]) {
+    const dpItems = (((dp as any).items) ?? []) as any[];
+    const dpIdByGrade = new Map<number, number>();
+    const dpIdByGradeName = new Map<string, number>(); // fallback
+
+    for (const it of dpItems) {
       if (s.programId && Number(it?.id_program) !== Number(s.programId)) continue;
+      const gid = Number(it?.id_grade ?? it?.grade?.id);
+      const did = Number(it?.id);
       const gname = it?.grade?.nama_grade ? norm(String(it.grade.nama_grade)) : '';
-      if (!gname) continue;
-      const dpId = Number((it as any)?.id);
-      if (Number.isFinite(dpId)) mapGradeToDpId.set(gname, dpId);
+      if (Number.isFinite(gid) && Number.isFinite(did)) dpIdByGrade.set(gid, did);
+      if (gname && Number.isFinite(did)) dpIdByGradeName.set(gname, did);
     }
 
-    // 3) Update/Create silabus untuk row aktif
+    // 3) Update/Create silabus untuk setiap row aktif
     for (const [idx, row] of s.rows.entries()) {
-      if (s.deletedDraftRows[idx]) continue; // dilewati
+      if (s.deletedDraftRows[idx]) continue;
       const d = s.syllabusDrafts[idx];
       if (!hasValidSyllabus(d)) continue;
 
-      const dpId = mapGradeToDpId.get(norm(String(row?.nama_grade ?? '')));
+      const gradeId = Number(row?.id_grade);
+      const byGrade = Number.isFinite(gradeId) ? dpIdByGrade.get(gradeId) : undefined;
+
+      const dpId =
+        byGrade ??
+        (s.rowMetas[idx]?.dpId ?? undefined) ??
+        (d?.id_detail_program ?? undefined) ??
+        dpIdByGradeName.get(norm(String(row?.nama_grade ?? ''))) ??
+        null;
+
       if (!dpId) continue;
 
       const payload: any = {
@@ -315,24 +449,23 @@ export const submitWizardEditThunk = createAsyncThunk<
       if (d!.file_base64 !== undefined) payload.file_base64 = d!.file_base64 ?? undefined;
       if (d!.file_url !== undefined) payload.file_url = d!.file_url ?? undefined;
 
-      // fallback ke rowMetas.silabusId jika id di draft tidak ada
-      const draftId = d!.id ?? s.rowMetas[idx]?.silabusId ?? null;
+      const draftId = d!.id ?? (s.rowMetas[idx]?.silabusId ?? null);
 
       if (draftId) {
         await SilabusAPI.updateSilabus(draftId, payload);
       } else {
         await SilabusAPI.createSilabus({
-          id_detail_program: dpId,
+          id_detail_program: Number(dpId),
           ...payload,
         });
       }
     }
 
-    // 4) Eksekusi pending delete (hapus DP dulu baru silabus)
+    // 4) Eksekusi pending delete (optional)
     if (Array.isArray(s.pendingDeletes) && s.pendingDeletes.length > 0) {
       for (const del of s.pendingDeletes) {
-        if (del.dpId) await DPAPI.deleteDetailProgram(del.dpId); 
-        if (del.silabusId) await SilabusAPI.deleteSilabus(del.silabusId); 
+        if (del.dpId) await DPAPI.deleteDetailProgram(del.dpId);
+        if (del.silabusId) await SilabusAPI.deleteSilabus(del.silabusId);
       }
     }
 
@@ -357,13 +490,17 @@ const slice = createSlice({
       state.draftName = a.payload.name;
       state.draftIconBase64 = a.payload.iconBase64 ?? null;
       state.existingIconUrl = null;
+
       state.rows = [{ id_grade: null, nama_grade: 'Grade I', base_harga: 0 }];
       state.programId = null;
+      state.existingProgramId = null;
       state.createdInstrumentId = null;
+
       state.error = null;
       state.status = 'idle';
-      state.syllabusDrafts = {};
-      state.rowMetas = {};
+
+      state.syllabusDrafts = [];
+      state.rowMetas = [];
       state.deletedDraftRows = {};
       state.pendingDeletes = [];
     },
@@ -379,6 +516,30 @@ const slice = createSlice({
     setProgramId(state, a: PayloadAction<number | null | undefined>) {
       state.programId = a.payload ?? null;
     },
+    setExistingProgramId(state, a: PayloadAction<number | null>) {
+      state.existingProgramId = a.payload ?? null;
+    },
+
+    /**
+     * Dipakai page saat:
+     * - switch program dari cache lokal
+     * - memulai create mode program baru (kosong → addRow())
+     */
+    hydrateRowsAndSyllabus(
+      state,
+      a: PayloadAction<{
+        rows: WizardRow[];
+        drafts: (SyllabusDraft | undefined)[];
+        deletedDraftRows?: Record<number, boolean>;
+        rowMetas?: (RowMeta | undefined)[];
+      }>
+    ) {
+      state.rows = Array.isArray(a.payload.rows) ? a.payload.rows : [];
+      state.syllabusDrafts = Array.isArray(a.payload.drafts) ? a.payload.drafts : [];
+      state.deletedDraftRows = a.payload.deletedDraftRows ?? {};
+      // Reset rowMetas untuk mencegah kebocoran dpId/silabusId dari program sebelumnya
+      state.rowMetas = Array.isArray(a.payload.rowMetas) ? a.payload.rowMetas : [];
+    },
 
     replaceRows(state, a: PayloadAction<WizardRow[]>) {
       state.rows = Array.isArray(a.payload) ? a.payload : [];
@@ -393,36 +554,31 @@ const slice = createSlice({
       state.rows[index] = { ...state.rows[index], ...patch };
     },
 
-    /** CREATE MODE delete langsung dari draft */
+    /** CREATE MODE: delete langsung dari draft (reindex draft & metas) */
     deleteRow(state, a: PayloadAction<number>) {
       const idx = a.payload;
       if (!state.rows[idx]) return;
-      const oldRows = state.rows.slice();
-      const oldDrafts = { ...state.syllabusDrafts };
-      const oldMetas = { ...state.rowMetas };
 
-      state.rows = oldRows.filter((_, i) => i !== idx);
+      state.rows.splice(idx, 1);
+      state.syllabusDrafts.splice(idx, 1);
+      state.rowMetas.splice(idx, 1);
 
-      const newDrafts: Record<number, SyllabusDraft | undefined> = {};
-      const newMetas: Record<number, RowMeta | undefined> = {};
-      let j = 0;
-      for (let i = 0; i < oldRows.length; i++) {
-        if (i === idx) continue;
-        if (oldDrafts[i]) newDrafts[j] = oldDrafts[i];
-        if (oldMetas[i]) newMetas[j] = oldMetas[i];
-        j++;
-      }
-      state.syllabusDrafts = newDrafts;
-      state.rowMetas = newMetas;
+      // perbaiki index di deletedDraftRows
+      const next: Record<number, boolean> = {};
+      Object.keys(state.deletedDraftRows).forEach((k) => {
+        const i = Number(k);
+        if (i < idx) next[i] = state.deletedDraftRows[i];
+        else if (i > idx) next[i - 1] = state.deletedDraftRows[i];
+      });
+      state.deletedDraftRows = next;
     },
 
-    /** EDIT MODE: tandai / batal tandai delete (soft delete) */
+    /** EDIT MODE: tandai/batal tandai delete (soft delete) */
     markRowDeletedDraft(state, a: PayloadAction<{ index: number; undo?: boolean }>) {
       const { index, undo } = a.payload;
       if (!state.rows[index]) return;
 
       if (undo) {
-        // batalkan
         delete state.deletedDraftRows[index];
 
         // hapus dari pendingDeletes
@@ -445,16 +601,20 @@ const slice = createSlice({
       const dpId = meta?.dpId ?? draft?.id_detail_program ?? null;
       const silabusId = meta?.silabusId ?? draft?.id ?? null;
       if (dpId) {
-        // hindari duplikat
         const existed = state.pendingDeletes.some(
           (x) => x.dpId === dpId && (silabusId ? x.silabusId === silabusId : true)
         );
-        if (!existed) state.pendingDeletes.push({ dpId: Number(dpId), silabusId: silabusId ? Number(silabusId) : undefined });
+        if (!existed) {
+          state.pendingDeletes.push({
+            dpId: Number(dpId),
+            silabusId: silabusId ? Number(silabusId) : undefined,
+          });
+        }
       }
     },
 
     resetWizard() {
-      return initialState;
+      return { ...initialState };
     },
 
     hydrateFromExisting(
@@ -471,15 +631,25 @@ const slice = createSlice({
       state.programId = typeof a.payload.programId === 'number' ? a.payload.programId : null;
       state.rows = Array.isArray(a.payload.rows) ? a.payload.rows : [];
       state.draftIconBase64 = null;
+
       state.status = 'idle';
       state.error = null;
+
+      state.syllabusDrafts = []; // akan di-prefill setelah ini (lihat thunk)
+      state.rowMetas = [];
+      state.deletedDraftRows = {};
+      state.pendingDeletes = [];
     },
 
     // Draft silabus (MERGE, pertahankan id / id_detail_program)
     setSyllabusDraft(state, a: PayloadAction<{ index: number; draft?: SyllabusDraft }>) {
       const { index, draft } = a.payload;
       if (!state.rows[index]) return;
-      if (!draft) { delete state.syllabusDrafts[index]; return; }
+
+      if (!draft) {
+        state.syllabusDrafts[index] = undefined;
+        return;
+      }
 
       const prev = state.syllabusDrafts[index];
       state.syllabusDrafts[index] = {
@@ -490,16 +660,15 @@ const slice = createSlice({
         completion_pts: draft.completion_pts ?? prev?.completion_pts ?? [],
       };
     },
-    resetSyllabusDrafts(state) { state.syllabusDrafts = {}; },
+    resetSyllabusDrafts(state) { state.syllabusDrafts = []; },
 
     // Meta per row
     setRowMeta(state, a: PayloadAction<{ index: number; meta?: RowMeta }>) {
       const { index, meta } = a.payload;
       if (!state.rows[index]) return;
-      if (!meta) { delete state.rowMetas[index]; return; }
-      state.rowMetas[index] = { ...(state.rowMetas[index] || {}), ...meta };
+      state.rowMetas[index] = meta ? { ...(state.rowMetas[index] || {}), ...meta } : undefined;
     },
-    resetRowMetas(state) { state.rowMetas = {}; },
+    resetRowMetas(state) { state.rowMetas = []; },
 
     // Deleted flags & pending deletes
     clearDeletedFlags(state) { state.deletedDraftRows = {}; },
@@ -508,6 +677,27 @@ const slice = createSlice({
   extraReducers: (b) => {
     b.addCase(fetchProgramsThunk.fulfilled, (s, a) => {
       s.programs = a.payload ?? [];
+    });
+
+    b.addCase(loadRowsForInstrumentProgramThunk.pending, (s) => {
+      s.status = 'loading';
+      s.error = null;
+    });
+    b.addCase(loadRowsForInstrumentProgramThunk.fulfilled, (s, a) => {
+      const { programId, rows, drafts, rowMetas, isExisting } = a.payload;
+      s.status = 'idle';
+      s.programId = programId;
+      s.rows = rows;
+      s.syllabusDrafts = drafts ?? [];
+      s.rowMetas = rowMetas ?? [];
+      s.deletedDraftRows = {};
+      if (isExisting && s.existingProgramId == null) {
+        s.existingProgramId = programId;
+      }
+    });
+    b.addCase(loadRowsForInstrumentProgramThunk.rejected, (s, a) => {
+      s.status = 'failed';
+      s.error = (a.payload as string) ?? 'Gagal memuat detail program';
     });
 
     b.addCase(submitWizardThunk.pending, (s) => { s.status = 'submitting'; s.error = null; });
@@ -530,11 +720,13 @@ export const {
   patchDraft,
   setPrograms,
   setProgramId,
+  setExistingProgramId,
+  hydrateRowsAndSyllabus,
   replaceRows,
   addRow,
   updateRow,
-  deleteRow,              // create-mode delete langsung
-  markRowDeletedDraft,    // edit-mode soft delete / undo via {undo:true}
+  deleteRow,
+  markRowDeletedDraft,
   resetWizard,
   hydrateFromExisting,
   setSyllabusDraft,

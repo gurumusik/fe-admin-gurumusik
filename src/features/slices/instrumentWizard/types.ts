@@ -40,8 +40,8 @@ export type WizardState = {
   programs: ProgramLite[];
 
   // per-row
-  syllabusDrafts: Record<number, SyllabusDraft | undefined>;
-  rowMetas: Record<number, RowMeta | undefined>;
+  syllabusDrafts: (SyllabusDraft | undefined)[];
+  rowMetas: (RowMeta | undefined)[];
 
   // soft delete (edit mode): index->true jika ditandai hapus
   deletedDraftRows: Record<number, boolean>;

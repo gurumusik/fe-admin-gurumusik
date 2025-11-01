@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/features/earnings/pages/AdminEarningsPage.tsx
 import React from "react";
+import { useNavigate } from 'react-router-dom';
 import {
   RiCoinsLine,
   RiInformationLine,
@@ -427,6 +428,7 @@ const MonthRangeOverlay: React.FC<{
 
 /* PAGE */
 const AdminEarningsPage: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const tx = useSelector((s: RootState) => s.transaksi);
 
@@ -970,7 +972,7 @@ const AdminEarningsPage: React.FC = () => {
                           <button
                             type="button"
                             className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--secondary-color)] px-3 text-sm text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
-                            onClick={() => console.log("invoice", r.uuid)}
+                            onClick={() => navigate(`/dashboard-admin/invoice/${r.uuid}`)}
                           >
                             <RiDownloadLine className="text-[18px]" />
                             Invoice
@@ -999,7 +1001,7 @@ const AdminEarningsPage: React.FC = () => {
                           <button
                             type="button"
                             className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--secondary-color)] px-3 text-sm text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
-                            onClick={() => console.log("invoice", r.uuid)}
+                            onClick={() => navigate(`/dashboard-admin/invoice/${r.uuid}`)}
                           >
                             <RiDownloadLine className="text-[18px]" />
                             Invoice

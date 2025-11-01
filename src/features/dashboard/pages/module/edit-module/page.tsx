@@ -37,6 +37,8 @@ const toNumber = (s: string) => {
 const padArray = (arr: string[], min = 3) => { const c = [...arr]; while (c.length < min) c.push(''); return c; };
 const toInstrumentOption = (nama?: string | null) => (nama ? nama.toLowerCase() : '');
 
+const HIDE_CUPLIKAN_DAN_EBOOK = true as const;
+
 /* ================== WYSIWYG ================== */
 function cmd(command: string, value?: string) { document.execCommand(command, false, value); }
 const Wysiwyg: React.FC<{ value: string; onChange: (html: string) => void; placeholder?: string; }> = ({ value, onChange, placeholder }) => {
@@ -631,7 +633,7 @@ export default function EditModulePage() {
               </div>
 
               {/* === Upload E-Book Pendukung === */}
-              <div>
+              <div className={HIDE_CUPLIKAN_DAN_EBOOK ? 'hidden' : ''}>
                 <div className="mb-2 text-sm font-semibold text-neutral-800">Upload E-Book Pendukung</div>
                 <EbookDropArea onPick={onPickEbooks} />
                 <p className="mt-2 text-xs text-neutral-500">Supported formats: <b>.PDF only</b></p>
@@ -729,7 +731,7 @@ export default function EditModulePage() {
             </div>
 
             {/* ======= Cuplikan Modul (Images only) ======= */}
-            <div>
+            <div className={HIDE_CUPLIKAN_DAN_EBOOK ? 'hidden' : ''}>
               <div className="mb-2 text-lg font-semibold text-neutral-800">Cuplikan Modul</div>
 
               {/* Drop area image only */}
