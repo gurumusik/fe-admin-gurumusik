@@ -18,6 +18,7 @@ import {
   setSyllabusDraft,
   hydrateRowsAndSyllabus,
   loadRowsForInstrumentProgramThunk,
+  setRowMeta, // 👈 TAMBAHAN
 } from "@/features/slices/instrumentWizard/slice";
 
 import {
@@ -26,10 +27,12 @@ import {
   RiAddLine,
   RiPencilFill,
   RiDeleteBinLine,
+  RiCloseLine,
 } from "react-icons/ri";
 
 import SylabusModal from "@/features/dashboard/components/SylabusModal";
 import AddInstrumentModal from "@/features/dashboard/components/AddInstrumentModal";
+import ConfirmationModal from "@/components/ui/common/ConfirmationModal";
 
 // ✅ Gunakan tipe SyllabusDraft dari wizard sebagai sumber kebenaran
 import type {
@@ -44,7 +47,8 @@ import type {
 } from "@/features/slices/instruments/types";
 
 const toTitle = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-const slugify = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+const slugify = (s: string) =>
+  s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
 const hasValidSyllabus = (d?: WizardSyllabusDraft) =>
   !!(d && d.title?.trim() && (d.file_base64 || d.file_url || d.link_url));
@@ -90,16 +94,28 @@ const InstrumentDetailPage: React.FC = () => {
   // Dropdown program
   const [programMenuOpen, setProgramMenuOpen] = React.useState(false);
 
+  // Unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = React.useState(false);
+
   // ===== Program cache per id_program (rows & drafts) =====
-  // Agar ketika user pindah program lalu balik lagi, data lokal tidak hilang.
   const programCacheRef = React.useRef<
-    Record<number, { rows: WizardRow[]; drafts: (WizardSyllabusDraft | undefined)[]; deleted?: Record<number, boolean> }>
+    Record<
+      number,
+      {
+        rows: WizardRow[];
+        drafts: (WizardSyllabusDraft | undefined)[];
+        deleted?: Record<number, boolean>;
+      }
+    >
   >({});
 
   // 1) load list program
-  React.useEffect(() => { dispatch(fetchProgramsThunk()); }, [dispatch]);
+  React.useEffect(() => {
+    dispatch(fetchProgramsThunk());
+  }, [dispatch]);
 
-  // 2) EDIT → prefill instrument (akan set existingProgramId & rows awal)
+  // 2) EDIT → prefill instrument
   React.useEffect(() => {
     if (isEdit) dispatch(prefillFromInstrumentThunk({ instrumentId }));
   }, [dispatch, isEdit, instrumentId]);
@@ -109,10 +125,11 @@ const InstrumentDetailPage: React.FC = () => {
     if (!isEdit && wizard.programs.length > 0) {
       const alreadyChosen = wizard.programId != null;
       if (!alreadyChosen) {
-        const abk = wizard.programs.find((p) => p.nama_program?.toLowerCase() === "abk");
+        const abk = wizard.programs.find(
+          (p) => p.nama_program?.toLowerCase() === "abk"
+        );
         if (abk) dispatch(setProgramId(abk.id));
       }
-      // siapkan minimal 1 row
       if (wizard.rows.length === 0) dispatch(addRow());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,23 +152,22 @@ const InstrumentDetailPage: React.FC = () => {
   }, [navigate]);
 
   // === Mode submit ===
-  // - isCreatingBrandNewInstrument: halaman NEW (buat instrumen baru + programnya)
-  // - isCreatingNewProgramForExistingInstrument: halaman EDIT tapi program dipilih berbeda/baru → tambah program untuk instrumen ini
   const isCreatingBrandNewInstrument = !isEdit;
   const isCreatingNewProgramForExistingInstrument =
-    isEdit && (
-      wizard.existingProgramId == null ||
-      (wizard.programId != null && wizard.programId !== wizard.existingProgramId)
-    );
+    isEdit &&
+    (wizard.existingProgramId == null ||
+      (wizard.programId != null &&
+        wizard.programId !== wizard.existingProgramId));
 
   const handleSubmit = React.useCallback(async () => {
-    // Gunakan instrumen saat ini ketika sedang menambah program baru di halaman edit
     const thunkPromise = isCreatingBrandNewInstrument
-      ? dispatch(submitWizardThunk()) // Buat instrumen BARU + DPs
-      : dispatch(submitWizardEditThunk({ instrumentId })); // Tambah/ubah di instrumen sekarang → hindari error "nama instrumen sudah dipakai"
+      ? dispatch(submitWizardThunk())
+      : dispatch(submitWizardEditThunk({ instrumentId }));
 
     const ok = await thunkPromise.unwrap().catch(() => null);
     if (!ok) return;
+
+    setHasUnsavedChanges(false);
     okNavigateHome();
   }, [dispatch, instrumentId, isCreatingBrandNewInstrument, okNavigateHome]);
 
@@ -169,6 +185,10 @@ const InstrumentDetailPage: React.FC = () => {
 
   const isSubmitting = wizard.status === "submitting";
 
+  // Lazy load flag (grade + detail program + silabus)
+  const isContentLoading =
+    wizard.status === "loading" && wizard.rows.length === 0;
+
   // ====== Sylabus (draft) handlers ======
   const handleOpenSylabus = (idx: number) => {
     setCurrentRowIndex(idx);
@@ -178,10 +198,16 @@ const InstrumentDetailPage: React.FC = () => {
 
   const handleSaveSylabusDraft = (draft: WizardSyllabusDraft) => {
     if (currentRowIndex < 0) return;
+
     const title =
       draft.title?.trim() ||
-      `${displayTitle} - ${wizard.rows[currentRowIndex]?.nama_grade ?? ""}`;
+      `${displayTitle} - ${
+        wizard.rows[currentRowIndex]?.nama_grade ?? ""
+      }`;
     const prev = wizard.syllabusDrafts[currentRowIndex];
+
+    setHasUnsavedChanges(true);
+
     dispatch(
       setSyllabusDraft({
         index: currentRowIndex,
@@ -191,7 +217,8 @@ const InstrumentDetailPage: React.FC = () => {
           ...(prev || {}),
           ...draft,
           title,
-          completion_pts: draft.completion_pts ?? prev?.completion_pts ?? [],
+          completion_pts:
+            draft.completion_pts ?? prev?.completion_pts ?? [],
         },
       })
     );
@@ -201,7 +228,9 @@ const InstrumentDetailPage: React.FC = () => {
   const allSyllabusReady = React.useMemo(
     () =>
       wizard.rows.every((_, idx) =>
-        wizard.deletedDraftRows[idx] ? true : hasValidSyllabus(wizard.syllabusDrafts[idx])
+        wizard.deletedDraftRows[idx]
+          ? true
+          : hasValidSyllabus(wizard.syllabusDrafts[idx])
       ),
     [wizard.rows, wizard.syllabusDrafts, wizard.deletedDraftRows]
   );
@@ -210,7 +239,7 @@ const InstrumentDetailPage: React.FC = () => {
   const onChooseProgram = async (newProgramId: number) => {
     const prevProgramId = wizard.programId ?? undefined;
 
-    // 1) simpan cache program sebelumnya (kalau ada)
+    // simpan cache program sebelumnya
     if (prevProgramId !== undefined) {
       programCacheRef.current[prevProgramId] = {
         rows: [...wizard.rows],
@@ -219,14 +248,11 @@ const InstrumentDetailPage: React.FC = () => {
       };
     }
 
-    // 2) set pilihan program baru
     dispatch(setProgramId(newProgramId));
     setProgramMenuOpen(false);
 
-    // 3) muat data utk program baru
     const cached = programCacheRef.current[newProgramId];
     if (cached) {
-      // gunakan cache lokal jika sudah pernah diisi
       dispatch(
         hydrateRowsAndSyllabus({
           rows: cached.rows,
@@ -235,19 +261,25 @@ const InstrumentDetailPage: React.FC = () => {
         })
       );
     } else if (isEdit) {
-      // di mode edit → fetch dari server berdasarkan (instrumentId, programId)
       await dispatch(
-        loadRowsForInstrumentProgramThunk({ instrumentId, programId: newProgramId })
+        loadRowsForInstrumentProgramThunk({
+          instrumentId,
+          programId: newProgramId,
+        })
       );
-      // Cache akan di-update otomatis via effect di bawah ketika state wizard berubah
     } else {
-      // mode create & belum ada cache → mulai kosong (isi 1 row default)
-      dispatch(hydrateRowsAndSyllabus({ rows: [], drafts: [], deletedDraftRows: {} }));
+      dispatch(
+        hydrateRowsAndSyllabus({
+          rows: [],
+          drafts: [],
+          deletedDraftRows: {},
+        })
+      );
       dispatch(addRow());
     }
   };
 
-  // Auto-cache: setiap kali rows/drafts berubah untuk program aktif, simpan ke cache lokal
+  // Auto-cache setiap kali rows/drafts berubah
   React.useEffect(() => {
     if (wizard.programId != null) {
       programCacheRef.current[wizard.programId] = {
@@ -256,7 +288,80 @@ const InstrumentDetailPage: React.FC = () => {
         deleted: { ...wizard.deletedDraftRows },
       };
     }
-  }, [wizard.programId, wizard.rows, wizard.syllabusDrafts, wizard.deletedDraftRows]);
+  }, [
+    wizard.programId,
+    wizard.rows,
+    wizard.syllabusDrafts,
+    wizard.deletedDraftRows,
+  ]);
+
+  // ===== Handler perubahan (set hasUnsavedChanges) =====
+  const handleChangeGrade = (index: number, value: string) => {
+    setHasUnsavedChanges(true);
+
+    const prevRow = wizard.rows[index];
+    const oldGrade = prevRow?.nama_grade ?? "";
+    const gradeChanged = value !== oldGrade;
+
+    // update nama grade, dan kalau berubah reset id_grade supaya nggak pake gradeId lama
+    dispatch(
+      updateRow({
+        index,
+        patch: gradeChanged
+          ? { nama_grade: value, id_grade: null }
+          : { nama_grade: value },
+      })
+    );
+
+    if (gradeChanged) {
+      // 🔥 Grade berubah → anggap silabus baru, buang semua binding lama
+      dispatch(
+        setSyllabusDraft({
+          index,
+          draft: undefined,
+        })
+      );
+      dispatch(
+        setRowMeta({
+          index,
+          meta: undefined,
+        })
+      );
+    }
+  };
+
+  const handleChangeHarga = (index: number, rawValue: string) => {
+    setHasUnsavedChanges(true);
+    const onlyDigits = rawValue.replace(/\D+/g, "");
+    const num = onlyDigits === "" ? "" : Number(onlyDigits);
+    dispatch(
+      updateRow({ index, patch: { base_harga: num as any } })
+    );
+  };
+
+  const handleAddRow = () => {
+    setHasUnsavedChanges(true);
+    dispatch(addRow());
+  };
+
+  const handleDeleteRow = (idx: number, isMarkedDelete: boolean) => {
+    setHasUnsavedChanges(true);
+    if (isEdit) {
+      dispatch(
+        markRowDeletedDraft({ index: idx, undo: isMarkedDelete })
+      );
+    } else {
+      dispatch(deleteRow(idx));
+    }
+  };
+
+  const handleProgramButtonClick = () => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedModal(true);
+      return;
+    }
+    setProgramMenuOpen((v) => !v);
+  };
 
   return (
     <div className="rounded-2xl">
@@ -274,10 +379,16 @@ const InstrumentDetailPage: React.FC = () => {
           </button>
 
           <div className="flex items-center gap-3">
-            <img src={iconUrl} alt={displayTitle} className="h-8 w-8 object-contain" />
+            <img
+              src={iconUrl}
+              alt={displayTitle}
+              className="h-8 w-8 object-contain"
+            />
             <div className="leading-tight">
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold text-[#0F172A]">{displayTitle}</h1>
+                <h1 className="text-xl font-semibold text-[#0F172A]">
+                  {displayTitle}
+                </h1>
               </div>
               <p className="text-[13px] text-[#6B7E93]">
                 Total Level: {Math.max(1, wizard.rows.length)}
@@ -294,12 +405,15 @@ const InstrumentDetailPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex items-center gap-3 relative" data-program-dropdown>
+          <div
+            className="flex items-center gap-3 relative"
+            data-program-dropdown
+          >
             <button
               type="button"
-              onClick={() => setProgramMenuOpen((v) => !v)}
+              onClick={handleProgramButtonClick}
               className="inline-flex items-center gap-2 rounded-full border border-[var(--secondary-color)] px-4 h-10 text-[15px] font-semibold text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color,#E6F4FF)]"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isContentLoading}
             >
               {selectedProgramName} <span className="opacity-60">▾</span>
             </button>
@@ -332,7 +446,11 @@ const InstrumentDetailPage: React.FC = () => {
               onClick={handleSubmit}
               disabled={isSubmitting || !allSyllabusReady}
               className="inline-flex items-center justify-center rounded-full bg-[#F6C437] text-[#0B0B0B] font-semibold px-6 h-10 hover:brightness-95 disabled:opacity-60"
-              title={!allSyllabusReady ? "Lengkapi silabus untuk semua grade terlebih dahulu" : undefined}
+              title={
+                !allSyllabusReady
+                  ? "Lengkapi silabus untuk semua grade terlebih dahulu"
+                  : undefined
+              }
             >
               {isSubmitting
                 ? "Menyimpan..."
@@ -355,141 +473,178 @@ const InstrumentDetailPage: React.FC = () => {
       {/* Body */}
       <div>
         <div className="rounded-2xl bg-white p-4 sm:p-6">
-          <div className="space-y-6">
-            {wizard.rows.map((row, idx) => {
-              const draft = wizard.syllabusDrafts[idx];
-              const isMarkedDelete = !!wizard.deletedDraftRows[idx];
-              const canDeleteThisRow = wizard.rows.length > 1 && !isSubmitting;
-
-              return (
-                <div key={idx} className="pb-6 border-b border-[#E5EDF6] last:border-none">
+          {isContentLoading ? (
+            // Lazy load skeleton grade/detail program/silabus
+            <div className="space-y-6">
+              {[0, 1].map((i) => (
+                <div
+                  key={i}
+                  className="pb-6 border-b border-[#E5EDF6] last:border-none animate-pulse"
+                >
                   <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 md:gap-6 items-end">
-                    {/* Instrument Grade */}
                     <div>
-                      <label className="block text-[14px] font-semibold text-[#0F172A] mb-2">
-                        Instrument Grade
-                      </label>
-                      <input
-                        value={row.nama_grade}
-                        onChange={(e) =>
-                          dispatch(updateRow({ index: idx, patch: { nama_grade: e.target.value } }))
-                        }
-                        className="w-full rounded-xl border border-[#B8C8DA] bg-white px-4 py-3 text-[15px] outline-none focus:ring-2 focus:ring-neutral-200"
-                        placeholder="Grade I"
-                        disabled={isSubmitting || isMarkedDelete}
-                      />
+                      <div className="h-4 w-32 bg-slate-200 rounded mb-2" />
+                      <div className="h-11 w-full bg-slate-200 rounded-xl" />
                     </div>
-
-                    {/* Harga per sesi */}
                     <div>
-                      <label className="block text-[14px] font-semibold text-[#0F172A] mb-2">
-                        Harga Per Sesi
-                      </label>
-                      <input
-                        value={String(row.base_harga ?? "")}
-                        onChange={(e) => {
-                          const onlyDigits = e.target.value.replace(/\D+/g, "");
-                          const num = onlyDigits === "" ? "" : Number(onlyDigits);
-                          dispatch(updateRow({ index: idx, patch: { base_harga: num as any } }));
-                        }}
-                        className="w-full rounded-xl border border-[#B8C8DA] bg-white px-4 py-3 text-[15px] outline-none focus:ring-2 focus:ring-neutral-200"
-                        placeholder="Rp0"
-                        inputMode="numeric"
-                        disabled={isSubmitting || isMarkedDelete}
-                      />
+                      <div className="h-4 w-32 bg-slate-200 rounded mb-2" />
+                      <div className="h-11 w-full bg-slate-200 rounded-xl" />
                     </div>
-
-                    {/* Aksi kanan */}
-                    <div className="md:justify-self-end flex flex-col items-start md:items-end">
-                      <span className="block text-[14px] font-semibold text-[#0F172A] mb-2">
-                        Aksi
-                      </span>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenSylabus(idx)}
-                          className="inline-flex items-center gap-2 rounded-full border border-[var(--secondary-color,#0682DF)] text-[var(--secondary-color,#0682DF)] px-4 h-10 hover:bg-[var(--secondary-light-color,#E6F4FF)]"
-                          disabled={isSubmitting || isMarkedDelete}
-                        >
-                          <RiBookOpenLine className="text-lg" />
-                          {draft?.title ? "Edit Silabus" : "Silabus"}
-                        </button>
-
-                        {canDeleteThisRow && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              isEdit
-                                ? dispatch(markRowDeletedDraft({ index: idx, undo: isMarkedDelete }))
-                                : dispatch(deleteRow(idx))
-                            }
-                            className={`inline-flex items-center gap-2 rounded-full px-4 h-10 ${
-                              isMarkedDelete
-                                ? "border border-neutral-300 text-neutral-600 hover:bg-neutral-50"
-                                : "border border-red-300 text-red-600 hover:bg-red-50"
-                            }`}
-                            title={
-                              isEdit
-                                ? isMarkedDelete
-                                  ? "Batalkan penghapusan grade ini"
-                                  : "Tandai grade ini untuk dihapus saat Simpan"
-                                : "Hapus grade dari draft"
-                            }
-                          >
-                            <RiDeleteBinLine className="text-lg" />
-                            {isMarkedDelete ? "Batal Hapus" : "Hapus Grade"}
-                          </button>
-                        )}
+                    <div className="flex flex-col items-start md:items-end">
+                      <div className="h-4 w-20 bg-slate-200 rounded mb-2" />
+                      <div className="flex gap-2">
+                        <div className="h-10 w-28 bg-slate-200 rounded-full" />
+                        <div className="h-10 w-28 bg-slate-200 rounded-full" />
                       </div>
                     </div>
                   </div>
-
-                  {/* Indikator draft / delete */}
-                  {isMarkedDelete ? (
-                    <p className="mt-2 text-xs text-red-600">
-                      Baris ini <strong>akan dihapus</strong> saat kamu menekan Simpan.
-                    </p>
-                  ) : draft?.title ? (
-                    <p className="mt-2 text-xs text-green-700">
-                      Draft silabus tersimpan: {draft.title}
-                      {draft.link_url
-                        ? " (Link)"
-                        : draft.file_url
-                        ? " (PDF)"
-                        : draft.file_base64
-                        ? " (Gambar)"
-                        : ""}
-                      {Array.isArray(draft.completion_pts) && draft.completion_pts.length > 0
-                        ? ` • ${draft.completion_pts.length} target`
-                        : null}
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-xs text-orange-700">
-                      Belum ada draft silabus untuk grade ini.
-                    </p>
-                  )}
+                  <div className="mt-2 h-3 w-40 bg-slate-200 rounded" />
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="space-y-6">
+                {wizard.rows.map((row, idx) => {
+                  const draft = wizard.syllabusDrafts[idx];
+                  const isMarkedDelete = !!wizard.deletedDraftRows[idx];
+                  const canDeleteThisRow =
+                    wizard.rows.length > 1 && !isSubmitting;
 
-          {/* Tambah grade */}
-          <div className="pt-5">
-            <button
-              type="button"
-              onClick={() => dispatch(addRow())}
-              className="inline-flex items-center gap-2 rounded-full border border-[#B8C8DA] px-4 h-10 text-[15px] font-semibold text-[var(--secondary-color,#0682DF)] hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
-              disabled={isSubmitting}
-            >
-              <RiAddLine className="text-lg" />
-              Tambah Grade
-            </button>
-          </div>
+                  return (
+                    <div
+                      key={idx}
+                      className="pb-6 border-b border-[#E5EDF6] last:border-none"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 md:gap-6 items-end">
+                        {/* Instrument Grade */}
+                        <div>
+                          <label className="block text-[14px] font-semibold text-[#0F172A] mb-2">
+                            Instrument Grade
+                          </label>
+                          <input
+                            value={row.nama_grade}
+                            onChange={(e) =>
+                              handleChangeGrade(idx, e.target.value)
+                            }
+                            className="w-full rounded-xl border border-[#B8C8DA] bg-white px-4 py-3 text-[15px] outline-none focus:ring-2 focus:ring-neutral-200"
+                            placeholder="Grade I"
+                            disabled={isSubmitting || isMarkedDelete}
+                          />
+                        </div>
 
-          {/* Error */}
-          {wizard.status === "failed" && wizard.error && (
-            <div className="mt-4 text-sm text-red-600">{wizard.error}</div>
+                        {/* Harga Per Sesi */}
+                        <div>
+                          <label className="block text-[14px] font-semibold text-[#0F172A] mb-2">
+                            Harga Per Sesi
+                          </label>
+                          <input
+                            value={String(row.base_harga ?? "")}
+                            onChange={(e) =>
+                              handleChangeHarga(idx, e.target.value)
+                            }
+                            className="w-full rounded-xl border border-[#B8C8DA] bg-white px-4 py-3 text-[15px] outline-none focus:ring-2 focus:ring-neutral-200"
+                            placeholder="Rp0"
+                            inputMode="numeric"
+                            disabled={isSubmitting || isMarkedDelete}
+                          />
+                        </div>
+
+                        {/* Aksi kanan */}
+                        <div className="md:justify-self-end flex flex-col items-start md:items-end">
+                          <span className="block text-[14px] font-semibold text-[#0F172A] mb-2">
+                            Aksi
+                          </span>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenSylabus(idx)}
+                              className="inline-flex items-center gap-2 rounded-full border border-[var(--secondary-color,#0682DF)] text-[var(--secondary-color,#0682DF)] px-4 h-10 hover:bg-[var(--secondary-light-color,#E6F4FF)]"
+                              disabled={isSubmitting || isMarkedDelete}
+                            >
+                              <RiBookOpenLine className="text-lg" />
+                              {draft?.title ? "Edit Silabus" : "Silabus"}
+                            </button>
+
+                            {canDeleteThisRow && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteRow(idx, isMarkedDelete)
+                                }
+                                className={`inline-flex items-center gap-2 rounded-full px-4 h-10 ${
+                                  isMarkedDelete
+                                    ? "border border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                                    : "border border-red-300 text-red-600 hover:bg-red-50"
+                                }`}
+                                title={
+                                  isEdit
+                                    ? isMarkedDelete
+                                      ? "Batalkan penghapusan grade ini"
+                                      : "Tandai grade ini untuk dihapus saat Simpan"
+                                    : "Hapus grade dari draft"
+                                }
+                              >
+                                <RiDeleteBinLine className="text-lg" />
+                                {isMarkedDelete ? "Batal Hapus" : "Hapus Grade"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Indikator draft / delete */}
+                      {isMarkedDelete ? (
+                        <p className="mt-2 text-xs text-red-600">
+                          Baris ini <strong>akan dihapus</strong> saat kamu
+                          menekan Simpan.
+                        </p>
+                      ) : draft?.title ? (
+                        <p className="mt-2 text-xs text-green-700">
+                          Draft silabus tersimpan: {draft.title}
+                          {draft.link_url
+                            ? " (Link)"
+                            : draft.file_url
+                            ? " (PDF)"
+                            : draft.file_base64
+                            ? " (Gambar)"
+                            : ""}
+                          {Array.isArray(draft.completion_pts) &&
+                          draft.completion_pts.length > 0
+                            ? ` • ${draft.completion_pts.length} target`
+                            : null}
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-xs text-orange-700">
+                          Belum ada draft silabus untuk grade ini.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Tambah grade */}
+              <div className="pt-5">
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#B8C8DA] px-4 h-10 text-[15px] font-semibold text-[var(--secondary-color,#0682DF)] hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                  disabled={isSubmitting}
+                >
+                  <RiAddLine className="text-lg" />
+                  Tambah Grade
+                </button>
+              </div>
+
+              {/* Error */}
+              {wizard.status === "failed" && wizard.error && (
+                <div className="mt-4 text-sm text-red-600">
+                  {wizard.error}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -499,7 +654,11 @@ const InstrumentDetailPage: React.FC = () => {
         open={showSylabus}
         onClose={() => setShowSylabus(false)}
         subtitle={`${displayTitle} - ${currentGrade || "Grade I"}`}
-        initial={currentRowIndex >= 0 ? wizard.syllabusDrafts[currentRowIndex] : undefined}
+        initial={
+          currentRowIndex >= 0
+            ? wizard.syllabusDrafts[currentRowIndex]
+            : undefined
+        }
         onSaveDraft={handleSaveSylabusDraft}
       />
 
@@ -511,12 +670,19 @@ const InstrumentDetailPage: React.FC = () => {
         requireIcon={false}
         initialPreview={iconUrl}
         onSubmit={(payload: EditInstrumentPayload) => {
+          let changed = false;
+
           if (typeof payload.name === "string") {
+            changed = true;
             dispatch(patchDraft({ name: payload.name }));
           }
           if (typeof payload.iconBase64 === "string") {
+            changed = true;
             dispatch(patchDraft({ iconBase64: payload.iconBase64 }));
           }
+
+          if (changed) setHasUnsavedChanges(true);
+
           const newType = resolveType(payload);
           if (newType && newType !== typeSlug) {
             setTypeSlug(newType);
@@ -529,6 +695,24 @@ const InstrumentDetailPage: React.FC = () => {
           } else {
             setShowEdit(false);
           }
+        }}
+      />
+
+      {/* Modal peringatan perubahan belum disimpan */}
+      <ConfirmationModal
+        isOpen={showUnsavedModal}
+        onClose={() => setShowUnsavedModal(false)}
+        icon={<RiCloseLine />}
+        iconTone="danger"
+        title="Perubahan belum disimpan"
+        texts={[
+          "Mohon simpan perubahan terlebih dahulu sebelum berganti program.",
+        ]}
+        align="center"
+        button1={{
+          label: "Mengerti",
+          onClick: () => setShowUnsavedModal(false),
+          variant: "danger",
         }}
       />
     </div>
