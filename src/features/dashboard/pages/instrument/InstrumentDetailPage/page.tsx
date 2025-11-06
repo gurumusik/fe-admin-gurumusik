@@ -186,8 +186,7 @@ const InstrumentDetailPage: React.FC = () => {
   const isSubmitting = wizard.status === "submitting";
 
   // Lazy load flag (grade + detail program + silabus)
-  const isContentLoading =
-    wizard.status === "loading" && wizard.rows.length === 0;
+  const isContentLoading = wizard.status === "loading";
 
   // ====== Sylabus (draft) handlers ======
   const handleOpenSylabus = (idx: number) => {
