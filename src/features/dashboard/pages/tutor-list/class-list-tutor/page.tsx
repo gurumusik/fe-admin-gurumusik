@@ -17,6 +17,7 @@ import type { AppDispatch } from '@/app/store';
 // ⬇️ Detail guru
 import { fetchGuruByIdThunk, selectGuruDetail } from '@/features/slices/guru/slice';
 import { getStatusColor } from '@/utils/getStatusColor';
+import defaultUser from "@/assets/images/default-user.png";
 
 // ⬇️ Performa mengajar (ADMIN endpoint: /rating/:guru_id/performa-mengajar)
 import {
@@ -38,6 +39,7 @@ import {
 // UI utils
 import ProgramAvatarBadge from '@/components/ui/badge/ProgramAvatarBadge';
 import { getInstrumentIcon } from '@/utils/getInstrumentIcon';
+import { resolveImageUrl } from '@/utils/resolveImageUrl';
 
 /* =========================================================
    Helpers UI
@@ -365,7 +367,7 @@ export default function ClassListTutorPage() {
             ) : guru ? (
               <div className="flex items-center gap-3">
                 <img
-                  src={(guru as any).profile_pic_url || '/avatar-placeholder.png'}
+                  src={resolveImageUrl((guru as any).profile_pic_url) || defaultUser}
                   alt={(guru as any).nama}
                   className="h-14 w-14 rounded-full object-cover ring-2 ring-black/5"
                 />

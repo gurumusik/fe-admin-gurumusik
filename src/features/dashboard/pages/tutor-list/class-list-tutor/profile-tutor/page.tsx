@@ -19,6 +19,7 @@ import {
   RiCloseLine,
   RiArrowRightSLine,
 } from 'react-icons/ri';
+import defaultUser from "@/assets/images/default-user.png";
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
 import type { AppDispatch } from '@/app/store';
@@ -468,7 +469,7 @@ export default function ProfileTutorPage() {
               <div className="text-red-600 text-sm">{profile.error}</div>
             ) : (
               <div className="flex items-start gap-5">
-                <img src={tutor.avatar} alt={tutor.name} className="h-20 w-20 rounded-full object-cover ring-2 ring-black/5" />
+                <img src={resolveImageUrl(tutor.avatar) || defaultUser} alt={tutor.name} className="h-20 w-20 rounded-full object-cover ring-2 ring-black/5" />
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-neutral-900">{tutor.name}</h3>
 

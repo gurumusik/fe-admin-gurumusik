@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/features/program/slice.ts
+// src/features/slices/program/slice.ts
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import * as ProgramAPI from '@/services/api/program.api';
 import type {
@@ -8,6 +8,7 @@ import type {
   FetchProgramsParams,
   ListProgramsResponse,
   CreateProgramPayload,
+  UpdateProgramPayload,
 } from './types';
 
 /** ===== Initial State ===== */
@@ -29,7 +30,6 @@ export const fetchProgramsThunk = createAsyncThunk<
   { rejectValue: string }
 >('program/fetchList', async (params, { rejectWithValue }) => {
   try {
-    // Sesuaikan tipe return dari API ke bentuk yang dipakai slice
     const res = await ProgramAPI.listPrograms(params);
     return res as ListProgramsResponse;
   } catch (e: any) {
@@ -47,6 +47,32 @@ export const createProgramThunk = createAsyncThunk<
     return res.data as Program; // Program baru
   } catch (e: any) {
     return rejectWithValue(e?.message ?? 'Gagal membuat program');
+  }
+});
+
+export const updateProgramThunk = createAsyncThunk<
+  Program,
+  UpdateProgramPayload,
+  { rejectValue: string }
+>('program/update', async ({ id, data }, { rejectWithValue }) => {
+  try {
+    const res = await ProgramAPI.updateProgram(id, data);
+    return res as Program;
+  } catch (e: any) {
+    return rejectWithValue(e?.message ?? 'Gagal mengubah program');
+  }
+});
+
+export const deleteProgramThunk = createAsyncThunk<
+  { id: number | string },
+  number | string,
+  { rejectValue: string }
+>('program/delete', async (id, { rejectWithValue }) => {
+  try {
+    await ProgramAPI.deleteProgram(id);
+    return { id };
+  } catch (e: any) {
+    return rejectWithValue(e?.message ?? 'Gagal menghapus program');
   }
 });
 
@@ -91,13 +117,46 @@ const slice = createSlice({
     });
     b.addCase(createProgramThunk.fulfilled, (s, a) => {
       s.creating = false;
-      // Prepend supaya langsung muncul di dropdown/list
+      // Prepend supaya langsung muncul di list
       s.items = [a.payload, ...s.items];
       s.total += 1;
     });
     b.addCase(createProgramThunk.rejected, (s, a) => {
       s.creating = false;
       s.error = (a.payload as string) ?? 'Gagal membuat program';
+    });
+
+    // update
+    b.addCase(updateProgramThunk.pending, (s) => {
+      s.status = 'loading';
+      s.error = null;
+    });
+    b.addCase(updateProgramThunk.fulfilled, (s, a) => {
+      s.status = 'succeeded';
+      const updated = a.payload;
+      s.items = s.items.map((p) =>
+        p.id === updated.id ? { ...p, ...updated } : p
+      );
+    });
+    b.addCase(updateProgramThunk.rejected, (s, a) => {
+      s.status = 'failed';
+      s.error = (a.payload as string) ?? 'Gagal mengubah program';
+    });
+
+    // delete
+    b.addCase(deleteProgramThunk.pending, (s) => {
+      s.status = 'loading';
+      s.error = null;
+    });
+    b.addCase(deleteProgramThunk.fulfilled, (s, a) => {
+      s.status = 'succeeded';
+      const id = a.payload.id;
+      s.items = s.items.filter((p) => p.id !== id);
+      if (s.total > 0) s.total -= 1;
+    });
+    b.addCase(deleteProgramThunk.rejected, (s, a) => {
+      s.status = 'failed';
+      s.error = (a.payload as string) ?? 'Gagal menghapus program';
     });
   },
 });

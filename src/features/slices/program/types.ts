@@ -1,10 +1,15 @@
-// src/features/program/types.ts
+// src/features/slices/program/types.ts
 
 /** ===== Entity (dipakai app) ===== */
 export type Program = {
   id: number;
   nama_program: string;
-  // Tambahkan field lain dari backend bila ada, mis: deskripsi?: string;
+  headline?: string;
+  deskripsi?: string | null;
+  bnefits?: string[] | null;
+  durasi_menit?: number | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 /** ===== State & Status ===== */
@@ -35,6 +40,18 @@ export type ListProgramsResponse = {
   limit: number;
 };
 
+// Alias supaya gaya di layer API tetap sama
+export type ProgramListResp = ListProgramsResponse;
+
 export type CreateProgramPayload = {
   nama_program: string;
+  headline?: string;
+  deskripsi?: string;
+  bnefits?: string[];
+  durasi_menit?: number | null;
+};
+
+export type UpdateProgramPayload = {
+  id: number | string;
+  data: Partial<CreateProgramPayload>;
 };

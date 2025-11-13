@@ -9,6 +9,7 @@ import {
   RiUserSearchLine,
   RiSoundModuleLine,
   RiStarLine,
+  RiFileAddLine,
 } from "react-icons/ri";
 import logo from "@/assets/images/gurumusik.png";
 
@@ -56,7 +57,7 @@ const AdminSidebar: React.FC = () => {
   const starts = (xs: string[]) => xs.some((p) => isUnder(p) || isExact(p));
 
   // prefix route per grup
-  const managePrefixes = ["/dashboard-admin/instrument", "/dashboard-admin/module"];
+  const managePrefixes = ["/dashboard-admin/programs", "/dashboard-admin/instrument", "/dashboard-admin/module"];
   const financePrefixes = [
     "/dashboard-admin/earnings",
     "/dashboard-admin/tutor-commision",
@@ -76,6 +77,7 @@ const AdminSidebar: React.FC = () => {
   const isPromoActive = isUnder("/dashboard-admin/manage-promo");
   const isVerifiedTutorActive = isUnder("/dashboard-admin/verified-tutor");
   const isRatingActive = isUnder("/dashboard-admin/manage-rating");
+  const isEntryTutorActive = isUnder("/dashboard-admin/entry-tutor");
 
   // state dropdown
   const [openManage, setOpenManage] = React.useState(groupActiveManage);
@@ -136,6 +138,12 @@ const AdminSidebar: React.FC = () => {
             <DropWrap open={openManage}>
               <div className="pl-6 relative">
                 <span className="pointer-events-none absolute left-[12px] top-1 bottom-1 w-[3px] rounded bg-neutral-200" />
+                <SubItem
+                  to="/dashboard-admin/programs"
+                  label="Programs"
+                  active={isUnder("/dashboard-admin/programs")}
+                  className="mt-0 px-3 py-3"
+                />
                 <SubItem
                   to="/dashboard-admin/instrument"
                   label="Instrumen"
@@ -354,7 +362,6 @@ const AdminSidebar: React.FC = () => {
               </div>
             </Link>
           </li>
-
           <li>
             <Link
               to="/dashboard-admin/verified-tutor"
@@ -379,6 +386,34 @@ const AdminSidebar: React.FC = () => {
                   }`}
                 >
                   Verified Tutor
+                </span>
+              </div>
+            </Link>
+          </li>
+                    <li>
+            <Link
+              to="/dashboard-admin/entry-tutor"
+              className={`group flex items-center justify-between px-2 py-3 rounded-xl
+                ${isEntryTutorActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"}`}
+            >
+              <div className="flex items-center gap-3">
+                <RiFileAddLine
+                  className={`text-2xl transition-colors ${
+                    isEntryTutorActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                />
+                <span
+                  className={`ml-2 font-medium text-lg transition-colors ${
+                    isEntryTutorActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                >
+                  Entry Tutor
                 </span>
               </div>
             </Link>

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { RiUser2Fill, RiSearchLine, RiStarFill } from 'react-icons/ri';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/app/store';
+import { resolveImageUrl } from '@/utils/resolveImageUrl';
 
 import {
   fetchGuruListThunk,
@@ -187,7 +188,7 @@ export default function TutorListPage() {
             <td className="px-4 py-4">
               <div className="h-12 w-12 overflow-hidden rounded-full">
                 <img
-                  src={t.image || defaultUser}
+                  src={resolveImageUrl(t.image) || defaultUser}
                   alt={t.nama}
                   className="h-12 w-12 object-cover"
                 />

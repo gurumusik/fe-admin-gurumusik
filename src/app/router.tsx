@@ -32,6 +32,7 @@ import DetailClassTutorPage from "@/features/dashboard/pages/tutor-list/class-li
 import ManageRatingPage from "@/features/dashboard/pages/manage-rating/page";
 import EntryTutorPage from "@/features/dashboard/pages/entry-tutor/page"
 import InvoicePage from '@/features/dashboard/pages/invoice/page';
+import ManageProgramPage from '@/features/dashboard/pages/programs/page';
 
 export const router = createBrowserRouter([
   {
@@ -77,6 +78,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/manage-rating", element: <ManageRatingPage /> },
       { path: "/dashboard-admin/entry-tutor", element: <EntryTutorPage /> },
       { path: "/dashboard-admin/invoice/:id", element: <InvoicePage /> },
+      { path: "/dashboard-admin/programs", element: <ManageProgramPage /> },
     ],
   },
 ]);

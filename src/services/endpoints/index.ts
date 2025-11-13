@@ -46,13 +46,12 @@ export const ENDPOINTS = {
     DELETE: (id: number | string) => `/detail-programs/master/${id}`,
   },
 
-  // SESUAIKAN dengan route yang kamu punya untuk ambil daftar program
   PROGRAMS: {
     LIST: '/programs',                 // GET public (q,page,limit)
-    DETAIL: (id: number|string) => `/programs/master/${id}`, // GET admin
-    CREATE: '/programs/master',        // POST admin
-    UPDATE: (id: number|string) => `/programs/master/${id}`, // PUT admin
-    DELETE: (id: number|string) => `/programs/master/${id}`, // DELETE admin
+    DETAIL: (id: number|string) => `/programs/${id}`, // GET admin
+    CREATE: '/programs',        // POST admin
+    UPDATE: (id: number|string) => `/programs/${id}`, // PUT admin
+    DELETE: (id: number|string) => `/programs/${id}`, // DELETE admin
   },
 
   GURU_APPLICATION: {
@@ -134,6 +133,13 @@ export const ENDPOINTS = {
 
   SERTIFIKAT: {
     UPDATE: (id: number | string) => `/sertifikat/${id}/status`
+  },
+
+  WILAYAH: {
+    PROVINCES: '/wilayah/provinces',                       // GET ?q=&page=&limit=
+    PROVINCE: (id: number | string) => `/wilayah/provinces/${id}`,
+    CITIES: '/wilayah/cities',                             // GET ?province_id=&q=&page=&limit=
+    CITY: (id: number | string) => `/wilayah/cities/${id}`,
   },
 };
 
