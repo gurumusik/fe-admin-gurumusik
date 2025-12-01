@@ -83,26 +83,6 @@ function Field({ label, icon, children }: { label: string; icon?: React.ReactNod
   );
 }
 
-/* ====== Tiles ====== */
-function PDFTile({ src, footer }: { src: string; footer?: React.ReactNode }) {
-  return (
-    <div className="relative rounded-xl bg-neutral-100 p-1">
-      <object
-        data={`${src}#page=1&zoom=100&toolbar=0&navpanes=0&scrollbar=0`}
-        type="application/pdf"
-        className="h-24 w-32 rounded-lg bg-white"
-      >
-        <iframe
-          src={`${src}#page=1&zoom=100&toolbar=0&navpanes=0&scrollbar=0`}
-          className="h-24 w-32 rounded-lg bg-white"
-          title="pdf"
-        />
-      </object>
-      {footer ? <div className="mt-1 text-[10px] text-center text-neutral-600">{footer}</div> : null}
-    </div>
-  );
-}
-
 function PreviewTile({ src, mime, footer }: { src: string; mime?: string; footer?: React.ReactNode }) {
   const isImage = (mime && mime.startsWith('image/')) || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(src || '');
   return (
@@ -240,6 +220,17 @@ function PickInstrumentGradeModal(props: PickIGProps) {
     </div>
   );
 }
+
+const getFileNameFromPath = (path?: string | null): string => {
+  if (!path) return '';
+  try {
+    const decoded = decodeURIComponent(path);
+    return decoded.split('/').pop() || decoded;
+  } catch {
+    return path.split('/').pop() || path;
+  }
+};
+
 
 /* ================== Page ================== */
 export default function EditModulePage() {
@@ -446,7 +437,7 @@ export default function EditModulePage() {
 
     // file PDF yang selesai di-“upload” (preview) saja
     const ebooksToAppend = ebooks
-      .filter(it => it.done && it.file)
+      .filter(it => it.file)
       .map(it => it.file as File);
 
     // file IMAGE cuplikan siap kirim
@@ -475,6 +466,7 @@ export default function EditModulePage() {
   };
 
   const loadingDetail = detailStatus === 'loading';
+  const tipe: string = (detail?.tipe ?? '').toString().toLowerCase();
 
   /* ===== UI values untuk field Instrumen Musik (ikon + nama) ===== */
   const uiInstrumentIcon = useMemo(() => {
@@ -620,20 +612,34 @@ export default function EditModulePage() {
                 <textarea value={form.audience} onChange={onChange('audience')} rows={4} placeholder="Pisahkan dengan titik koma (;)" className="w-full p-3 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none" />
               </div>
 
-              <div>
-                <div className="mb-2 text-sm font-semibold text-neutral-800">Tambahkan Module (Playlist)</div>
-                <div className="space-y-3">
-                  {form.playlists.map((link, idx) => (
-                    <input key={idx} value={link} onChange={(e) => setPlaylistAt(idx, e.target.value)} placeholder="Masukkan Link Playlist" className="w-full h-11 px-4 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none" />
-                  ))}
+              {tipe !== 'ebook' && (
+                <div>
+                  <div className="mb-2 text-sm font-semibold text-neutral-800">
+                    Tambahkan Module (Playlist)
+                  </div>
+                  <div className="space-y-3">
+                    {form.playlists.map((link, idx) => (
+                      <input
+                        key={idx}
+                        value={link}
+                        onChange={(e) => setPlaylistAt(idx, e.target.value)}
+                        placeholder="Masukkan Link Playlist"
+                        className="w-full h-11 px-4 rounded-lg border border-gray-200 focus:bg-neutral-50 focus:outline-none"
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addPlaylist}
+                    className="mt-4 inline-flex items-center gap-2 h-10 px-4 rounded-full border border-[var(--secondary-color)] text-[var(--secondary-color)] hover:bg-blue-50"
+                  >
+                    <RiAddLine /> Tambahkan Link Playlist
+                  </button>
                 </div>
-                <button type="button" onClick={addPlaylist} className="mt-4 inline-flex items-center gap-2 h-10 px-4 rounded-full border border-[var(--secondary-color)] text-[var(--secondary-color)] hover:bg-blue-50">
-                  <RiAddLine /> Tambahkan Link Playlist
-                </button>
-              </div>
+              )}
 
               {/* === Upload E-Book Pendukung === */}
-              <div className={HIDE_CUPLIKAN_DAN_EBOOK ? 'hidden' : ''}>
+              <div>
                 <div className="mb-2 text-sm font-semibold text-neutral-800">Upload E-Book Pendukung</div>
                 <EbookDropArea onPick={onPickEbooks} />
                 <p className="mt-2 text-xs text-neutral-500">Supported formats: <b>.PDF only</b></p>
@@ -650,57 +656,105 @@ export default function EditModulePage() {
                       Daftar File – {serverEbooks.length + ebooks.length}/{maxEbooks} files
                     </div>
 
-                    <div className="flex gap-3 overflow-x-auto pb-2">
+                    <div className="space-y-2">
+                      {/* File dari server */}
                       {serverEbooks.map((eb: any) => {
                         const selected = ebookIdsToDelete.includes(eb.id);
+                        const href = eb.ebook_path || '';
+                        const fileName =
+                          eb.nama_file ??
+                          eb.original_name ??
+                          getFileNameFromPath(eb.ebook_path) ??
+                          'E-book';
+
                         return (
-                          <div key={`srv-${eb.id}`} className="relative">
-                            <PDFTile
-                              src={eb.ebook_path || defaultUser}
-                              footer={`${eb.total_pages ?? '-'} hlm${eb.pendukung ? ' • Pendukung' : ''}`}
-                            />
+                          <div
+                            key={`srv-${eb.id}`}
+                            className={cls(
+                              'flex items-center justify-between rounded-lg border px-3 py-2 bg-neutral-50',
+                              selected && 'border-red-300 ring-2 ring-red-500/70'
+                            )}
+                          >
+                            {/* Nama file → klik ke URL e-book */}
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-[var(--secondary-color)] underline truncate max-w-[70%]"
+                              title={fileName}
+                            >
+                              {fileName}
+                            </a>
+
+                            {/* Tombol hapus / batal */}
                             <button
                               type="button"
                               onClick={() => toggleDeleteServerEbook(eb.id)}
                               className={cls(
-                                'absolute -top-2 -right-2 h-7 px-2 rounded-full text-xs shadow',
-                                selected ? 'bg-red-600 text-white' : 'bg-white text-neutral-700'
+                                'ml-3 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold border',
+                                selected
+                                  ? 'border-red-600 text-red-600 bg-red-50'
+                                  : 'border-neutral-300 text-neutral-700 hover:bg-neutral-100'
                               )}
-                              title={selected ? 'Batalkan hapus' : 'Hapus e-book ini'}
+                              title={selected ? 'Batalkan hapus e-book ini' : 'Hapus e-book ini'}
                             >
-                              {selected ? 'Batal' : 'Hapus'}
+                              {selected ? 'Batalkan' : 'Hapus'}
                             </button>
-                            {selected && (
-                              <div className="absolute inset-0 rounded-xl ring-2 ring-red-500/80 pointer-events-none opacity-90" />
-                            )}
                           </div>
                         );
                       })}
 
-                      {ebooks.map((it) => (
-                        <div key={it.id} className="relative">
-                          <PDFTile src={it.url} footer={it.done ? 'Siap disimpan' : 'Mengunggah…'} />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEbooks((prev) => {
-                                const it2 = prev.find((x) => x.id === it.id);
-                                if (it2) URL.revokeObjectURL(it2.url);
-                                return prev.filter((x) => x.id !== it.id);
-                              });
-                            }}
-                            className="absolute -top-2 -right-2 h-7 w-7 grid place-items-center rounded-full bg-white shadow text-neutral-700"
-                            title="Hapus draft upload"
+                      {/* File lokal (baru diupload) */}
+                      {ebooks.map((it) => {
+                        const fileName = it.file?.name ?? 'Draft e-book';
+
+                        return (
+                          <div
+                            key={it.id}
+                            className="flex items-center justify-between rounded-lg border px-3 py-2 bg-neutral-50"
                           >
-                            ×
-                          </button>
-                          {!it.done && (
-                            <div className="absolute left-2 right-2 bottom-2 h-2 rounded-full bg-white/70 overflow-hidden">
-                              <div className="h-full bg-[var(--accent-green-color)]" style={{ width: `${it.progress}%` }} />
+                            <div className="flex flex-col max-w-[60%]">
+                              {/* HANYA NAMA FILE, BUKAN LINK */}
+                              <span
+                                className="text-sm text-neutral-800 truncate"
+                                title={fileName}
+                              >
+                                {fileName}
+                              </span>
+                              <span className="mt-0.5 text-[11px] text-amber-600">
+                                Belum disimpan — file baru bisa di-download setelah kamu klik "Simpan Modul"
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      ))}
+
+                            <div className="flex items-center gap-2">
+                              {/* Progress kalau belum selesai "upload" */}
+                              {!it.done && (
+                                <div className="w-24 h-1.5 rounded-full bg-neutral-200 overflow-hidden">
+                                  <div
+                                    className="h-full bg-[var(--accent-green-color)]"
+                                    style={{ width: `${it.progress}%` }}
+                                  />
+                                </div>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEbooks((prev) => {
+                                    const it2 = prev.find((x) => x.id === it.id);
+                                    if (it2) URL.revokeObjectURL(it2.url);
+                                    return prev.filter((x) => x.id !== it.id);
+                                  });
+                                }}
+                                className="h-7 w-7 grid place-items-center rounded-full bg-white shadow text-neutral-700 text-sm"
+                                title="Hapus draft upload"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

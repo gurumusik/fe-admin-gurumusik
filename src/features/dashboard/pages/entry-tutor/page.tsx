@@ -503,7 +503,7 @@ export default function EntryTutorPage() {
               <input
                 id="demoLink"
                 name="demoLink"
-                type="url"
+                required
                 value={demoLink}
                 onChange={(e) => setDemoLink(e.target.value)}
                 placeholder="https://youtu.be/xxxxx atau link publik Google Drive"
@@ -668,7 +668,7 @@ export default function EntryTutorPage() {
             <button
               type="button"
               onClick={addScheduleRow}
-              className="rounded-full px-3 py-1.5 text-sm bg-neutral-800 text-white hover:opacity-90"
+              className="rounded-full px-3 py-1.5 text-sm bg-[var(--primary-color)] font-semibold hover:opacity-90"
             >
               + Tambah Slot
             </button>

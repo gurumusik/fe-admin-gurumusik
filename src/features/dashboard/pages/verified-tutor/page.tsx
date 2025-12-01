@@ -30,6 +30,7 @@ import ApproveTeacherModal, {
 } from "../../components/ApproveTeacherModal";
 import LoadingScreen from "@/components/ui/common/LoadingScreen"; // ✅ tambahkan ini
 import defaultUser from "@/assets/images/default-user.png";
+import { resolveImageUrl } from "@/utils/resolveImageUrl";
 
 const cls = (...xs: Array<string | false | null | undefined>) =>
   xs.filter(Boolean).join(" ");
@@ -101,7 +102,7 @@ const RowItem: React.FC<{
   onApprove: () => void;
   onReject: () => void;
 }> = ({ row, onApprove, onReject }) => {
-  const profileUrl = row.user?.profile_pic_url || defaultUser;
+  const profileUrl = resolveImageUrl(row.user?.profile_pic_url) || defaultUser;
 
   const createdAt = row.created_at
     ? new Date(row.created_at).toLocaleDateString("id-ID", {
@@ -385,7 +386,7 @@ const VerifiedTutorPage: React.FC = () => {
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmitModal}
         data={{
-          image: selected?.user?.profile_pic_url || defaultUser,
+          image: resolveImageUrl(selected?.user?.profile_pic_url) || defaultUser,
           name: selected?.nama ?? undefined,
           phone: selected?.no_telp ?? undefined,
           city: selected?.domisili ?? "-",

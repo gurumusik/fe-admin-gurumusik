@@ -57,7 +57,11 @@ const AdminSidebar: React.FC = () => {
   const starts = (xs: string[]) => xs.some((p) => isUnder(p) || isExact(p));
 
   // prefix route per grup
-  const managePrefixes = ["/dashboard-admin/programs", "/dashboard-admin/instrument", "/dashboard-admin/module"];
+  const managePrefixes = [
+    "/dashboard-admin/programs",
+    "/dashboard-admin/instrument",
+    "/dashboard-admin/module",
+  ];
   const financePrefixes = [
     "/dashboard-admin/earnings",
     "/dashboard-admin/tutor-commision",
@@ -85,13 +89,21 @@ const AdminSidebar: React.FC = () => {
   const [openReport, setOpenReport] = React.useState(groupActiveReport);
   const [openUsers, setOpenUsers] = React.useState(groupActiveUsers);
 
-  // default buka saat rute terkait aktif
+  // default buka HANYA grup yang rutenya aktif, lainnya ditutup
   React.useEffect(() => {
-    if (groupActiveManage) setOpenManage(true);
-    if (groupActiveFinance) setOpenFinance(true);
-    if (groupActiveReport) setOpenReport(true);
-    if (groupActiveUsers) setOpenUsers(true);
+    setOpenManage(groupActiveManage);
+    setOpenFinance(groupActiveFinance);
+    setOpenReport(groupActiveReport);
+    setOpenUsers(groupActiveUsers);
   }, [groupActiveManage, groupActiveFinance, groupActiveReport, groupActiveUsers]);
+
+  // Accordion: cuma 1 section yang boleh kebuka
+  const toggleSection = (section: "manage" | "finance" | "report" | "users") => {
+    setOpenManage((prev) => (section === "manage" ? !prev : false));
+    setOpenFinance((prev) => (section === "finance" ? !prev : false));
+    setOpenReport((prev) => (section === "report" ? !prev : false));
+    setOpenUsers((prev) => (section === "users" ? !prev : false));
+  };
 
   return (
     <aside className="bg-white w-[260px] h-screen fixed left-0 top-0 p-4 shadow-md z-[11]">
@@ -109,7 +121,7 @@ const AdminSidebar: React.FC = () => {
           <li>
             <button
               type="button"
-              onClick={() => setOpenManage((v) => !v)}
+              onClick={() => toggleSection("manage")}
               className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${
                 groupActiveManage ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
               }`}
@@ -163,7 +175,7 @@ const AdminSidebar: React.FC = () => {
           <li>
             <button
               type="button"
-              onClick={() => setOpenFinance((v) => !v)}
+              onClick={() => toggleSection("finance")}
               className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${
                 groupActiveFinance ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
               }`}
@@ -215,7 +227,7 @@ const AdminSidebar: React.FC = () => {
           <li>
             <button
               type="button"
-              onClick={() => setOpenReport((v) => !v)}
+              onClick={() => toggleSection("report")}
               className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${
                 groupActiveReport ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
               }`}
@@ -262,7 +274,7 @@ const AdminSidebar: React.FC = () => {
           <li>
             <button
               type="button"
-              onClick={() => setOpenUsers((v) => !v)}
+              onClick={() => toggleSection("users")}
               className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${
                 groupActiveUsers ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
               }`}
@@ -305,13 +317,16 @@ const AdminSidebar: React.FC = () => {
             </DropWrap>
           </li>
 
+          {/* Single items */}
           <li>
             <Link
               to="/dashboard-admin/manage-rating"
               className={`group flex items-center justify-between px-2 py-3 rounded-xl
-                ${isRatingActive
-                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
-                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"}`}
+                ${
+                  isRatingActive
+                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                }`}
             >
               <div className="flex items-center gap-3">
                 <RiStarLine
@@ -338,9 +353,11 @@ const AdminSidebar: React.FC = () => {
             <Link
               to="/dashboard-admin/manage-promo"
               className={`group flex items-center justify-between px-2 py-3 rounded-xl
-                ${isPromoActive
-                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
-                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"}`}
+                ${
+                  isPromoActive
+                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                }`}
             >
               <div className="flex items-center gap-3">
                 <RiCoupon2Line
@@ -362,13 +379,16 @@ const AdminSidebar: React.FC = () => {
               </div>
             </Link>
           </li>
+
           <li>
             <Link
               to="/dashboard-admin/verified-tutor"
               className={`group flex items-center justify-between px-2 py-3 rounded-xl
-                ${isVerifiedTutorActive
-                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
-                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"}`}
+                ${
+                  isVerifiedTutorActive
+                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                }`}
             >
               <div className="flex items-center gap-3">
                 <RiUserSearchLine
@@ -390,13 +410,16 @@ const AdminSidebar: React.FC = () => {
               </div>
             </Link>
           </li>
-                    <li>
+
+          <li>
             <Link
               to="/dashboard-admin/entry-tutor"
               className={`group flex items-center justify-between px-2 py-3 rounded-xl
-                ${isEntryTutorActive
-                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
-                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"}`}
+                ${
+                  isEntryTutorActive
+                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                }`}
             >
               <div className="flex items-center gap-3">
                 <RiFileAddLine
