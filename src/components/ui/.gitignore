@@ -1,0 +1,190 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useEffect, useMemo, useState } from "react";
+import { RiCloseLine, RiSearchLine, RiCheckboxCircleFill } from "react-icons/ri";
+
+/* ===== Types ===== */
+export type Tutor = { id: string; name: string; city: string; avatar: string };
+
+const AVATARS = [
+  "https://i.pravatar.cc/64?img=11",
+  "https://i.pravatar.cc/64?img=12",
+  "https://i.pravatar.cc/64?img=13",
+  "https://i.pravatar.cc/64?img=14",
+  "https://i.pravatar.cc/64?img=15",
+  "https://i.pravatar.cc/64?img=16",
+];
+
+/* Dummy master pool */
+const TUTOR_POOL: Tutor[] = [
+  { id: "t1", name: "Isabella Fernández", city: "Kota Depok", avatar: AVATARS[0] },
+  { id: "t2", name: "Laila Fadel",        city: "Kota Depok", avatar: AVATARS[1] },
+  { id: "t3", name: "Maria Korhonen",     city: "Kota Depok", avatar: AVATARS[2] },
+  { id: "t4", name: "Gabriela Romero",    city: "Kota Depok", avatar: AVATARS[3] },
+  { id: "t5", name: "Sanjay Mandal",      city: "Kota Depok", avatar: AVATARS[4] },
+  { id: "t6", name: "Anthony Johnson",    city: "Kota Depok", avatar: AVATARS[5] },
+];
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  /** id tutor yang sudah dipilih di parent — akan di-disable dari default checked awal */
+  selectedIds?: Set<string>;
+  /** ketika klik Simpan, kirim daftar tutor yang dipilih di modal */
+  onSave: (picked: Tutor[]) => void;
+};
+
+const TutorFlashsaleModal: React.FC<Props> = ({
+  open,
+  onClose,
+  selectedIds = new Set<string>(),
+  onSave,
+}) => {
+  const [q, setQ] = useState("");
+  const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
+
+  // reset setiap kali modal dibuka
+  useEffect(() => {
+    if (open) {
+      setQ("");
+      setPickedIds(new Set());
+    }
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return TUTOR_POOL.filter((t) =>
+      query ? t.name.toLowerCase().includes(query) : true
+    );
+  }, [q]);
+
+  const togglePick = (id: string) => {
+    // Jangan toggle jika id sudah ada di selectedIds parent? Masih boleh, tapi tidak duplikat saat save.
+    setPickedIds((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+
+  const picked = useMemo(
+    () => filtered.filter((t) => pickedIds.has(t.id)),
+    [filtered, pickedIds]
+  );
+
+  const disabledSave = pickedIds.size === 0;
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-black/10">
+          <h4 className="text-[15px] md:text-base font-semibold text-neutral-900">
+            Tambahkan Tutor Flash Sale
+          </h4>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full hover:bg-black/5 text-neutral-600"
+          >
+            <RiCloseLine size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-4">
+          {/* Search */}
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
+              <RiSearchLine />
+            </span>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Cari Guru, cth: John Doe"
+              className="w-full rounded-xl border border-black/10 py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/30"
+            />
+          </div>
+
+          {/* List */}
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10">
+              {/* ilustrasi sederhana */}
+              <div className="h-28 w-28 rounded-2xl bg-neutral-100 grid place-items-center mb-3">
+                <span className="text-4xl">🔎</span>
+              </div>
+              <p className="text-sm text-neutral-600 text-center max-w-xs">
+                Guru tidak ditemukan, coba cari Guru lain
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3 max-h-72 overflow-auto pr-1 space-y-2">
+              {filtered.map((t) => {
+                const checked = pickedIds.has(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => togglePick(t.id)}
+                    className={
+                      "w-full flex items-center justify-between rounded-xl border border-black/10 p-2 text-left " +
+                      (checked ? "bg-blue-50" : "hover:bg-black/5")
+                    }
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={t.avatar}
+                        alt={t.name}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                      <div className="leading-tight">
+                        <div className="text-[15px] font-medium text-neutral-900">
+                          {t.name}
+                        </div>
+                        <div className="text-xs text-neutral-500">{t.city}</div>
+                      </div>
+                    </div>
+
+                    {/* Checkbox style seperti contoh */}
+                    <span
+                      className={
+                        "grid size-5 place-items-center rounded-md border " +
+                        (checked
+                          ? "border-blue-500 bg-blue-500 text-white"
+                          : "border-black/20")
+                      }
+                    >
+                      {checked && <RiCheckboxCircleFill size={16} />}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 pb-4">
+          <button
+            disabled={disabledSave}
+            onClick={() => {
+              // Kembalikan daftar tutor dari pickedIds
+              const pickedTutors = TUTOR_POOL.filter((t) => pickedIds.has(t.id));
+              onSave(pickedTutors);
+            }}
+            className={
+              "mt-2 w-full rounded-xl py-3 text-sm font-semibold " +
+              (disabledSave
+                ? "bg-neutral-300 text-neutral-600 cursor-not-allowed"
+                : "bg-[var(--primary-color)] hover:brightness-95")
+            }
+          >
+            Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TutorFlashsaleModal;
