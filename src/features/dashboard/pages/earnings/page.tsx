@@ -464,7 +464,7 @@ const AdminEarningsPage: React.FC = () => {
     if (tx.limit !== PAGE_SIZE) dispatch(setReduxLimit(PAGE_SIZE));
     dispatch(setCategory("Kursus"));
     dispatch(setReduxPage(1));
-    dispatch(fetchAllTxThunk());
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -473,18 +473,18 @@ const AdminEarningsPage: React.FC = () => {
     const chip: TxCategoryChip = tab === "kursus" ? "Kursus" : "Modul";
     dispatch(setCategory(chip));
     dispatch(setReduxPage(1));
-    dispatch(fetchAllTxThunk());
-  }, [tab, dispatch]);
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+  }, [tab, dispatch, netOnly]);
 
-  // search
+    // search
   React.useEffect(() => {
     const handler = setTimeout(() => {
       dispatch(setQuery(searchQ));
       dispatch(setReduxPage(1));
-      dispatch(fetchAllTxThunk());
+      dispatch(fetchAllTxThunk({ net: netOnly } as any));
     }, 400);
     return () => clearTimeout(handler);
-  }, [searchQ, dispatch]);
+  }, [searchQ, dispatch, netOnly]);
 
   // status filter
   React.useEffect(() => {
@@ -495,24 +495,26 @@ const AdminEarningsPage: React.FC = () => {
     };
     dispatch(setStatusFilter(mapUIToLabel(statusQ)));
     dispatch(setReduxPage(1));
-    dispatch(fetchAllTxThunk());
-  }, [statusQ, dispatch]);
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+  }, [statusQ, dispatch, netOnly]);
 
   // pagination
   const onPrev = () => {
     if (tx.page <= 1) return;
     dispatch(setReduxPage(tx.page - 1));
-    dispatch(fetchAllTxThunk());
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
   };
+
   const onNext = () => {
     const pages = Math.max(1, Math.ceil((tx.allTotal || 0) / (tx.limit || PAGE_SIZE)));
     if (tx.page >= pages) return;
     dispatch(setReduxPage(tx.page + 1));
-    dispatch(fetchAllTxThunk());
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
   };
+
   const onGoto = (p: number) => {
     dispatch(setReduxPage(p));
-    dispatch(fetchAllTxThunk());
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
   };
 
   /* Normalisasi rows untuk tabel */
@@ -725,11 +727,26 @@ const AdminEarningsPage: React.FC = () => {
                 <span className="hidden sm:inline">Pendapatan Bersih</span>
                 <button
                   type="button"
-                  onClick={() => setNetOnly((v) => !v)}
-                  className={cls("relative h-[24px] w-[44px] rounded-full transition", netOnly ? "bg-[var(--secondary-color)]" : "bg-neutral-300")}
+                  onClick={() =>
+                    setNetOnly((prev) => {
+                      const next = !prev;
+                      // ⬇️ refetch recap + data dengan mode baru
+                      dispatch(fetchAllTxThunk({ net: next } as any));
+                      return next;
+                    })
+                  }
+                  className={cls(
+                    "relative h-[24px] w-[44px] rounded-full transition",
+                    netOnly ? "bg-[var(--secondary-color)]" : "bg-neutral-300"
+                  )}
                   aria-label="Toggle pendapatan bersih"
                 >
-                  <span className={cls("absolute left-1 top-1 h-[16px] w-[16px] rounded-full bg-white transition", netOnly && "translate-x-[20px]")} />
+                  <span
+                    className={cls(
+                      "absolute left-1 top-1 h-[16px] w-[16px] rounded-full bg-white transition",
+                      netOnly && "translate-x-[20px]"
+                    )}
+                  />
                 </button>
               </div>
             </div>
@@ -911,7 +928,7 @@ const AdminEarningsPage: React.FC = () => {
                 className="h-9 rounded-xl border border-[var(--secondary-light-color)] bg-white px-3 text-sm text-[#0F172A] cursor-pointer"
                 title="Filter Status"
               >
-                {["All", "Success", "On Progress", "Expired", "Failed", "Canceled"].map((s) => (
+                {["All", "Success", "On Progress", "Expired", "Failed"].map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
