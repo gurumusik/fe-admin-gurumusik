@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, macOS, ARM64, label-1]
+    runs-on: self-hosted
 
     steps:
       - name: Checkout repository
