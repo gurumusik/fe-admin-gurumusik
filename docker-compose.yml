@@ -1,0 +1,17 @@
+version: '3.9'
+services:
+  vite-frontend:
+    build: .
+    container_name: vite-frontend
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    networks:
+      - localnet
+    stdin_open: true
+    tty: true
+
+networks:
+  localnet:
+    driver: bridge
