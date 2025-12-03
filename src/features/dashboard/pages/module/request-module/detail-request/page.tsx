@@ -94,6 +94,7 @@ export default function DetailRequestModulePage() {
   const previewUrl: string = d?.preview_class || d?.link_drive || '';
   const descriptionHtml: string = d?.deskripsi || '<p>Tidak ada deskripsi.</p>';
   const audienceText: string = d?.appropriate_module || d?.target_audience || '—';
+  const tipe: string = (d?.tipe ?? '').toString().toLowerCase();
 
   // ✅ FIX: Ambil **string** dari array objek
   const playlistLinks: string[] = Array.isArray(d?.playlists)
@@ -116,6 +117,7 @@ export default function DetailRequestModulePage() {
   // info pengaju (guru)
   const requesterName: string = d?.owner?.name || d?.guru?.nama || 'Guru';
   const requesterId: string = d?.owner?.id ? `#${d.owner.id}` : d?.guru?.id ? `#${d.guru.id}` : '#—';
+  const requesterUCode: string = d?.owner?.ucode ? `#${d.owner.ucode}` : d?.guru?.ucode ? `#${d.guru.ucode}` : '#—';
   const requesterAvatar: string =
     d?.owner?.avatar || d?.guru?.profile_pic_url || (Landscape as unknown as string);
 
@@ -147,6 +149,7 @@ export default function DetailRequestModulePage() {
       await dispatch(
         approveModuleAdminThunk({
           id: moduleId,
+          basePrice: hargaAwal,          // <= SELALU ikut data.harga dari API
           salePrice: prices.salePrice,   // => body.harga_bid
           promoPrice: prices.promoPrice, // => body.harga_discount
           percentDiscount: percentDiscount || 0,
@@ -175,6 +178,18 @@ export default function DetailRequestModulePage() {
       setOpenModal(null);
       setConfirmKind('rejected-fail');
     }
+  };
+
+    const handleDownloadEbook = (url: string) => {
+    if (!url) return;
+
+    const a = document.createElement('a');
+    a.href = url;
+    // biar nama file ikut dari backend / header
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   const handleCloseConfirm = () => {
@@ -210,7 +225,7 @@ export default function DetailRequestModulePage() {
               />
               <div className="flex flex-col">
                 <div className="font-semibold text-md text-neutral-900">{requesterName}</div>
-                <span className="text-sm text-neutral-500">{requesterId}</span>
+                <span className="text-sm text-neutral-500">{requesterUCode}</span>
               </div>
             </div>
           </div>
@@ -342,45 +357,59 @@ export default function DetailRequestModulePage() {
               />
             </div>
 
-            {/* ✅ Link Playlist */}
-            <div>
-              <div className="mb-4 text-md font-semibold text-neutral-800 flex items-center justify-between">
-                <span>Link Playlist</span>
-                <button
-                  className="flex gap-2 text-sm border border-[var(--secondary-color)] text-[var(--secondary-color)] px-5 py-2 rounded-full"
-                  type="button"
-                >
-                  <RiDownloadLine size={20} />
-                  Download Modul
-                </button>
-              </div>
-              {playlistLinks.length === 0 ? (
-                <p className="text-sm text-neutral-500">Tidak ada playlist.</p>
-              ) : (
-                <div className="space-y-3">
-                  {playlistLinks.map((link, idx) => (
-                    <input
-                      key={idx}
-                      value={link}
-                      readOnly
-                      disabled
-                      className="w-full h-11 px-4 rounded-lg border border-gray-200 bg-neutral-50 text-black/80 cursor-default"
-                    />
-                  ))}
+            {/* Link Playlist */}
+            {tipe === 'video' && (
+              <div>
+                <div className="mb-4 text-md font-semibold text-neutral-800 flex items-center justify-between">
+                  <span>Folder Google Drive berisi Video</span>
                 </div>
-              )}
-            </div>
+                {playlistLinks.length === 0 ? (
+                  <p className="text-sm text-neutral-500">Tidak ada video.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {playlistLinks.map((link, idx) => (
+                      <input
+                        key={idx}
+                        value={link}
+                        readOnly
+                        disabled
+                        className="w-full h-11 px-4 rounded-lg border border-gray-200 bg-neutral-50 text-black/80 cursor-default"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* E-Books */}
-            <div className={HIDE_CUPLIKAN_DAN_EBOOK ? 'hidden' : ''}>
-              <div className="mb-2 text-md font-semibold text-neutral-800">E-Book Pendukung</div>
+            <div>
+              <div className="mb-2 text-md font-semibold text-neutral-800">
+                E-Book Yang Terupload
+              </div>
+
               {ebookThumbs.length === 0 ? (
                 <p className="text-sm text-neutral-500">Tidak ada file.</p>
               ) : (
-                <div className="flex gap-3 overflow-x-auto pb-1">
+                <div className="flex flex-col gap-3">
                   {ebookThumbs.map((u, i) => (
-                    <div key={`eb-${i}`} className="relative rounded-xl bg-neutral-100 p-1">
-                      <img src={u} alt="Ebook" className="h-16 w-24 rounded-lg object-cover" />
+                    <div
+                      key={`eb-${i}`}
+                      className="flex items-center justify-between rounded-xl border border-black/10 bg-neutral-50 px-4 py-3"
+                    >
+                      {/* Label E-Book #1, #2, #3, ... */}
+                      <div className="text-sm font-medium text-neutral-800">
+                        E-Book #{i + 1}
+                      </div>
+
+                      {/* Tombol Download */}
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadEbook(u)}
+                        className="inline-flex items-center gap-2 rounded-full border border-[var(--secondary-color)] px-4 py-2 text-sm font-semibold text-[var(--secondary-color)] hover:bg-[var(--secondary-color)] hover:text-white transition-colors"
+                      >
+                        <RiDownloadLine className="text-base" />
+                        Download
+                      </button>
                     </div>
                   ))}
                 </div>

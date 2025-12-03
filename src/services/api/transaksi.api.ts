@@ -190,6 +190,7 @@ export type ListAllTransactionsParams = {
   category?: 'paket' | 'modul' | 'all';
   date_from?: string; // YYYY-MM-DD
   date_to?: string;   // YYYY-MM-DD
+  net?: boolean;
 };
 
 /** BE untuk /transaksi/all sekarang mengembalikan payload yang SAMA dengan listPromoTransactions */
@@ -228,6 +229,9 @@ export async function listAllTransactions(params: ListAllTransactionsParams = {}
   if (params.category) qs.set('category', params.category);
   if (params.date_from) qs.set('date_from', params.date_from);
   if (params.date_to) qs.set('date_to', params.date_to);
+  if (params.net) {
+    qs.set('net', 'true');
+  }
 
   const qstr = qs.toString() ? `?${qs.toString()}` : '';
 

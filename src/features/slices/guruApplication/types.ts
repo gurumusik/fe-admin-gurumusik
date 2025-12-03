@@ -1,14 +1,51 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/features/slices/guruApplication/types.ts
 
 export type GAStatus = 'proses' | 'diterima' | 'ditolak';
 export type GAListSortBy = 'created_at' | 'decided_at' | 'nama' | 'status';
 export type GAListSortDir = 'ASC' | 'DESC';
 
+export type GASertifikatLite = {
+  id: number;
+  certif_path: string;
+  keterangan: string;
+  penyelenggara: string;
+  instrument_id: number;
+  grade_id: number;
+  status: 'approved' | 'under_review' | 'rejected';
+  alasan_penolakan: string | null;
+  instrument?: {
+    id: number;
+    nama: string;
+    icon?: string | null;
+  } | null;
+  grade?: {
+    id: number;
+    nama: string;
+  } | null;
+};
+
+export type GADetailGuruLite = {
+  id: number;
+  intro_link: string;
+  bahasa: any | null;
+  link_sertifikasi: string | null;
+  rekrut_status: 'proses' | 'diterima' | 'ditolak';
+  rekrut_note: string | null;
+  is_abk: boolean | null;
+  title: string | null;
+  value_teacher: any | null;
+  sertifikat?: GASertifikatLite[];
+};
+
 export type GAUserLite = {
   id: number;
   nama: string;
   email: string;
   profile_pic_url?: string | null;
+  nama_panggilan?: string;
+  status_akun?: 'aktif' | 'cuti' | 'non_aktif';
+  detailGuru?: GADetailGuruLite | null;
 };
 
 export type GADeciderLite = {

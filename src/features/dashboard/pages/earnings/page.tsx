@@ -47,6 +47,7 @@ import type {
   TxStatusRaw,
   AllTxRecap,
 } from "@/features/slices/transaksi/types";
+import { resolveImageUrl } from "@/utils/resolveImageUrl";
 
 /* UI helpers */
 const toneClasses = {
@@ -161,6 +162,22 @@ function parseRangeLabel(label: string): MonthPoint[] {
     if (mi > 11) { mi = 0; y += 1; }
   }
   return out;
+}
+
+function buildDefaultRangeLabel(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const monthIdx = now.getMonth(); // 0 = Jan, 11 = Des
+
+  // Kalau sekarang di antara Januari–Juni ➜ pakai Jan–Jun
+  if (monthIdx <= 5) {
+    // Jan (0) - Jun (5)
+    return formatRangeLabel(year, 0, year, 5);
+  }
+
+  // Kalau sekarang di antara Juli–Desember ➜ pakai Jul–Des
+  // Jul (6) - Des (11)
+  return formatRangeLabel(year, 6, year, 11);
 }
 
 function formatRangeLabel(sYear: number, sMonthIdx: number, eYear: number, eMonthIdx: number) {
@@ -433,7 +450,7 @@ const AdminEarningsPage: React.FC = () => {
   const tx = useSelector((s: RootState) => s.transaksi);
 
   const [netOnly, setNetOnly] = React.useState(false);
-  const [rangeLabel, setRangeLabel] = React.useState("Jan 2025 - Agu 2025");
+  const [rangeLabel, setRangeLabel] = React.useState(() => buildDefaultRangeLabel());
   const [infoOpen, setInfoOpen] = React.useState(false);
   const [rangeOpen, setRangeOpen] = React.useState(false);
   const [tab, setTab] = React.useState<Tab>("kursus");
@@ -447,7 +464,7 @@ const AdminEarningsPage: React.FC = () => {
     if (tx.limit !== PAGE_SIZE) dispatch(setReduxLimit(PAGE_SIZE));
     dispatch(setCategory("Kursus"));
     dispatch(setReduxPage(1));
-    dispatch(fetchAllTxThunk());
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -456,18 +473,18 @@ const AdminEarningsPage: React.FC = () => {
     const chip: TxCategoryChip = tab === "kursus" ? "Kursus" : "Modul";
     dispatch(setCategory(chip));
     dispatch(setReduxPage(1));
-    dispatch(fetchAllTxThunk());
-  }, [tab, dispatch]);
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+  }, [tab, dispatch, netOnly]);
 
-  // search
+    // search
   React.useEffect(() => {
     const handler = setTimeout(() => {
       dispatch(setQuery(searchQ));
       dispatch(setReduxPage(1));
-      dispatch(fetchAllTxThunk());
+      dispatch(fetchAllTxThunk({ net: netOnly } as any));
     }, 400);
     return () => clearTimeout(handler);
-  }, [searchQ, dispatch]);
+  }, [searchQ, dispatch, netOnly]);
 
   // status filter
   React.useEffect(() => {
@@ -478,24 +495,26 @@ const AdminEarningsPage: React.FC = () => {
     };
     dispatch(setStatusFilter(mapUIToLabel(statusQ)));
     dispatch(setReduxPage(1));
-    dispatch(fetchAllTxThunk());
-  }, [statusQ, dispatch]);
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+  }, [statusQ, dispatch, netOnly]);
 
   // pagination
   const onPrev = () => {
     if (tx.page <= 1) return;
     dispatch(setReduxPage(tx.page - 1));
-    dispatch(fetchAllTxThunk());
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
   };
+
   const onNext = () => {
     const pages = Math.max(1, Math.ceil((tx.allTotal || 0) / (tx.limit || PAGE_SIZE)));
     if (tx.page >= pages) return;
     dispatch(setReduxPage(tx.page + 1));
-    dispatch(fetchAllTxThunk());
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
   };
+
   const onGoto = (p: number) => {
     dispatch(setReduxPage(p));
-    dispatch(fetchAllTxThunk());
+    dispatch(fetchAllTxThunk({ net: netOnly } as any));
   };
 
   /* Normalisasi rows untuk tabel */
@@ -708,23 +727,28 @@ const AdminEarningsPage: React.FC = () => {
                 <span className="hidden sm:inline">Pendapatan Bersih</span>
                 <button
                   type="button"
-                  onClick={() => setNetOnly((v) => !v)}
-                  className={cls("relative h-[24px] w-[44px] rounded-full transition", netOnly ? "bg-[var(--secondary-color)]" : "bg-neutral-300")}
+                  onClick={() =>
+                    setNetOnly((prev) => {
+                      const next = !prev;
+                      // ⬇️ refetch recap + data dengan mode baru
+                      dispatch(fetchAllTxThunk({ net: next } as any));
+                      return next;
+                    })
+                  }
+                  className={cls(
+                    "relative h-[24px] w-[44px] rounded-full transition",
+                    netOnly ? "bg-[var(--secondary-color)]" : "bg-neutral-300"
+                  )}
                   aria-label="Toggle pendapatan bersih"
                 >
-                  <span className={cls("absolute left-1 top-1 h-[16px] w-[16px] rounded-full bg-white transition", netOnly && "translate-x-[20px]")} />
+                  <span
+                    className={cls(
+                      "absolute left-1 top-1 h-[16px] w-[16px] rounded-full bg-white transition",
+                      netOnly && "translate-x-[20px]"
+                    )}
+                  />
                 </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setRangeOpen(true)}
-                className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--secondary-light-color)] bg-white px-3 text-sm text-[#0F172A] hover:bg-[var(--secondary-light-color)]"
-              >
-                <RiCalendar2Line className="text-[18px] text-[var(--secondary-color)]" />
-                <span>{rangeLabel}</span>
-                <RiArrowDownSLine className="text-[18px]" />
-              </button>
             </div>
           </div>
 
@@ -904,7 +928,7 @@ const AdminEarningsPage: React.FC = () => {
                 className="h-9 rounded-xl border border-[var(--secondary-light-color)] bg-white px-3 text-sm text-[#0F172A] cursor-pointer"
                 title="Filter Status"
               >
-                {["All", "Success", "On Progress", "Expired", "Failed", "Canceled"].map((s) => (
+                {["All", "Success", "On Progress", "Expired", "Failed"].map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -954,7 +978,7 @@ const AdminEarningsPage: React.FC = () => {
                     tab === "modul" ? (
                       <tr key={r.uuid} className="border-b border-[var(--secondary-light-color)]">
                         <td className="p-3">
-                          <img src={r.image} alt={r.title} className="h-12 w-12 rounded-md object-cover" />
+                          <img src={resolveImageUrl(r.image) || ""} alt={r.title} className="h-12 w-12 rounded-md object-cover" />
                         </td>
                         <td className="p-3 text-[#0F172A] font-medium">{r.title}</td>
                         <td className="p-3">
@@ -982,7 +1006,7 @@ const AdminEarningsPage: React.FC = () => {
                     ) : (
                       <tr key={r.uuid} className="border-b border-[var(--secondary-light-color)]">
                         <td className="p-3">
-                          <img src={r.image} alt={r.student} className="h-10 w-10 rounded-full object-cover" />
+                          <img src={resolveImageUrl(r.image) || ""} alt={r.student} className="h-10 w-10 rounded-full object-cover" />
                         </td>
                         <td className="p-3">
                           <div className="font-medium text-[#0F172A]">{r.student}</div>

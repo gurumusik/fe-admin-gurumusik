@@ -520,7 +520,7 @@ const InvoicePage: React.FC = () => {
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between">
                 <span>Harga Item</span>
-                <span className="tabular-nums">{formatIDR(hargaItemDisplay)}</span>
+                <span className="tabular-nums">{formatIDR(hargaItemDisplay - taxAmount)}</span>
               </div>
 
               {promoValue > 0 && (
