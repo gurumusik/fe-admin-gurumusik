@@ -15,7 +15,7 @@ import {
   setPage,
   setLimit,
 } from '@/features/slices/murid/slice';
-import { resolveIconUrl } from '@/utils/resolveIconUrl'; // ⬅️ tambahkan ini
+import { resolveImageUrl } from '@/utils/resolveImageUrl'; // ⬅️ tambahkan ini
 import defaultUser from '@/assets/images/default-user.png'
 
 type StudentRecap = {
@@ -186,12 +186,11 @@ export default function StudentListPage() {
               )}
 
               {list.status !== 'loading' && rows.map((s) => {
-                const img = resolveIconUrl(s.image) || defaultUser; 
                 return (
                   <tr key={s.uuid}>
                     <td className="px-4 py-4">
                       <div className="h-12 w-12 overflow-hidden rounded-full ring-1 ring-black/10">
-                        <img src={img} alt={s.name} className="h-12 w-12 object-cover" />
+                        <img src={resolveImageUrl(s.image || '') || defaultUser} alt={s.name} className="h-12 w-12 object-cover" />
                       </div>
                     </td>
                     <td className="px-4 py-4 text-black">{s.name}</td>
