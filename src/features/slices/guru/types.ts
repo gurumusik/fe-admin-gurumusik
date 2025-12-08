@@ -93,7 +93,6 @@ export type GuruProfileResponse = {
   }>;
 
   sertifikat: Array<{
-    alasan_penolakan: null;
     id: number;
     certif_path: string | null;
     keterangan: string | null;
@@ -101,6 +100,19 @@ export type GuruProfileResponse = {
     status: string;
     instrument_id: number | null;
     grade_id: number | null;
+    alasan_penolakan: string | null;
+
+    // NEW: ikutkan relasi dari backend
+    instrument?: {
+      id: number;
+      nama: string;
+      icon: string | null;
+    } | null;
+
+    grade?: {
+      id: number;
+      nama: string;
+    } | null;
   }>;
 
   jadwal: Array<{

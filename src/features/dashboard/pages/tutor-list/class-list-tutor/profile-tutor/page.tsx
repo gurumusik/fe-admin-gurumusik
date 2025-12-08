@@ -168,25 +168,45 @@ export default function ProfileTutorPage() {
   }, [p?.instruments]);
 
   // Susun daftar sertifikat (payload -> CertificateItem[])
+// Susun daftar sertifikat (payload -> CertificateItem[])
   const allCertificates: CertificateItem[] = useMemo(() => {
     const rows = p?.sertifikat ?? [];
+
     return rows.map((s: any): CertificateItem => {
-      const fileUrl = s.certif_path ? resolveImageUrl(s.certif_path) : undefined;
-      const instrumentName =
-        (typeof s.instrument_id === 'number' && lookups.instNameById.get(s.instrument_id)) || '—';
-      const instrumentIcon =
-        (typeof s.instrument_id === 'number' && lookups.instIconById.get(s.instrument_id)) || undefined;
-      const gradeName =
-        (typeof s.grade_id === 'number' && lookups.gradeNameById.get(s.grade_id)) || '—';
+      // ⬇⬇ raw boleh null
+      const rawFileUrl: string | null =
+        s.certif_path ? resolveImageUrl(s.certif_path) : null;
+
+      // ⬇⬇ DI SINI kita paksa jadi string | undefined (bukan null)
+      const fileUrl: string | undefined = rawFileUrl ?? undefined;
+
+      const instrumentName: string =
+        s.instrument?.nama ||
+        (typeof s.instrument_id === 'number' &&
+          lookups.instNameById.get(s.instrument_id)) ||
+        '—';
+
+      const instrumentIcon: string | undefined =
+        (s.instrument?.icon && resolveImageUrl(s.instrument.icon)) ||
+        (typeof s.instrument_id === 'number' &&
+          lookups.instIconById.get(s.instrument_id)) ||
+        undefined;
+
+      const gradeName: string =
+        s.grade?.nama ||
+        (typeof s.grade_id === 'number' &&
+          lookups.gradeNameById.get(s.grade_id)) ||
+        '—';
+
       return {
         id: s.id,
         title: s.keterangan || 'Sertifikat',
         school: s.penyelenggara || '—',
         instrument: instrumentName,
-        instrumentIcon: instrumentIcon || undefined,
+        instrumentIcon,
         grade: gradeName,
         status: mapCertStatus(s.status),
-        link: fileUrl || '',
+        link: fileUrl,                 // ✅ sekarang string | undefined
         rejectReason: s.alasan_penolakan ?? null,
       };
     });
