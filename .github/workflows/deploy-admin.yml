@@ -12,6 +12,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: [self-hosted, deploy-admin]
+    environment: production
 
     steps:
       - name: Checkout repository
