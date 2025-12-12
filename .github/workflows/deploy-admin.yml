@@ -1,0 +1,32 @@
+name: Deploy Web Admin
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-web-admin-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, deploy-admin]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Docker status
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Stop old container
+        run: docker compose down --remove-orphans || true
+
+      - name: Clean unused images (optional)
+        run: docker system prune -f
+
+      - name: Build and run new container
+        run: docker compose up -d --build
