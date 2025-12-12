@@ -509,12 +509,13 @@ export default function ClassListTutorPage() {
                   const instr = row?.detail_program?.instrument || null;
                   const instrName = instr?.nama ?? '';
                   const instrIcon = getInstrumentIcon(instrName);
-
+                  const studentImage = row?.murid?.profile_pic_url
+                  console.log(resolveImageUrl(studentImage));
                   return (
                     <tr key={row.transaksi_id} className="border-b border-black/5">
                       <td className="px-4 py-4">
                         <ProgramAvatarBadge
-                          src={row.murid.profile_pic_url || '/avatar-placeholder.png'}
+                          src={resolveImageUrl(studentImage)}
                           alt={row.murid.nama || 'murid'}
                           pkg={row.program?.nama || ''}
                           size={55}

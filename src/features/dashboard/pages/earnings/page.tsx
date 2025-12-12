@@ -47,6 +47,13 @@ import type {
   TxStatusRaw,
   AllTxRecap,
 } from "@/features/slices/transaksi/types";
+
+import {
+  fetchEarningsChartThunk,
+  setRange as setChartRange,
+} from "@/features/slices/earnings/slice";
+import type { EarningsChartPoint } from "@/features/slices/earnings/types";
+
 import { resolveImageUrl } from "@/utils/resolveImageUrl";
 
 /* UI helpers */
@@ -55,6 +62,7 @@ const toneClasses = {
   orange: { bg: "bg-[var(--primary-light-color)]" },
   blue: { bg: "bg-[var(--secondary-light-color)]" },
   pink: { bg: "bg-[var(--accent-red-light-color)]" },
+  purple: { bg: "bg-[var(--accent-purple-light-color)]" },
 } as const;
 
 const COLORS = {
@@ -62,6 +70,15 @@ const COLORS = {
   course: "var(--primary-color)",         // kuning/oranye
   module: "var(--secondary-color)",       // biru
   promo: "var(--accent-red-color)",       // merah
+  fee: "var(--accent-purple-color)",      // ungu (fee layanan)
+};
+
+const LEGEND_ORDER: Record<string, number> = {
+  total: 0,
+  course: 1,
+  module: 2,
+  promo: 3,
+  fee: 4,
 };
 
 const cls = (...xs: Array<string | false | null | undefined>) =>
@@ -85,7 +102,6 @@ const DeltaBadge: React.FC<{ value?: number | null }> = ({ value }) => {
   if (value === null) {
     return (
       <div className="mt-1 inline-flex items-center text-md text-neutral-500">
-        
         <span>0% dari bulan lalu</span>
       </div>
     );
@@ -121,6 +137,21 @@ const TopBorderBar: React.FC<any> = (props) => {
 /* ===== util bulan/range untuk chart & picker ===== */
 const ID_MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+] as const;
+
+const ID_MONTHS_LONG = [
+  "januari",
+  "februari",
+  "maret",
+  "april",
+  "mei",
+  "juni",
+  "juli",
+  "agustus",
+  "september",
+  "oktober",
+  "november",
+  "desember",
 ] as const;
 
 const MONTH_NAME_TO_INDEX: Record<string, number> = {
@@ -188,6 +219,9 @@ function monthsDiffInclusive(sYear: number, sMonthIdx: number, eYear: number, eM
   const b = eYear * 12 + eMonthIdx;
   return b - a + 1;
 }
+
+const toYYYYMM = (year: number, monthIdx: number) =>
+  `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
 
 /* TYPES (untuk table lokal) */
 type Tab = "kursus" | "modul";
@@ -448,6 +482,7 @@ const AdminEarningsPage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const tx = useSelector((s: RootState) => s.transaksi);
+  const earnings = useSelector((s: RootState) => s.earningsChart);
 
   const [netOnly, setNetOnly] = React.useState(false);
   const [rangeLabel, setRangeLabel] = React.useState(() => buildDefaultRangeLabel());
@@ -459,12 +494,26 @@ const AdminEarningsPage: React.FC = () => {
   const [searchQ, setSearchQ] = React.useState(tx.q ?? "");
   const [statusQ, setStatusQ] = React.useState<string>(tx.statusFilter === "ALL" ? "All" : String(tx.statusFilter));
 
-  // init
+  // init transaksi list
   React.useEffect(() => {
     if (tx.limit !== PAGE_SIZE) dispatch(setReduxLimit(PAGE_SIZE));
     dispatch(setCategory("Kursus"));
     dispatch(setReduxPage(1));
     dispatch(fetchAllTxThunk({ net: netOnly } as any));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // init chart earnings (default range)
+  React.useEffect(() => {
+    const months = parseRangeLabel(rangeLabel);
+    if (!months.length) return;
+    const start = months[0];
+    const end = months[months.length - 1];
+    const startMonth = toYYYYMM(start.year, start.mIdx);
+    const endMonth = toYYYYMM(end.year, end.mIdx);
+
+    dispatch(setChartRange({ start_month: startMonth, end_month: endMonth }));
+    dispatch(fetchEarningsChartThunk({ start_month: startMonth, end_month: endMonth }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -476,7 +525,7 @@ const AdminEarningsPage: React.FC = () => {
     dispatch(fetchAllTxThunk({ net: netOnly } as any));
   }, [tab, dispatch, netOnly]);
 
-    // search
+  // search
   React.useEffect(() => {
     const handler = setTimeout(() => {
       dispatch(setQuery(searchQ));
@@ -615,85 +664,94 @@ const AdminEarningsPage: React.FC = () => {
     } as any;
   }, [tx.allRecap, tx.allItems]);
 
-// ====== DATA CHART PER BULAN (pakai COUNTER TOTAL per bulan dari BE) ======
+  // ====== DATA CHART PER BULAN ======
   const monthlyPerfData = React.useMemo(() => {
-    // base: semua bulan pada range -> 0
     const months = parseRangeLabel(rangeLabel);
-    const base = months.map((p) => ({
-      month: p.label,
-      total: 0,   // course_and_module_count
-      course: 0,  // course_count
-      module: 0,  // module_count
-      promo: 0,   // promo_tx_count
-      _k: `${p.year}-${p.mIdx}`, // internal key
-    }));
 
-    const mr = tx.allMonthlyRecap || [];
+    // 1) Coba pakai monthlyrecap dari endpoint listAllTransactions
+    const recapThisYear = (tx as any).monthlyrecap?.["this year"];
 
-    if (Array.isArray(mr) && mr.length) {
-      // BE: pt.year, pt.month (1..12), pt.count, pt.course_count, pt.module_count, pt.promo_tx_count
-      for (const pt of mr) {
-        const kk = `${pt.year}-${(pt.month ?? 1) - 1}`;
-        const slot = base.find((x) => x._k === kk);
-        if (!slot) continue;
+    if (recapThisYear && months.length > 0) {
+      return months.map((p) => {
+        const longKey = ID_MONTHS_LONG[p.mIdx]; // "desember", "juli", dll
+        const src = recapThisYear[longKey] || {};
 
-        const course = Number(pt.course_count ?? 0);
-        const module = Number(pt.module_count ?? 0);
-        const promo  = Number(pt.promo_tx_count ?? 0);
-        // total utama = course_and_module_count
-        const total  = Number(
-          pt.count ?? (course + module)
-        );
-
-        slot.course = course;
-        slot.module = module;
-        slot.promo  = promo;
-        slot.total  = total;
-      }
-    } else {
-      // fallback FE (kalau belum ada recap bulanan dari BE): hitung dari items yang sedang terload
-      const rows = (tx.allItems as any[]) || [];
-      for (const r of rows) {
-        const d = new Date(r.date || r.tanggal_transaksi);
-        if (Number.isNaN(d.getTime())) continue;
-        const kk = `${d.getFullYear()}-${d.getMonth()}`;
-        const slot = base.find((x) => x._k === kk);
-        if (!slot) continue;
-
-        const isModul =
-          String(r?.type || r?.category_transaksi || "").toLowerCase() === "modul" || !!r?.module;
-
-        if (isModul) slot.module += 1;
-        else slot.course += 1;
-
-        const percent = Number(r?.promo?.percent ?? 0);
-        if (percent > 0) slot.promo += 1;
-
-        slot.total = slot.course + slot.module;
-      }
+        return {
+          month: p.label, // "Des", "Jul", dst (dipakai XAxis & tooltip)
+          total: Number(src.total_sum ?? 0),
+          course: Number(src.course_sum ?? 0),
+          module: Number(src.module_sum ?? 0),
+          promo: Number(src.promo_sum ?? 0),
+          fee: Number(src.fee_sum ?? 0),
+        };
+      });
     }
 
-    // kembalikan tanpa key internal
+    // 2) Fallback: kalau nanti kamu bener2 pakai endpoint earnings (GetEarningsChartResp)
+    const base = months.map((p) => {
+      const key = toYYYYMM(p.year, p.mIdx); // 'YYYY-MM'
+      return {
+        month: p.label,
+        total: 0,
+        course: 0,
+        module: 0,
+        promo: 0,
+        fee: 0,
+        _k: key,
+      };
+    });
+
+    const points = (earnings.points || []) as EarningsChartPoint[];
+    const byMonth: Record<string, EarningsChartPoint> = {};
+    for (const pt of points) {
+      if (!pt?.month) continue;
+      byMonth[pt.month] = pt;
+    }
+
+    for (const slot of base) {
+      const pt = byMonth[slot._k];
+      if (!pt) continue;
+
+      const course = Number(pt.kursus ?? 0);
+      const module = Number(pt.modul ?? 0);
+      const total = Number(pt.total ?? course + module);
+      const promo = Number((pt as any).promo ?? 0);
+      const fee = Number((pt as any).fee ?? 0);
+
+      slot.course = course;
+      slot.module = module;
+      slot.total = total;
+      slot.promo = promo;
+      slot.fee = fee;
+    }
+
+    // buang _k sebelum dikirim ke Recharts
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     return base.map(({ _k, ...rest }) => rest);
-  }, [rangeLabel, tx.allMonthlyRecap, tx.allItems]);
-  // Y-axis dinamis (max dari seluruh bulan)
+  }, [rangeLabel, tx, earnings.points]);
+
+    // Y-axis dinamis (kelipatan 10.000)
   const { yDomainMax, yTicks } = React.useMemo(() => {
+    if (!monthlyPerfData.length) {
+      // default kalau belum ada data
+      return { yDomainMax: 10000, yTicks: [0, 10000] };
+    }
+
     const rawMax = monthlyPerfData.reduce(
-      (mx, r) => Math.max(mx, r.total, r.course, r.module, r.promo),
+      (mx, r) => Math.max(mx, r.total, r.course, r.module, r.promo, r.fee),
       0
     );
-    const padded = rawMax <= 10 ? 10 : Math.ceil(rawMax * 1.1);
-    const step =
-      padded <= 10 ? 1 :
-      padded <= 25 ? 5 :
-      padded <= 50 ? 10 :
-      Math.ceil(padded / 10);
 
-    const ticks = Array.from({ length: Math.floor(padded / step) + 1 }, (_, i) => i * step);
-    return { yDomainMax: ticks[ticks.length - 1] || 0, yTicks: ticks };
+    // dibulatkan ke atas ke kelipatan 10.000, minimal 10.000
+    const roundedMax = Math.max(10000, Math.ceil(rawMax / 10000) * 10000);
+
+    const ticks: number[] = [];
+    for (let v = 0; v <= roundedMax; v += 10000) {
+      ticks.push(v);
+    }
+
+    return { yDomainMax: roundedMax, yTicks: ticks };
   }, [monthlyPerfData]);
-
 
   const fmt = (n: number) =>
     n.toLocaleString("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 });
@@ -754,7 +812,7 @@ const AdminEarningsPage: React.FC = () => {
 
           {/* Cards Rekap */}
           <div className="px-4 sm:px-5 py-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
               {/* Total */}
               <div className={cls("relative rounded-2xl p-4 sm:p-5", toneClasses.green.bg)}>
                 <button
@@ -827,6 +885,22 @@ const AdminEarningsPage: React.FC = () => {
                   {(recap as any).promo_tx_count ?? 0} Transaksi
                 </div>
               </div>
+
+              <div className={cls("relative rounded-2xl p-4 sm:p-5", toneClasses.purple.bg)}>
+                <p className="text-md text-[#0B1220]">Fee Layanan</p>
+                <div className="mt-2">
+                  <div className="text-[20px] font-bold leading-tight text-[#0B122A] sm:text-[22px]">
+                    {fmt((recap as any).fee_sum ?? 0)}
+                  </div>
+                  {/* kalau nanti BE kirim delta_percent.fee_sum bisa langsung kebaca */}
+                  <div className="mt-1 inline-flex items-center text-sm text-[var(--accent-green-color)]">
+                    <DeltaBadge value={(recap as any)?.delta_percent?.fee_sum} />
+                  </div>
+                </div>
+                <div className="mt-3 text-sm text-[#0B1220]">
+                  Dari semua transaksi
+                </div>
+              </div>
             </div>
           </div>
 
@@ -851,7 +925,7 @@ const AdminEarningsPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Chart Performa (per bulan; COUNTER → tinggi bar = jumlah) */}
+          {/* Chart Performa (per bulan; pakai SUM nominal dari endpoint earnings) */}
           <div className="px-2 pb-4 sm:px-4">
             <div className="h-[360px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -878,12 +952,46 @@ const AdminEarningsPage: React.FC = () => {
                       border: "1px solid var(--secondary-light-color)",
                       boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
                     }}
+                    formatter={(value: any) =>
+                      typeof value === "number" ? fmt(value) : value
+                    }
                   />
-                  <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: 16 }} iconType="square" />
-                  <Bar dataKey="total"  name="Total (Kursus + Modul)" fill={COLORS.total}  shape={<TopBorderBar borderColor="var(--accent-green-color)" />} />
-                  <Bar dataKey="course" name="Kursus"               fill={COLORS.course} shape={<TopBorderBar borderColor="var(--primary-color)"/>} />
-                  <Bar dataKey="module" name="Modul"                fill={COLORS.module} shape={<TopBorderBar borderColor="var(--secondary-color)"/>} />
-                  <Bar dataKey="promo"  name="Promo"                fill={COLORS.promo}  shape={<TopBorderBar borderColor="var(--accent-red-color)"/>} />
+                  <Legend
+                    verticalAlign="bottom"
+                    wrapperStyle={{ paddingTop: 16 }}
+                    iconType="square"
+                    itemSorter={(item) => LEGEND_ORDER[String(item?.dataKey ?? "")] ?? 99}
+                  />
+                  <Bar
+                    dataKey="total"
+                    name="Total Kursus + Modul"
+                    fill={COLORS.total}
+                    shape={<TopBorderBar borderColor="var(--accent-green-color)" />}
+                  />
+                  <Bar
+                    dataKey="course"
+                    name="Kursus"
+                    fill={COLORS.course}
+                    shape={<TopBorderBar borderColor="var(--primary-color)" />}
+                  />
+                  <Bar
+                    dataKey="module"
+                    name="Modul"
+                    fill={COLORS.module}
+                    shape={<TopBorderBar borderColor="var(--secondary-color)" />}
+                  />
+                  <Bar
+                    dataKey="promo"
+                    name="Promo"
+                    fill={COLORS.promo}
+                    shape={<TopBorderBar borderColor="var(--accent-red-color)" />}
+                  />
+                  <Bar
+                    dataKey="fee"
+                    name="Fee Layanan"
+                    fill={COLORS.fee}
+                    shape={<TopBorderBar borderColor="var(--accent-purple-color)" />}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1096,7 +1204,20 @@ const AdminEarningsPage: React.FC = () => {
       <MonthRangeOverlay
         open={rangeOpen}
         initialLabel={rangeLabel}
-        onApply={(lbl) => { setRangeLabel(lbl); setRangeOpen(false); }}
+        onApply={(lbl) => {
+          setRangeLabel(lbl);
+          setRangeOpen(false);
+
+          const months = parseRangeLabel(lbl);
+          if (!months.length) return;
+          const start = months[0];
+          const end = months[months.length - 1];
+          const startMonth = toYYYYMM(start.year, start.mIdx);
+          const endMonth = toYYYYMM(end.year, end.mIdx);
+
+          dispatch(setChartRange({ start_month: startMonth, end_month: endMonth }));
+          dispatch(fetchEarningsChartThunk({ start_month: startMonth, end_month: endMonth }));
+        }}
         onClose={() => setRangeOpen(false)}
       />
     </>

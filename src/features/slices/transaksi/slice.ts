@@ -66,6 +66,7 @@ const initialState: TransaksiByPromoState = {
 
   allRecap: null,          // rekap agregat
   allMonthlyRecap: null,   // rekap bulanan (chart)
+  monthlyrecap: null,
 };
 
 /* ========================= THUNKS ========================= */
@@ -281,6 +282,7 @@ const slice = createSlice({
       s.allRecap = (a.payload as any).recap ?? null;
 
       const p: any = a.payload as any;
+      s.monthlyrecap = p.monthlyrecap ?? null;
       let monthlyFromPayload: MonthlyRecapPoint[] | null =
         p.monthlyRecap ?? p.recap?.monthly ?? p.recap?.by_month ?? null;
 

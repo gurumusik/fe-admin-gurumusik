@@ -7,12 +7,16 @@ import { ENDPOINTS } from '@/services/endpoints';
 export type EarningsChartPoint = {
   /** 'YYYY-MM' */
   month: string;
-  /** nominal dari arus source_type='sesi' pada bulan tsb */
+  /** nominal dari arus source_type='sesi' pada bulan tsb (kursus) */
   kursus: number;
   /** nominal dari arus source_type='modul' pada bulan tsb */
   modul: number;
   /** kursus + modul (sudah dijumlah di backend) */
   total: number;
+  /** (opsional) nominal promo / nombok pada bulan tsb */
+  promo?: number;
+  /** (opsional) nominal fee layanan pada bulan tsb */
+  fee?: number;
 };
 
 export type EarningsChartRange = {

@@ -256,4 +256,5 @@ export type TransaksiByPromoState = {
 
   allRecap?: AllTxRecap | null;
   allMonthlyRecap?: MonthlyRecapPoint[] | null; // <-- sumber data chart (tak ikut tab)
+  monthlyrecap?: any | null; 
 };

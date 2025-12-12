@@ -119,6 +119,15 @@ function getYouTubeThumb(id: string | null): string | null {
   return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
 }
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  id: 'Indonesia',
+  en: 'Inggris',
+  ch: 'China',
+  ko: 'Korea',
+  ja: 'Jepang',
+};
+const formatLangLabel = (code: string) => LANGUAGE_LABELS[code.toLowerCase()] || code;
+
 /* ===================== Map status backend -> modal ===================== */
 const mapCertStatus = (raw?: string | null): CertStatus => {
   const v = String(raw || '').toLowerCase();
@@ -659,7 +668,7 @@ export default function ProfileTutorPage() {
                         return (
                           <Chip
                             key={lang}
-                            label={lang}
+                            label={formatLangLabel(lang)}
                             icon={
                               iconUrl ? (
                                 <img

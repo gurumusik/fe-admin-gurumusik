@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getProgramRing } from '@/utils/getProgramRing';
 import { imgUrl } from '@/lib/fileUrl';
+import defaultUser from '@/assets/images/default-user.png'
 
 type BadgeColors = { bgVar: string; text: string };
 function getProgramBadgeColors(pkg: string): BadgeColors {
@@ -133,7 +134,7 @@ export default function ProgramAvatarBadge({
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <img
-        src={!src ? imgUrl(src) : "/assets/images/profile.png"}
+        src={src ? imgUrl(src) : defaultUser}
         alt={alt}
         className={`rounded-full object-cover ring-2 ${ringClass}`}
         style={{ width: size, height: size }}

@@ -490,14 +490,7 @@ const DetailClassTutorPage: React.FC = () => {
                         <div className={`font-semibold capitalize ${getStatusColor(h.status)}`}>{h.status}</div>
                       </td>
                       <td className="px-4 py-4">
-                        {h.status === 'belum dimulai' ? (
-                          <button
-                            type="button"
-                            className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
-                          >
-                            Aktifkan Kelas
-                          </button>
-                        ) : (
+                        {h.status === 'belum dimulai' ? null : (
                           <button
                             type="button"
                             onClick={!disabled ? openReport : undefined}
