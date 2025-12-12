@@ -32,14 +32,25 @@ jobs:
           VITE_API_IMG_URL=${{ secrets.VITE_API_IMG_URL }}
           VITE_NODE_ENV=${{ secrets.VITE_NODE_ENV }}
           VITE_API_VERSION=${{ secrets.VITE_API_VERSION }}
-          VITE_FILE_BASE_URL=${{ secrets.VITE_FILE_ }}
+          VITE_FILE_BASE_URL=${{ secrets.VITE_FILE_BASE_URL }}
           EOF
 
-      - name: Stop old container
+          echo "✅ .env created (keys only):"
+          cut -d= -f1 .env
+
+      - name: Stop old container (compose)
         run: docker compose down --remove-orphans || true
+
+      # ✅ Fix conflict: container_name vite-frontend masih nyangkut
+      - name: Force remove conflicting container if exists
+        run: |
+          docker rm -f vite-frontend || true
 
       - name: Clean unused images (optional)
         run: docker system prune -f
 
       - name: Build and run new container
         run: docker compose up -d --build
+
+      - name: Show running containers
+        run: docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
