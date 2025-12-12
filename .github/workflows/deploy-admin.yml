@@ -22,6 +22,17 @@ jobs:
           docker --version
           docker compose version
 
+      - name: Create .env
+        shell: bash
+        run: |
+          rm -f .env
+          cat > .env << 'EOF'
+          # ====== Web Admin (Vite) Env ======
+          VITE_API_BASE_URL=${{ secrets.VITE_API_URL }}
+          VITE_API_IMG_URL=${{ secrets.VITE_API_URL }}
+          VITE_NODE_ENV=${{ secrets.VITE_NODE_ENV }}
+          EOF
+
       - name: Stop old container
         run: docker compose down --remove-orphans || true
 
