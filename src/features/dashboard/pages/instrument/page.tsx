@@ -98,7 +98,7 @@ export const AdminInstrumentPage: React.FC = () => {
       <div className="px-6 sm:px-8 lg:px-10 py-6">
         {/* Header */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-xl font-semibold text-neutral-800">Kelola Instrumen Guru Musik</h1>
+          <h1 className="text-xl font-semibold text-neutral-800">Kelola Instrumen Guru Musik.</h1>
 
           <div className="w-full sm:w-[520px] flex gap-3 sm:justify-end">
             <button

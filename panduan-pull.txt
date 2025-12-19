@@ -1,0 +1,15 @@
+STEP 1
+    - git pull
+    - nah di git pull ini bakal ada username & token (untuk token lu bisa ambil di notes ya)
+
+STEP 2 
+    - Cheking dulu pastiin semua feature saat dev berjalan lancar disini
+    - sama jangan lupa tambahin setup dan konfigurasi tambahan bila ada
+
+STEP 3
+    - sekarang build menggunakan docker
+    - buka terminal dan pastiin lokasi "terminal" nya ada di project (cd Documents/project/admin-dashboard)
+    - setelah itu lu bisa lakuin command yang di bawah ini
+    - docker compose build
+    - docker compose up
+    - docker compose logs => untuk check apakah jalan atau tidak

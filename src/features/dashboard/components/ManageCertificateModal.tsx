@@ -34,12 +34,13 @@ type Props = {
   onClose: () => void;
   certificates?: CertificateItem[];
   title?: string;
-
+  canDecide?: boolean;
   onPreview?: (item: CertificateItem) => void;
   onApprove?: (item: CertificateItem) => void;
   onReject?: (item: CertificateItem) => void; // legacy
   onRejectSubmit?: (item: CertificateItem, payload: RejectPayload) => void | Promise<void>;
   onShowRejectNote?: (item: CertificateItem) => void; // tidak dipakai (kita handle internal)
+  
 };
 
 const FALLBACK: CertificateItem[] = [
@@ -80,6 +81,7 @@ const ManageCertificateModal: React.FC<Props> = ({
   onReject,           // legacy
   onRejectSubmit,     // kirim reason saja
   onPreview,
+  canDecide = true,
 }) => {
   const items = useMemo(
     () => (certificates && certificates.length ? certificates : FALLBACK),
@@ -214,7 +216,7 @@ const ManageCertificateModal: React.FC<Props> = ({
     }
   };
 
-  const showDecisionButtons = selected?.status === "Menunggu Verifikasi";
+  const showDecisionButtons = canDecide && selected?.status === "Menunggu Verifikasi";
 
   return (
     <div

@@ -174,13 +174,14 @@ export const saveModuleAdminThunk = createAsyncThunk<
 /** SETUJUI modul (status → aktif) + optional update harga */
 export const approveModuleAdminThunk = createAsyncThunk<
   true,
-  { id: number; salePrice: number; promoPrice?: number | null; percentDiscount?: number | null },
+  { id: number; basePrice: number; salePrice: number; promoPrice?: number | null; percentDiscount?: number | null },
   { rejectValue: string }
 >('moduleAdminDetail/approve', async (args, { rejectWithValue }) => {
   try {
-    const { id, salePrice, promoPrice, percentDiscount } = args;
+    const { id, basePrice, salePrice, promoPrice, percentDiscount } = args;
     await updateModuleAdmin(id, {
       status: 'aktif',
+      harga: Math.max(0, Number(basePrice || 0)),
       harga_bid: Math.max(0, Number(salePrice || 0)),
       harga_discount: Math.max(0, Number(promoPrice || 0)),
       percent_discount: Math.max(0, Number(percentDiscount || 0)),

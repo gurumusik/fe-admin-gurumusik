@@ -79,7 +79,7 @@ export const LoginPage: React.FC = () => {
         {/* Header (logo + title) */}
         <div className="flex items-center gap-3 mb-8">
           <img src={GuruMusik} alt="Guru Musik.ID" width={40} height={40} className="rounded object-contain" />
-          <h1 className="text-xl font-bold text-[#0f172a]">Guru Musik.ID Admin</h1>
+          <h1 className="text-xl font-bold text-[#0f172a]">Guru Musik.ID Admin.</h1>
         </div>
 
         {/* Email */}

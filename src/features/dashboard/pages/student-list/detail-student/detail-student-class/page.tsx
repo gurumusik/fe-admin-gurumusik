@@ -42,6 +42,7 @@ function pageWindow(total: number, current: number) {
 }
 
 const isBelumSelesai = (s?: string) => (s || '').toLowerCase().includes('belum selesai');
+const isBelumMulai = (s?: string) => (s || '').toLowerCase().includes('belum mulai');
 
 /* ===================== Page ===================== */
 const DetailStudentClassPage: React.FC = () => {
@@ -365,7 +366,7 @@ const DetailStudentClassPage: React.FC = () => {
                       >
                         Aktifkan Kelas
                       </button>
-                    ) : (
+                    ) : isBelumMulai(r.status) ? null : (
                       <button
                         type="button"
                         onClick={() => setReportOpen(true)}

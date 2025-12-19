@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/features/dashboard/pages/teacher/VerifiedTutorPage.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   RiUser2Fill,
   RiCheckFill,
@@ -9,30 +9,35 @@ import {
   RiArrowRightSLine,
   RiCheckboxCircleFill,
   RiCloseLine,
-} from "react-icons/ri";
-import { useDispatch, useSelector } from "react-redux";
-import type { RootState, AppDispatch } from "@/app/store";
+} from 'react-icons/ri';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState, AppDispatch } from '@/app/store';
 
 import {
   fetchGuruApplicationsThunk,
   setGAPage,
   setGALimit,
   setGAStatus,
-  approveApplicationThunk,   // ✅ thunk approve
-  rejectApplicationThunk,    // ✅ thunk reject
-} from "@/features/slices/guruApplication/slice";
-import type { GuruApplicationDTO } from "@/features/slices/guruApplication/types";
+  approveApplicationThunk,
+  rejectApplicationThunk,
+} from '@/features/slices/guruApplication/slice';
+import type { GuruApplicationDTO } from '@/features/slices/guruApplication/types';
 
-import ConfirmationModal from "@/components/ui/common/ConfirmationModal";
+import ConfirmationModal from '@/components/ui/common/ConfirmationModal';
 import ApproveTeacherModal, {
   type ApproveMode,
   type ApproveTeacherPayload,
-} from "../../components/ApproveTeacherModal";
-import LoadingScreen from "@/components/ui/common/LoadingScreen"; // ✅ tambahkan ini
-import defaultUser from "@/assets/images/default-user.png";
+} from '../../components/ApproveTeacherModal';
+import LoadingScreen from '@/components/ui/common/LoadingScreen';
+import defaultUser from '@/assets/images/default-user.png';
+import { resolveImageUrl } from '@/utils/resolveImageUrl';
+import ManageCertificateModal, {
+  type CertificateItem,
+  type CertStatus,
+} from '@/features/dashboard/components/ManageCertificateModal';
 
 const cls = (...xs: Array<string | false | null | undefined>) =>
-  xs.filter(Boolean).join(" ");
+  xs.filter(Boolean).join(' ');
 
 const PAGE_SIZE = 5;
 const EMPTY_ARR: any[] = [];
@@ -43,7 +48,7 @@ const Header: React.FC = () => (
   <div className="flex items-center gap-3 mb-5">
     <div
       className="w-10 h-10 rounded-full grid place-items-center"
-      style={{ backgroundColor: "var(--primary-color)" }}
+      style={{ backgroundColor: 'var(--primary-color)' }}
     >
       <RiUser2Fill size={25} className="text-black" />
     </div>
@@ -53,7 +58,7 @@ const Header: React.FC = () => (
 
 const TableHeader: React.FC = () => {
   const headCls =
-    "text-md font-semibold text-neutral-900 p-4 text-left whitespace-nowrap";
+    'text-md font-semibold text-neutral-900 p-4 text-left whitespace-nowrap';
   return (
     <thead>
       <tr className="bg-neutral-100">
@@ -101,19 +106,21 @@ const RowItem: React.FC<{
   onApprove: () => void;
   onReject: () => void;
 }> = ({ row, onApprove, onReject }) => {
-  const profileUrl = row.user?.profile_pic_url || defaultUser;
+  const profileUrl = resolveImageUrl(row.user?.profile_pic_url ?? null) || defaultUser;
 
   const createdAt = row.created_at
-    ? new Date(row.created_at).toLocaleDateString("id-ID", {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
+    ? new Date(row.created_at).toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
       })
-    : "-";
+    : '-';
 
   const abk = !!row.is_abk;
-  const abkLabel = abk ? "Bersedia" : "Tidak Bersedia";
-  const abkColorVar = abk ? "var(--accent-green-color)" : "var(--accent-red-color)";
+  const abkLabel = abk ? 'Bersedia' : 'Tidak Bersedia';
+  const abkColorVar = abk
+    ? 'var(--accent-green-color)'
+    : 'var(--accent-red-color)';
 
   return (
     <tr>
@@ -135,12 +142,12 @@ const RowItem: React.FC<{
 
       {/* Phone */}
       <td className="py-3 px-4">
-        <span className="text-[#202020] text-md">{row.no_telp ?? "-"}</span>
+        <span className="text-[#202020] text-md">{row.no_telp ?? '-'}</span>
       </td>
 
       {/* Kota */}
       <td className="py-3 px-4">
-        <span className="text-[#202020] text-md">{row.domisili ?? "-"}</span>
+        <span className="text-[#202020] text-md">{row.domisili ?? '-'}</span>
       </td>
 
       {/* Tanggal */}
@@ -172,18 +179,18 @@ const Pagination: React.FC<{
   const pages = Math.ceil(Math.max(0, Number(total) || 0) / pageSize);
 
   const btnCls =
-    "min-w-9 h-9 px-3 rounded-lg border border-[#E3E8EF] text-md text-[#202020] hover:bg-[#F5F7FA]";
+    'min-w-9 h-9 px-3 rounded-lg border border-[#E3E8EF] text-md text-[#202020] hover:bg-[#F5F7FA]';
   const arrowBtnCls =
-    "w-9 h-9 grid place-items-center rounded-lg text-[#202020] hover:bg-[#F5F7FA] disabled:opacity-40 disabled:hover:bg-transparent";
+    'w-9 h-9 grid place-items-center rounded-lg text-[#202020] hover:bg-[#F5F7FA] disabled:opacity-40 disabled:hover:bg-transparent';
 
   const window = useMemo(() => {
-    const arr: (number | "...")[] = [];
-    const push = (v: number | "...") =>
+    const arr: (number | '...')[] = [];
+    const push = (v: number | '...') =>
       arr[arr.length - 1] === v ? undefined : arr.push(v);
 
     for (let i = 1; i <= pages; i++) {
       if (i <= 3 || i > pages - 2 || Math.abs(i - page) <= 1) push(i);
-      else if (arr[arr.length - 1] !== "...") push("...");
+      else if (arr[arr.length - 1] !== '...') push('...');
     }
     return arr;
   }, [pages, page]);
@@ -203,7 +210,7 @@ const Pagination: React.FC<{
       </button>
 
       {window.map((v, i) =>
-        v === "..." ? (
+        v === '...' ? (
           <span key={`gap-${i}`} className="px-2 text-sm text-neutral-900">
             ...
           </span>
@@ -213,7 +220,7 @@ const Pagination: React.FC<{
             className={cls(
               btnCls,
               v === page &&
-                "bg-[var(--secondary-light-color)] border-[var(--secondary-color)] font-medium"
+                'bg-[var(--secondary-light-color)] border-[var(--secondary-color)] font-medium'
             )}
             onClick={() => onChange(v)}
           >
@@ -235,41 +242,100 @@ const Pagination: React.FC<{
   );
 };
 
+/* ======================== Helpers Sertifikat ======================== */
+
+const mapCertStatus = (raw?: string | null): CertStatus => {
+  const v = String(raw || '').toLowerCase();
+  if (v === 'approved' || v === 'disetujui') return 'Disetujui';
+  if (v === 'rejected' || v === 'ditolak' || v === 'tidak_disetujui')
+    return 'Tidak Disetujui';
+  return 'Menunggu Verifikasi'; // termasuk 'under_review' / default
+};
+
+const buildCertificatesFromApplication = (
+  row: GuruApplicationDTO | null
+): CertificateItem[] => {
+  if (!row || !row.user) return [];
+  const userAny: any = row.user as any;
+  const detailGuru = userAny?.detailGuru;
+  const list: any[] = detailGuru?.sertifikat ?? [];
+  if (!Array.isArray(list) || !list.length) return [];
+
+  return list.map((s: any): CertificateItem => {
+    // pastikan hasil akhirnya string | undefined (bukan null)
+    const fileUrl = s.certif_path
+      ? (resolveImageUrl(s.certif_path ?? null) ?? undefined)
+      : undefined;
+
+    const instrumentName =
+      (s.instrument && (s.instrument.nama_instrumen as string)) || "—";
+
+    const instrumentIcon =
+      s.instrument && s.instrument.icon
+        ? (resolveImageUrl(s.instrument.icon ?? null) ?? undefined)
+        : undefined;
+
+    const gradeName = (s.grade && (s.grade.nama_grade as string)) || "—";
+
+    return {
+      id: s.id,
+      title: s.keterangan || "Sertifikat",
+      school: s.penyelenggara || "—",
+      instrument: instrumentName,
+      instrumentIcon,        // sekarang: string | undefined
+      grade: gradeName,
+      status: mapCertStatus(s.status),
+      link: fileUrl,         // sekarang: string | undefined
+      rejectReason: s.alasan_penolakan ?? null,
+    };
+  });
+};
+
 /* ======================== Main Page ======================== */
 
 const VerifiedTutorPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
 
   const gaList = useSelector((s: RootState) => s.guruApplication.list);
-  const itemsAll: GuruApplicationDTO[] = Array.isArray(gaList?.rows) ? gaList.rows : EMPTY_ARR;
-  const total: number = typeof gaList?.total === "number" ? gaList.total : 0;
+  const itemsAll: GuruApplicationDTO[] = Array.isArray(gaList?.rows)
+    ? gaList.rows
+    : EMPTY_ARR;
+  const total: number = typeof gaList?.total === 'number' ? gaList.total : 0;
   const loading: boolean = !!gaList?.loading;
   const errorMsg: string | null = gaList?.error ?? null;
 
   const [page, setPage] = useState<number>(gaList?.page || 1);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<ApproveMode>("approved");
+  const [modalMode, setModalMode] = useState<ApproveMode>('approved');
   const [selected, setSelected] = useState<GuruApplicationDTO | null>(null);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmKind, setConfirmKind] = useState<"success" | "error">("success");
-  const [confirmCtx, setConfirmCtx] = useState<"approved" | "rejected">("approved");
+  const [confirmKind, setConfirmKind] = useState<'success' | 'error'>('success');
+  const [confirmCtx, setConfirmCtx] = useState<'approved' | 'rejected'>(
+    'approved'
+  );
 
-  // ✅ state untuk overlay loading submit decide
+  // state untuk overlay loading submit decide
   const [deciding, setDeciding] = useState(false);
+
+  // state untuk ManageCertificateModal
+  const [certModalOpen, setCertModalOpen] = useState(false);
+  const [certModalItems, setCertModalItems] = useState<CertificateItem[]>([]);
+  const [certModalTitle, setCertModalTitle] =
+    useState<string>('Kelola Sertifikat');
 
   // Load awal: hanya status 'proses'
   useEffect(() => {
     dispatch(setGALimit(PAGE_SIZE));
     dispatch(setGAPage(page));
-    dispatch(setGAStatus("proses"));
+    dispatch(setGAStatus('proses'));
     dispatch(fetchGuruApplicationsThunk());
   }, [dispatch, page]);
 
   // Filter client-side juga (untuk berjaga)
   const items = useMemo(
-    () => itemsAll.filter((r) => r.status === "proses"),
+    () => itemsAll.filter((r) => r.status === 'proses'),
     [itemsAll]
   );
 
@@ -279,54 +345,67 @@ const VerifiedTutorPage: React.FC = () => {
     setModalOpen(true);
   };
 
-  // ⬇️ Panggil endpoint APPROVE/REJECT via thunk + tampilkan LoadingScreen
+  // Panggil endpoint APPROVE/REJECT via thunk + tampilkan LoadingScreen
   const handleSubmitModal = async (payload: ApproveTeacherPayload) => {
     if (!selected) return;
     setModalOpen(false);
-    setDeciding(true); // ✅ mulai overlay
+    setDeciding(true);
 
     try {
-      if (payload.mode === "approved") {
+      if (payload.mode === 'approved') {
         await dispatch(
-          approveApplicationThunk({ id: selected.id, note: (payload as any)?.notes })
+          approveApplicationThunk({
+            id: selected.id,
+            note: (payload as any)?.notes,
+          })
         ).unwrap();
       } else {
         const reason =
-          (payload as any)?.reason || (payload as any)?.notes || "Ditolak oleh admin";
+          (payload as any)?.reason ||
+          (payload as any)?.notes ||
+          'Ditolak oleh admin';
         await dispatch(
           rejectApplicationThunk({ id: selected.id, note: reason })
         ).unwrap();
       }
-      setConfirmKind("success");
+      setConfirmKind('success');
     } catch {
-      setConfirmKind("error");
+      setConfirmKind('error');
     } finally {
       setConfirmCtx(payload.mode);
       setSelected(null);
       // refresh list agar item yang sudah diputuskan hilang dari status 'proses'
       await dispatch(fetchGuruApplicationsThunk());
-      setDeciding(false); // ✅ matikan overlay setelah semua selesai
+      setDeciding(false);
       setConfirmOpen(true);
     }
   };
 
   const confirmTitle =
-    confirmCtx === "approved"
-      ? confirmKind === "success"
-        ? "Tutor berhasil disetujui."
-        : "Gagal menyetujui tutor"
-      : confirmKind === "success"
-      ? "Tutor berhasil ditolak."
-      : "Gagal menolak tutor";
+    confirmCtx === 'approved'
+      ? confirmKind === 'success'
+        ? 'Tutor berhasil disetujui.'
+        : 'Gagal menyetujui tutor'
+      : confirmKind === 'success'
+      ? 'Tutor berhasil ditolak.'
+      : 'Gagal menolak tutor';
 
   const confirmTexts =
-    confirmCtx === "approved"
-      ? confirmKind === "success"
-        ? ["Tutor ini kini resmi terdaftar di platform dan sudah dapat menerima murid."]
-        : ["Terjadi kendala saat menyetujui tutor ini. Silakan coba lagi beberapa saat lagi."]
-      : confirmKind === "success"
-      ? ["Tutor ini tidak akan muncul di daftar calon tutor dan tidak dapat mengajar di platform."]
-      : ["Terjadi kendala saat menolak tutor ini. Silakan coba lagi beberapa saat lagi."];
+    confirmCtx === 'approved'
+      ? confirmKind === 'success'
+        ? [
+            'Tutor ini kini resmi terdaftar di platform dan sudah dapat menerima murid.',
+          ]
+        : [
+            'Terjadi kendala saat menyetujui tutor ini. Silakan coba lagi beberapa saat lagi.',
+          ]
+      : confirmKind === 'success'
+      ? [
+          'Tutor ini tidak akan muncul di daftar calon tutor dan tidak dapat mengajar di platform.',
+        ]
+      : [
+          'Terjadi kendala saat menolak tutor ini. Silakan coba lagi beberapa saat lagi.',
+        ];
 
   return (
     <div className="p-4 sm:p-6 bg-white rounded-2xl">
@@ -366,8 +445,8 @@ const VerifiedTutorPage: React.FC = () => {
                 <RowItem
                   key={row.id}
                   row={row}
-                  onApprove={() => openModal("approved", row)}
-                  onReject={() => openModal("rejected", row)}
+                  onApprove={() => openModal('approved', row)}
+                  onReject={() => openModal('rejected', row)}
                 />
               ))}
           </tbody>
@@ -378,30 +457,64 @@ const VerifiedTutorPage: React.FC = () => {
         <Pagination total={total} page={page} onChange={setPage} />
       </div>
 
-      {/* Modal */}
+      {/* Modal Approve / Reject */}
       <ApproveTeacherModal
         open={modalOpen}
         mode={modalMode}
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmitModal}
         data={{
-          image: selected?.user?.profile_pic_url || defaultUser,
+          image: resolveImageUrl(selected?.user?.profile_pic_url ?? null) || defaultUser,
           name: selected?.nama ?? undefined,
+          short_name: selected?.user?.nama_panggilan ?? undefined,
+          email: selected?.email ?? undefined,
           phone: selected?.no_telp ?? undefined,
-          city: selected?.domisili ?? "-",
+          city: selected?.domisili ?? '-',
           videoUrl: selected?.demo_url ?? undefined,
           cvUrl: selected?.cv_url ?? undefined,
           certificateUrl: selected?.portfolio_url ?? undefined,
+          certificates: buildCertificatesFromApplication(selected),
+        }}
+        onOpenCertificates={(opts) => {
+          const all = buildCertificatesFromApplication(selected);
+          let filtered = all;
+          if (opts?.instrumentName) {
+            const key = opts.instrumentName.toLowerCase();
+            filtered = all.filter(
+              (c) => c.instrument.toLowerCase() === key
+            );
+            setCertModalTitle(`Sertifikat ${opts.instrumentName}`);
+          } else {
+            setCertModalTitle('Kelola Sertifikat');
+          }
+          setCertModalItems(filtered);
+          setCertModalOpen(true);
         }}
       />
 
+      {/* Modal konfirmasi approve/reject aplikasi */}
       <ConfirmationModal
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        icon={confirmKind === "success" ? <RiCheckboxCircleFill /> : <RiCloseLine />}
-        iconTone={confirmKind === "success" ? "success" : "danger"}
+        icon={
+          confirmKind === 'success' ? (
+            <RiCheckboxCircleFill />
+          ) : (
+            <RiCloseLine />
+          )
+        }
+        iconTone={confirmKind === 'success' ? 'success' : 'danger'}
         title={confirmTitle}
         texts={confirmTexts}
+      />
+
+      {/* Modal kelola/pratinjau sertifikat – READ ONLY di halaman ini */}
+      <ManageCertificateModal
+        isOpen={certModalOpen}
+        onClose={() => setCertModalOpen(false)}
+        certificates={certModalItems}
+        title={certModalTitle}
+        canDecide={false}
       />
     </div>
   );

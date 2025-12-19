@@ -2,7 +2,7 @@
 // src/pages/dashboard-admin/tutor-list/EntryTutorPage.tsx
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/app/store';
 import {
@@ -31,6 +31,7 @@ import EntryCertificateModal, {
 } from '@/features/dashboard/components/EntryCertificateModal';
 
 import { getLanguageIcon } from '@/utils/getLanguageIcon';
+import { clampCropFrame, cropImageToDataUrl, loadCropImage, type CropFrame } from '@/utils/cropPhoto';
 
 import type {
   CreateGuruFromEntryCertificate,
@@ -38,8 +39,14 @@ import type {
 } from '@/features/slices/guru/types';
 
 // ================== Bahasa (multi-select) ==================
-const LANGUAGE_OPTIONS = ['Indonesia', 'Inggris', 'Korea', 'Jepang', 'China'] as const;
-type Language = typeof LANGUAGE_OPTIONS[number];
+const LANGUAGE_OPTIONS = [
+  { code: 'id', label: 'Indonesia' },
+  { code: 'en', label: 'Inggris' },
+  { code: 'ch', label: 'China' },
+  { code: 'ko', label: 'Korea' },
+  { code: 'ja', label: 'Jepang' },
+] as const;
+type LanguageOption = typeof LANGUAGE_OPTIONS[number];
 
 function LanguageSelector({
   value,
@@ -52,9 +59,9 @@ function LanguageSelector({
   invalid?: boolean;
   onBlur?: () => void;
 }) {
-  const toggle = (lang: Language) => {
-    const has = value.includes(lang);
-    onChange(has ? value.filter((l) => l !== lang) : [...value, lang]);
+  const toggle = (lang: LanguageOption) => {
+    const has = value.includes(lang.code);
+    onChange(has ? value.filter((l) => l !== lang.code) : [...value, lang.code]);
   };
   return (
     <div className="flex flex-col gap-1.5">
@@ -66,11 +73,11 @@ function LanguageSelector({
         onBlur={onBlur}
       >
         {LANGUAGE_OPTIONS.map((lang) => {
-          const active = value.includes(lang);
-          const icon = getLanguageIcon?.(lang) ?? null;
+          const active = value.includes(lang.code);
+          const icon = getLanguageIcon?.(lang.code) ?? null;
           return (
             <button
-              key={lang}
+              key={lang.code}
               type="button"
               onClick={() => toggle(lang)}
               className={
@@ -78,16 +85,16 @@ function LanguageSelector({
                   ? 'inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-blue-50 border border-blue-200 text-blue-700'
                   : 'inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-neutral-50 border border-neutral-300 text-neutral-800'
               }
-              title={lang}
+              title={lang.label}
             >
               {icon ? (
-                <img src={icon} alt={lang} className="h-5 w-5 object-contain" loading="lazy" />
+                <img src={icon} alt={lang.label} className="h-5 w-5 object-contain" loading="lazy" />
               ) : (
                 <span className="inline-grid place-items-center w-5 h-5 rounded-full bg-white border border-neutral-300 text-[10px]">
                   A
                 </span>
               )}
-              {lang}
+              {lang.label}
             </button>
           );
         })}
@@ -126,6 +133,7 @@ const DAY_OPTIONS = [
   { label: 'Sabtu', value: 6 },
   { label: 'Minggu', value: 7 },
 ];
+const CROP_BOX_SIZE = 320;
 
 export default function EntryTutorPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -142,8 +150,20 @@ export default function EntryTutorPage() {
   }, []);
 
   // ==== Form dasar ====
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null); // final (pasca crop)
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null); // sebelum crop disimpan
   const [profilePicDataUrl, setProfilePicDataUrl] = useState<string | null>(null);
+  const [rawPhotoDataUrl, setRawPhotoDataUrl] = useState<string | null>(null);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSize, setCropImageSize] = useState({ w: 0, h: 0 }); // natural image size
+  const [cropDisplaySize, setCropDisplaySize] = useState({ w: 0, h: 0 }); // fitted to viewport
+  const [cropFrame, setCropFrame] = useState<CropFrame>({ x: 0, y: 0, size: 200 }); // 1:1 frame on display coords
+  const cropDragRef = useRef({
+    mode: null as 'move' | 'resize' | null,
+    startX: 0,
+    startY: 0,
+    startFrame: { x: 0, y: 0, size: 200 } as CropFrame,
+  });
 
   const [nama, setNama] = useState('');
   const [namaPanggilan, setNamaPanggilan] = useState('');
@@ -165,6 +185,7 @@ export default function EntryTutorPage() {
 
   // Jadwal UI
   const [schedules, setSchedules] = useState<UIScheduleRow[]>([]);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   const [provinces, setProvinces] = useState<ProvinceItem[]>([]);
   const [cities, setCities] = useState<CityItem[]>([]);
@@ -222,16 +243,96 @@ export default function EntryTutorPage() {
 
   // Foto profil -> dataURL
   const handlePhotoChange = async (file?: File | null) => {
-    setPhotoFile(file ?? null);
     if (file) {
       try {
         const dataUrl = await fileToDataUrl(file);
-        setProfilePicDataUrl(dataUrl);
+        setPendingPhotoFile(file);
+        setRawPhotoDataUrl(dataUrl);
+        setCropModalOpen(true);
       } catch {
-        setProfilePicDataUrl(null);
+        setPendingPhotoFile(null);
+        setRawPhotoDataUrl(null);
       }
     } else {
-      setProfilePicDataUrl(null);
+        setPendingPhotoFile(null);
+        setRawPhotoDataUrl(null);
+    }
+  };
+
+  // load gambar untuk crop, hitung display-fit dan frame awal
+  useEffect(() => {
+    if (!rawPhotoDataUrl) return;
+    let cancelled = false;
+    loadCropImage(rawPhotoDataUrl, { maxWidth: 520, maxHeight: 520, maxFrameSize: 320 })
+      .then((res) => {
+        if (cancelled) return;
+        setCropImageSize({ w: res.naturalWidth, h: res.naturalHeight });
+        setCropDisplaySize({ w: res.displayWidth, h: res.displayHeight });
+        setCropFrame(res.initialFrame);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [rawPhotoDataUrl]);
+
+  const clampFrame = (frame: CropFrame) =>
+    clampCropFrame(frame, cropDisplaySize.w, cropDisplaySize.h, 80);
+
+  const startDrag = (mode: 'move' | 'resize', e: any) => {
+    const point = 'touches' in e ? e.touches[0] : e;
+    cropDragRef.current = {
+      mode,
+      startX: point.clientX,
+      startY: point.clientY,
+      startFrame: { ...cropFrame },
+    };
+  };
+
+  const handleCropPointerMove = (e: any) => {
+    const { mode, startX, startY, startFrame } = cropDragRef.current;
+    if (!mode) return;
+    if ('preventDefault' in e) e.preventDefault?.();
+    const point = 'touches' in e ? e.touches[0] : e;
+    const dx = point.clientX - startX;
+    const dy = point.clientY - startY;
+    if (mode === 'move') {
+      setCropFrame((prev) => clampFrame({ ...prev, x: startFrame.x + dx, y: startFrame.y + dy }));
+    } else {
+      const delta = Math.max(dx, dy);
+      setCropFrame((prev) => clampFrame({ ...prev, size: startFrame.size + delta }));
+    }
+  };
+
+  const endDrag = () => {
+    cropDragRef.current = { ...cropDragRef.current, mode: null };
+  };
+
+  const handleCancelCrop = () => {
+    setCropModalOpen(false);
+    setPendingPhotoFile(null);
+    setRawPhotoDataUrl(null);
+  };
+
+  const handleConfirmCrop = async () => {
+    if (!rawPhotoDataUrl) return;
+    try {
+      const dataUrl = await cropImageToDataUrl({
+        imageUrl: rawPhotoDataUrl,
+        frame: clampFrame(cropFrame),
+        displayWidth: cropViewW,
+        displayHeight: cropViewH,
+        naturalWidth: cropImageSize.w || cropViewW,
+        naturalHeight: cropImageSize.h || cropViewH,
+        outputSize: CROP_BOX_SIZE,
+      });
+      setProfilePicDataUrl(dataUrl);
+      setPhotoFile(pendingPhotoFile);
+      setPendingPhotoFile(null);
+      setRawPhotoDataUrl(null);
+      setCropModalOpen(false);
+    } catch {
+      // ignore failure
     }
   };
 
@@ -297,15 +398,54 @@ export default function EntryTutorPage() {
     }));
   }
 
+  const dayLabel = (day: number | '') =>
+    DAY_OPTIONS.find((d) => d.value === day)?.label ?? `Hari ${day || ''}`;
+
+  const toMinutes = (t?: string) => {
+    if (!t) return null;
+    const [h, m] = t.split(':').map((x) => Number(x));
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    return h * 60 + m;
+  };
+
+  const toHHMM = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
   // Map jadwal
   function mapSchedulesToPayload(rows: UIScheduleRow[]) {
-    const ok = rows.filter((r) => r.day !== '' && r.start && r.end && r.start < r.end);
-    return ok.map((r) => ({
-      hari: Number(r.day),
-      mulai: r.start,
-      selesai: r.end,
-      status: 'available' as const,
-    }));
+    const slots: { hari: number; mulai: string; selesai: string; status: 'available' }[] = [];
+    for (const r of rows) {
+      const isEmpty = r.day === '' && !r.start && !r.end;
+      if (isEmpty) continue; // abaikan baris kosong
+      if (r.day === '' || !r.start || !r.end) {
+        setScheduleError('Lengkapi hari, jam mulai, dan jam selesai untuk setiap baris jadwal.');
+        return null;
+      }
+      const startMin = toMinutes(r.start);
+      const endMin = toMinutes(r.end);
+      if (startMin == null || endMin == null || endMin <= startMin) {
+        setScheduleError('Jam mulai/selesai tidak valid atau jam selesai harus lebih besar.');
+        return null;
+      }
+      const diff = endMin - startMin;
+      if (diff < 60) {
+        setScheduleError(`Slot ${dayLabel(r.day)} minimal 1 jam.`);
+        return null;
+      }
+      for (let cur = startMin; cur + 60 <= endMin; cur += 60) {
+        slots.push({
+          hari: Number(r.day),
+          mulai: toHHMM(cur),
+          selesai: toHHMM(cur + 60),
+          status: 'available' as const,
+        });
+      }
+    }
+    setScheduleError(null);
+    return slots;
   }
 
   async function handleSubmitCreate() {
@@ -328,10 +468,13 @@ export default function EntryTutorPage() {
       certificates: mapCertificatesToPayload(certs),
     };
 
+    const mappedSchedules = mapSchedulesToPayload(schedules);
+    if (mappedSchedules === null) return;
+
     const payloadWithExtras: any = {
       ...basePayload,
       is_abk: abkChoice === 'ya',
-      jadwal_available_guru: mapSchedulesToPayload(schedules),
+      jadwal_available_guru: mappedSchedules,
     };
 
     await dispatch(createGuruFromEntryThunk({ payload: payloadWithExtras }));
@@ -352,8 +495,14 @@ export default function EntryTutorPage() {
     setCerts([]);
     setSelectedLanguages([]);
     setPhotoFile(null);
+    setPendingPhotoFile(null);
     setProfilePicDataUrl(null);
+    setRawPhotoDataUrl(null);
+    setCropModalOpen(false);
+    setCropDisplaySize({ w: 0, h: 0 });
+    setCropFrame({ x: 0, y: 0, size: 200 });
     setLangTouched(false);
+    setScheduleError(null);
 
     // wilayah
     setProvId('');
@@ -389,8 +538,12 @@ export default function EntryTutorPage() {
   const loadingIG =
     instrumentsState?.status === 'loading' || gradesState?.status === 'loading';
 
+  const cropViewW = cropDisplaySize.w || CROP_BOX_SIZE;
+  const cropViewH = cropDisplaySize.h || CROP_BOX_SIZE;
+
   return (
-    <div className="mx-auto p-6">
+    <>
+      <div className="mx-auto p-6">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Entry Tutor</h1>
       </header>
@@ -431,6 +584,23 @@ export default function EntryTutorPage() {
                 onChange={(e) => handlePhotoChange(e.currentTarget.files?.[0] ?? null)}
                 className="block w-full cursor-pointer rounded-lg border border-dashed border-slate-300 bg-white px-3 py-6 text-md text-slate-600 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-md file:font-medium hover:file:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              {profilePicDataUrl && (
+                <div className="flex items-center gap-3">
+                  <div className="h-20 w-20 overflow-hidden rounded-full ring-2 ring-black/5 bg-neutral-100">
+                    <img
+                      src={profilePicDataUrl}
+                      alt="Preview foto profil"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  {photoFile && (
+                    <div className="flex flex-col text-xs text-slate-600">
+                      <span className="font-medium text-slate-700">Preview</span>
+                      <span className="text-slate-600 truncate max-w-[220px]">{photoFile.name}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               {photoFile ? (
                 <p className="text-xs text-slate-600">Dipilih: {photoFile.name}</p>
               ) : (
@@ -503,7 +673,7 @@ export default function EntryTutorPage() {
               <input
                 id="demoLink"
                 name="demoLink"
-                type="url"
+                required
                 value={demoLink}
                 onChange={(e) => setDemoLink(e.target.value)}
                 placeholder="https://youtu.be/xxxxx atau link publik Google Drive"
@@ -668,7 +838,7 @@ export default function EntryTutorPage() {
             <button
               type="button"
               onClick={addScheduleRow}
-              className="rounded-full px-3 py-1.5 text-sm bg-neutral-800 text-white hover:opacity-90"
+              className="rounded-full px-3 py-1.5 text-sm bg-[var(--primary-color)] font-semibold hover:opacity-90"
             >
               + Tambah Slot
             </button>
@@ -731,6 +901,7 @@ export default function EntryTutorPage() {
               ))}
             </div>
           )}
+          {scheduleError && <p className="mt-2 text-xs text-red-600">{scheduleError}</p>}
         </section>
 
         {/* Actions */}
@@ -759,6 +930,86 @@ export default function EntryTutorPage() {
         onCreate={handleCreateCertificate}
         onUpdate={handleUpdateCertificate}
       />
-    </div>
+      </div>
+
+      {/* Modal crop 1:1 */}
+      {cropModalOpen && rawPhotoDataUrl && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">Sesuaikan Foto Profil (1:1)</h3>
+              <button
+                type="button"
+                onClick={handleCancelCrop}
+                className="rounded-full px-3 py-1 text-sm text-slate-600 hover:bg-slate-100"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div
+                className="relative mx-auto overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-100"
+                style={{ width: cropViewW, height: cropViewH, touchAction: 'none' }}
+                onMouseMove={handleCropPointerMove}
+                onMouseUp={endDrag}
+                onMouseLeave={endDrag}
+                onTouchMove={(e) => { e.preventDefault(); handleCropPointerMove(e); }}
+                onTouchEnd={endDrag}
+                onTouchCancel={endDrag}
+              >
+                <img
+                  src={rawPhotoDataUrl}
+                  alt="Crop source"
+                  className="h-full w-full select-none object-contain"
+                  draggable={false}
+                />
+
+                {/* Frame 1:1 yang bisa digeser/resize */}
+                <div
+                  className="absolute border-2 border-[var(--primary-color)] bg-white/5"
+                  style={{
+                    width: cropFrame.size,
+                    height: cropFrame.size,
+                    left: cropFrame.x,
+                    top: cropFrame.y,
+                    cursor: cropDragRef.current.mode ? 'grabbing' : 'move',
+                  }}
+                  onMouseDown={(e) => { e.preventDefault(); startDrag('move', e); }}
+                  onTouchStart={(e) => { e.preventDefault(); startDrag('move', e); }}
+                >
+                  <div
+                    className="absolute right-0 bottom-0 h-4 w-4 translate-x-1 translate-y-1 rounded-sm bg-[var(--primary-color)] border border-white cursor-nwse-resize"
+                    onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); startDrag('resize', e); }}
+                    onTouchStart={(e) => { e.stopPropagation(); e.preventDefault(); startDrag('resize', e); }}
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-600 text-center">
+                Geser atau ubah ukuran frame 1:1. Area di dalam frame yang akan dikirim.
+              </p>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCancelCrop}
+                className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCrop}
+                className="rounded-full px-5 py-2 text-sm font-semibold bg-[var(--primary-color)] text-black hover:brightness-95"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -66,6 +66,7 @@ const initialState: TransaksiByPromoState = {
 
   allRecap: null,          // rekap agregat
   allMonthlyRecap: null,   // rekap bulanan (chart)
+  monthlyrecap: null,
 };
 
 /* ========================= THUNKS ========================= */
@@ -146,23 +147,28 @@ export const fetchAllTxThunk = createAsyncThunk<
 >('transaksi/all/fetchList', async (overrideParams, { rejectWithValue, getState }) => {
   try {
     const root = getState() as any;
-    // Bisa mounted di 'transaksi' atau 'transaksiByPromo'
     const s = (root.transaksi ?? root.transaksiByPromo ?? {}) as Partial<TransaksiByPromoState>;
 
     const rawCategory: 'paket' | 'modul' | 'all' =
       s?.category === 'Modul' ? 'modul' : 'all';
 
+    // ⬇️ gunakan "ov" biar bisa akses field custom seperti net
+    const ov: any = overrideParams || {};
+
     const req: any = {
-      page: overrideParams?.page ?? s?.page ?? 1,
-      limit: overrideParams?.limit ?? s?.limit ?? 10,
-      q: (overrideParams?.q ?? s?.q) || undefined,
-      category: overrideParams?.category ?? rawCategory,
-      status: overrideParams?.status ?? (s?.statusFilter ? labelToRawStatus(s.statusFilter) : undefined),
-      date_from: overrideParams?.date_from ?? (s?.date_from || undefined),
-      date_to: overrideParams?.date_to ?? (s?.date_to || undefined),
+      page: ov.page ?? s?.page ?? 1,
+      limit: ov.limit ?? s?.limit ?? 10,
+      q: (ov.q ?? s?.q) || undefined,
+      category: ov.category ?? rawCategory,
+      status: ov.status ?? (s?.statusFilter ? labelToRawStatus(s.statusFilter) : undefined),
+      date_from: ov.date_from ?? (s?.date_from || undefined),
+      date_to: ov.date_to ?? (s?.date_to || undefined),
+
+      // ⬇️ NEW: teruskan net ke service kalau dikirim dari FE
+      net: typeof ov.net === 'boolean' ? ov.net : undefined,
     };
 
-    // bersihkan kosong
+    // bersihkan kosong (net=false tidak akan dihapus, dan itu oke)
     Object.keys(req).forEach((k) => {
       const v = req[k];
       if (v == null || (typeof v === 'string' && v.trim() === '')) delete req[k];
@@ -276,6 +282,7 @@ const slice = createSlice({
       s.allRecap = (a.payload as any).recap ?? null;
 
       const p: any = a.payload as any;
+      s.monthlyrecap = p.monthlyrecap ?? null;
       let monthlyFromPayload: MonthlyRecapPoint[] | null =
         p.monthlyRecap ?? p.recap?.monthly ?? p.recap?.by_month ?? null;
 

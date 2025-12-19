@@ -1,0 +1,56 @@
+name: Deploy Web Admin
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-web-admin-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, deploy-admin]
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Docker status
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Create .env
+        shell: bash
+        run: |
+          rm -f .env
+          cat > .env << 'EOF'
+          # ====== Web Admin (Vite) Env ======
+          VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+          VITE_API_IMG_URL=${{ secrets.VITE_API_IMG_URL }}
+          VITE_NODE_ENV=${{ secrets.VITE_NODE_ENV }}
+          VITE_API_VERSION=${{ secrets.VITE_API_VERSION }}
+          VITE_FILE_BASE_URL=${{ secrets.VITE_FILE_BASE_URL }}
+          EOF
+
+          echo "✅ .env created (keys only):"
+          cut -d= -f1 .env
+
+      - name: Stop old container (compose)
+        run: docker compose down --remove-orphans || true
+
+      - name: Force remove conflicting container if exists
+        run: |
+          docker rm -f vite-frontend || true
+
+      - name: Clean unused images (optional)
+        run: docker system prune -f
+
+      - name: Build and run new container
+        run: docker compose up -d --build
+
+      - name: Show running containers
+        run: docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
