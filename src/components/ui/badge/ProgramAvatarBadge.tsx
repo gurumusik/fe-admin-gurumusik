@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getProgramRing } from '@/utils/getProgramRing';
 import { imgUrl } from '@/lib/fileUrl';
 
