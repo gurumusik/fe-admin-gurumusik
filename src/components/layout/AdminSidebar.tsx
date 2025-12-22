@@ -59,6 +59,7 @@ const AdminSidebar: React.FC = () => {
   // prefix route per grup
   const managePrefixes = [
     "/dashboard-admin/programs",
+    "/dashboard-admin/paket",
     "/dashboard-admin/instrument",
     "/dashboard-admin/module",
   ];
@@ -154,6 +155,12 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/programs"
                   label="Programs"
                   active={isUnder("/dashboard-admin/programs")}
+                  className="mt-0 px-3 py-3"
+                />
+                <SubItem
+                  to="/dashboard-admin/paket"
+                  label="Paket"
+                  active={isUnder("/dashboard-admin/paket")}
                   className="mt-0 px-3 py-3"
                 />
                 <SubItem

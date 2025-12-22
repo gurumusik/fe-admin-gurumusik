@@ -53,6 +53,14 @@ export const ENDPOINTS = {
     UPDATE: (id: number|string) => `/programs/${id}`, // PUT admin
     DELETE: (id: number|string) => `/programs/${id}`, // DELETE admin
   },
+  PAKET: {
+    LIST: '/paket',                              // GET ?search=&page=&limit=
+    GROUPED: '/paket/grouped',
+    DETAIL: (id: number | string) => `/paket/${id}`,
+    CREATE: '/paket',
+    UPDATE: (id: number | string) => `/paket/${id}`,
+    DELETE: (id: number | string) => `/paket/${id}`,
+  },
 
   GURU_APPLICATION: {
     LIST: '/guru-applications',
@@ -142,4 +150,3 @@ export const ENDPOINTS = {
     CITY: (id: number | string) => `/wilayah/cities/${id}`,
   },
 };
-
