@@ -9,6 +9,7 @@ export type InstrumentDTO = {
   nama_instrumen: string;
   icon: string | null;
   is_active?: boolean; // ⬅️ ditambahkan
+  is_abk?: boolean;
   created_at?: string;
   updated_at?: string;
 };
@@ -24,6 +25,7 @@ export type CreateInstrumentPayload = {
   nama_instrumen: string;
   icon_base64?: string;
   icon_url?: string;
+  is_abk?: boolean;
 };
 
 /**
@@ -36,6 +38,7 @@ export type UpdateInstrumentPayload = {
   icon_base64?: string | null;
   icon_url?: string | null;
   is_active?: boolean; // ⬅️ ditambahkan
+  is_abk?: boolean;
 
   // Optional wizard fields (sinkronisasi detail_program)
   program_id?: number;

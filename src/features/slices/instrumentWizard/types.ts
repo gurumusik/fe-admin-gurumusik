@@ -32,6 +32,7 @@ export type WizardState = {
   // instrument
   draftName: string;
   draftIconBase64: string | null;
+  draftIsAbk: boolean;
   existingIconUrl: string | null;
 
   // program/rows

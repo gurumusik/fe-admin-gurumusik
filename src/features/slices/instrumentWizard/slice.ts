@@ -25,6 +25,7 @@ const initialState: WizardState & {
   // instrument
   draftName: '',
   draftIconBase64: null,
+  draftIsAbk: false,
   existingIconUrl: null,
 
   // program/rows
@@ -197,6 +198,7 @@ export const submitWizardThunk = createAsyncThunk<
     const ins = await InstrumentAPI.createInstrument({
       nama_instrumen: s.draftName.trim(),
       icon_base64: s.draftIconBase64 || undefined,
+      is_abk: s.draftIsAbk,
     });
     const instrumenId = (ins as any).data?.id ?? (ins as any).id;
     if (!instrumenId) return rejectWithValue('Gagal membuat instrumen');
@@ -314,6 +316,7 @@ export const prefillFromInstrumentThunk = createAsyncThunk<
         icon: (ins as any).icon ?? null,
         programId: firstProgramId,
         rows,
+        isAbk: (ins as any)?.is_abk ?? false,
       })
     );
     dispatch(setEditMode(true));
@@ -395,7 +398,7 @@ export const submitWizardEditThunk = createAsyncThunk<
     if (!allHasSyllabus) throw new Error('Silabus wajib diisi untuk setiap grade sebelum menyimpan.');
 
     // 1) Update instrument (tetap instrumen yang sama → hindari "nama instrumen sudah dipakai")
-    const body: any = { nama_instrumen: s.draftName.trim() };
+    const body: any = { nama_instrumen: s.draftName.trim(), is_abk: s.draftIsAbk };
     if (s.draftIconBase64) body.icon_base64 = s.draftIconBase64;
     if (s.programId && Array.isArray(s.rows) && s.rows.length > 0) {
       body.program_id = s.programId;
@@ -485,10 +488,11 @@ const slice = createSlice({
       state.isEditMode = !!a.payload;
     },
 
-    startDraft(state, a: PayloadAction<{ name: string; iconBase64?: string | null }>) {
+    startDraft(state, a: PayloadAction<{ name: string; iconBase64?: string | null; isAbk?: boolean }>) {
       state.isEditMode = false;
       state.draftName = a.payload.name;
       state.draftIconBase64 = a.payload.iconBase64 ?? null;
+      state.draftIsAbk = !!a.payload.isAbk;
       state.existingIconUrl = null;
 
       state.rows = [{ id_grade: null, nama_grade: 'Grade I', base_harga: 0 }];
@@ -505,9 +509,10 @@ const slice = createSlice({
       state.pendingDeletes = [];
     },
 
-    patchDraft(state, a: PayloadAction<{ name?: string; iconBase64?: string | null }>) {
+    patchDraft(state, a: PayloadAction<{ name?: string; iconBase64?: string | null; isAbk?: boolean }>) {
       if (typeof a.payload.name === 'string') state.draftName = a.payload.name;
       if ('iconBase64' in a.payload) state.draftIconBase64 = a.payload.iconBase64 ?? null;
+      if ('isAbk' in a.payload) state.draftIsAbk = !!a.payload.isAbk;
     },
 
     setPrograms(state, a: PayloadAction<ProgramLite[]>) {
@@ -624,10 +629,12 @@ const slice = createSlice({
         icon?: string | null;
         programId: number | null;
         rows: WizardRow[];
+        isAbk?: boolean;
       }>
     ) {
       state.draftName = a.payload.name ?? '';
       state.existingIconUrl = a.payload.icon ?? null;
+      state.draftIsAbk = !!a.payload.isAbk;
       state.programId = typeof a.payload.programId === 'number' ? a.payload.programId : null;
       state.rows = Array.isArray(a.payload.rows) ? a.payload.rows : [];
       state.draftIconBase64 = null;

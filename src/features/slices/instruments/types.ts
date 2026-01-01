@@ -47,12 +47,14 @@ export type EditInstrumentPayload = {
   type?: string;
   name?: string;
   iconBase64?: string | null;
+  isAbk?: boolean;
 };
 
 /** Payload submit dari AddInstrumentModal (mode create di admin list) */
 export type AddInstrumentSubmitPayload = {
   name?: string;
   file?: File | null;
+  isAbk?: boolean;
 };
 
 /** Peta jumlah level/grade per instrumentId */

@@ -214,7 +214,7 @@ export const AdminInstrumentPage: React.FC = () => {
           if (!n) return;
           let base64: string | undefined = undefined;
           if (payload.file) base64 = await fileToDataUrl(payload.file);
-          dispatch(startDraft({ name: n, iconBase64: base64 }));
+          dispatch(startDraft({ name: n, iconBase64: base64, isAbk: payload.isAbk }));
           const slug = slugify(n);
           setShowAdd(false);
           navigate(`/dashboard-admin/instrument/${slug}?new=1`);

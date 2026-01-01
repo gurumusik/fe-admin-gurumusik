@@ -6,6 +6,7 @@ type SubmitPayload = {
   name: string;
   iconBase64?: string | null;
   file?: File | null;
+  isAbk?: boolean;
 };
 
 type Props = {
@@ -20,6 +21,8 @@ type Props = {
   requireIcon?: boolean;
   /** Preview awal icon saat edit (url/data:) */
   initialPreview?: string | null;
+  /** Nilai awal toggle ABK */
+  defaultIsAbk?: boolean;
 };
 
 const MAX_MB = 5;
@@ -32,12 +35,14 @@ const AddInstrumentModal: React.FC<Props> = ({
   defaultName = "",
   requireIcon = true,
   initialPreview = null,
+  defaultIsAbk = false,
 }) => {
   const [name, setName] = React.useState(defaultName);
   const [file, setFile] = React.useState<File | null>(null);
   // preview: icon baru (jika upload) ATAU icon lama (initialPreview)
   const [iconPreview, setIconPreview] = React.useState<string | null>(initialPreview);
   const [error, setError] = React.useState<string | null>(null);
+  const [isAbk, setIsAbk] = React.useState<boolean>(!!defaultIsAbk);
   const fileRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
@@ -46,8 +51,9 @@ const AddInstrumentModal: React.FC<Props> = ({
       setFile(null);
       setIconPreview(initialPreview || null);
       setError(null);
+      setIsAbk(!!defaultIsAbk);
     }
-  }, [open, defaultName, initialPreview]);
+  }, [open, defaultName, initialPreview, defaultIsAbk]);
 
   if (!open) return null;
 
@@ -115,12 +121,12 @@ const AddInstrumentModal: React.FC<Props> = ({
     }
     const trimmed = name.trim();
 
-    // Edit mode, user tidak upload baru → jangan kirim iconBase64 (agar icon lama tetap)
+    // Edit mode, user tidak upload baru -> jangan kirim iconBase64 (agar icon lama tetap)
     const sameAsInitial = iconPreview === (initialPreview || null);
     if (!requireIcon && sameAsInitial) {
-      onSubmit?.({ name: trimmed, file: null });
+      onSubmit?.({ name: trimmed, file: null, isAbk });
     } else {
-      onSubmit?.({ name: trimmed, iconBase64: iconPreview ?? null, file });
+      onSubmit?.({ name: trimmed, iconBase64: iconPreview ?? null, file, isAbk });
     }
   };
 
@@ -211,6 +217,36 @@ const AddInstrumentModal: React.FC<Props> = ({
               placeholder="Masukkan Nama Instrumen"
               className="w-full rounded-xl border border-[#B8C8DA] bg-white px-4 py-3 text-[15px] outline-none focus:ring-2 focus:ring-neutral-200"
             />
+          </div>
+
+          {/* Toggle ABK */}
+          <div className="mt-5">
+            <div className="flex items-center justify-between rounded-xl border border-[#B8C8DA] bg-white px-4 py-3">
+              <div className="pr-4">
+                <p className="text-[15px] font-semibold text-[#0F172A]">Instrumen ABK</p>
+                <p className="text-sm text-[#6B7E93]">
+                  Tandai jika instrumen khusus untuk pembelajaran ABK.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAbk((v) => !v)}
+                aria-pressed={isAbk}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full border transition ${
+                  isAbk
+                    ? "bg-[var(--secondary-color,#0682DF)] border-[var(--secondary-color,#0682DF)]"
+                    : "bg-[#E6EDF5] border-[#C7D5E5]"
+                }`}
+                title={isAbk ? "Instrumen ABK" : "Instrumen reguler"}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition ${
+                    isAbk ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+                <span className="sr-only">Toggle instrumen ABK</span>
+              </button>
+            </div>
           </div>
 
           {/* Action */}

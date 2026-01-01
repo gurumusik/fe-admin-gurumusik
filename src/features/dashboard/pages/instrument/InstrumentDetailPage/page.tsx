@@ -45,6 +45,7 @@ import type {
   InstrumentRouteParams,
   EditInstrumentPayload,
 } from "@/features/slices/instruments/types";
+import { resolveImageUrl } from "@/utils/resolveImageUrl";
 
 const toTitle = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const slugify = (s: string) =>
@@ -81,7 +82,7 @@ const InstrumentDetailPage: React.FC = () => {
 
   const iconUrl = React.useMemo(() => {
     if (wizard.draftIconBase64) return resolveFileUrl(wizard.draftIconBase64);
-    if (isEdit && wizard.existingIconUrl) return resolveFileUrl(wizard.existingIconUrl);
+    if (isEdit && wizard.existingIconUrl) return resolveImageUrl(wizard.existingIconUrl);
     return "/assets/icons/instruments/placeholder.svg";
   }, [isEdit, wizard.existingIconUrl, wizard.draftIconBase64]);
 
@@ -379,7 +380,7 @@ const InstrumentDetailPage: React.FC = () => {
 
           <div className="flex items-center gap-3">
             <img
-              src={iconUrl}
+              src={iconUrl || ""}
               alt={displayTitle}
               className="h-8 w-8 object-contain"
             />
@@ -668,6 +669,7 @@ const InstrumentDetailPage: React.FC = () => {
         title="Edit Instrumen"
         requireIcon={false}
         initialPreview={iconUrl}
+        defaultIsAbk={wizard.draftIsAbk}
         onSubmit={(payload: EditInstrumentPayload) => {
           let changed = false;
 
@@ -678,6 +680,10 @@ const InstrumentDetailPage: React.FC = () => {
           if (typeof payload.iconBase64 === "string") {
             changed = true;
             dispatch(patchDraft({ iconBase64: payload.iconBase64 }));
+          }
+          if (typeof payload.isAbk === "boolean") {
+            if (payload.isAbk !== wizard.draftIsAbk) changed = true;
+            dispatch(patchDraft({ isAbk: payload.isAbk }));
           }
 
           if (changed) setHasUnsavedChanges(true);
