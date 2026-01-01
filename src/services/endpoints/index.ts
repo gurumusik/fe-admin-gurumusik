@@ -129,6 +129,9 @@ export const ENDPOINTS = {
     BY_PROMO: (promoId: number | string) => `/transaksi/promo/${promoId}/transactions`,
     ALL: () => `/transaksi/all`,
   },
+  RESCHEDULE: {
+    ADMIN_LIST: '/reschedule/admin',
+  },
   PAYOUT_GURU: {
     LIST: () => `/payout-guru`,
     ITEM: (id: number | string) => `/payout-guru/${id}`,

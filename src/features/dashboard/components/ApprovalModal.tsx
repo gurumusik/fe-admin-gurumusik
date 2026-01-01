@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { RiTimeLine, RiArrowRightLine } from "react-icons/ri";
 import ProgramAvatarBadge from "@/components/ui/badge/ProgramAvatarBadge";
+import { resolveImageUrl } from "@/utils/resolveImageUrl";
 import { icons as instrumentIcons } from "@/utils/icons";
 
 type ButtonCfg = {
@@ -23,6 +24,7 @@ export type ApprovalModalProps = {
   showCloseIcon?: boolean; // default: true
   closeOnOverlay?: boolean; // default: true
   widthClass?: string; // default: 'max-w-lg'
+  metaContent?: React.ReactNode; // konten tambahan di body (badge/status, dll)
 
   /* Header */
   student: {
@@ -123,6 +125,7 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({
   showSubmitButton = true,
   submitButton,
   reasonReadOnly = false,
+  metaContent,
 }) => {
   // Refs
   const primaryRef = useRef<HTMLButtonElement | null>(null);
@@ -139,6 +142,11 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({
   // Reason
   const [reasonLocal, setReasonLocal] = useState("");
   const reason = reasonValue ?? reasonLocal;
+
+  const avatarSrc =
+    resolveImageUrl(student.avatarUrl ?? null) ||
+    student.avatarUrl ||
+    "/assets/images/profile.png";
 
   // Fokus & ESC
   useEffect(() => {
@@ -194,13 +202,9 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({
   const headerTitle =
     title ?? (curMode === "approval" ? "Mengajukan Perubahan Jadwal!" : "");
 
-  // Alignment header & title sesuai mode internal
-  const headerLayout =
-    curMode === "approval"
-      ? "flex-col items-center text-center"
-      : "flex-row items-center text-left";
-
-  const titleAlign = curMode === "approval" ? "text-center" : "text-left";
+  // Alignment header & title: selalu kiri
+  const headerLayout = "flex-row items-center text-left";
+  const titleAlign = "text-left";
 
   // Susun tombol approval dinamis (1 atau 2)
   const btns: Array<{ cfg: ButtonCfg; primary: boolean; onClick: () => void }> =
@@ -237,14 +241,9 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({
           )}
 
           <div className={cls("flex gap-3", headerLayout)}>
-            <div
-              className={cls(
-                "flex flex-wrap items-center gap-4",
-                curMode === "approval" ? "justify-center" : ""
-              )}
-            >
+            <div className={cls("flex flex-wrap items-center gap-4")}>
               <ProgramAvatarBadge
-                src={student.avatarUrl || "/assets/images/profile.png"}
+                src={avatarSrc}
                 alt={student.name}
                 pkg={student.package || ""}
                 size={45}
@@ -284,6 +283,7 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({
 
         {/* Body */}
         <div className="p-6 pt-4">
+          {metaContent ? <div className="mb-4">{metaContent}</div> : null}
           {curMode === "approval" ? (
             <>
               {/* Dari → Ke */}
