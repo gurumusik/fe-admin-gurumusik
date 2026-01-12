@@ -69,7 +69,11 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/refund",
     "/dashboard-admin/data-rekrutmen",
   ];
-  const reportPrefixes = ["/dashboard-admin/tutor-report", "/dashboard-admin/student-report"];
+  const reportPrefixes = [
+    "/dashboard-admin/reschedule",
+    "/dashboard-admin/tutor-report",
+    "/dashboard-admin/student-report",
+  ];
   const usersPrefixes = ["/dashboard-admin/tutor-list", "/dashboard-admin/student-list"];
 
   // cek aktif per grup
@@ -263,6 +267,11 @@ const AdminSidebar: React.FC = () => {
             <DropWrap open={openReport}>
               <div className="pl-6 relative">
                 <span className="pointer-events-none absolute left-[12px] top-1 bottom-1 w-[3px] rounded bg-neutral-200" />
+                <SubItem
+                  to="/dashboard-admin/reschedule"
+                  label="Reschedule"
+                  active={isExact("/dashboard-admin/reschedule")}
+                />
                 <SubItem
                   to="/dashboard-admin/tutor-report"
                   label="Tutor Report"

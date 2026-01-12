@@ -152,3 +152,20 @@ export type DecidePayoutGuruResp = {
   message: string;
   data: PayoutGuruDTO;
 };
+
+export type SendSlipKomisiItem = {
+  payout_id: number;
+  payout_at?: string;
+  transfer_reference?: string;
+};
+
+export type SendSlipKomisiReq = {
+  payout_ids?: number[];
+  items?: SendSlipKomisiItem[];
+};
+
+export type SendSlipKomisiResp = {
+  message: string;
+  updated: Array<{ payout_id: number; status: string }>;
+  skipped: Array<{ payout_id: number; reason: string }>;
+};

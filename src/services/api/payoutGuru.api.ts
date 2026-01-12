@@ -6,6 +6,8 @@ import type {
   PayoutGuruDTO,
   DecidePayoutGuruReq,
   DecidePayoutGuruResp,
+  SendSlipKomisiReq,
+  SendSlipKomisiResp,
 } from '@/features/slices/payoutGuru/types';
 
 /* ========================= API CALLS ========================= */
@@ -76,6 +78,20 @@ export async function approvePayoutGuru(id: number | string) {
 /** helper: reject (reason wajib) */
 export async function rejectPayoutGuru(id: number | string, reason: string) {
   return decidePayoutGuru(id, { action: 'reject', reason });
+}
+
+/**
+ * POST kirim slip komisi (update payout ke paid)
+ */
+export async function sendSlipKomisi(payload: SendSlipKomisiReq) {
+  return baseUrl.request<SendSlipKomisiResp>(
+    ENDPOINTS.PAYOUT_GURU.SEND_SLIP(),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 /* ========================= HELPERS (opsional) ========================= */

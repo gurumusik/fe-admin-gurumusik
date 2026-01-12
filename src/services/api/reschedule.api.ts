@@ -40,6 +40,8 @@ export type RescheduleAdminItem = {
     id?: number | string;
     id_murid?: number | string;
     id_guru?: number | string;
+    nama_paket?: string | null;
+    nama_instrumen?: string | null;
     murid?: BasicUser | null;
     guru?: BasicUser | null;
   } | null;

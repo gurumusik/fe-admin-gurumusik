@@ -11,6 +11,7 @@ import {
 } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
 import ConfirmationModal from "@/components/ui/common/ConfirmationModal";
+import PayoutDetailModal from "@/features/dashboard/components/PayoutDetailModal";
 
 /* ===== Redux & API ===== */
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
@@ -18,7 +19,7 @@ import {
   fetchPayoutGuruListThunk,
   selectPayoutGuruState,
 } from "@/features/slices/payoutGuru/slice";
-import { resolveImageUrl } from "@/services/api/payoutGuru.api";
+import { resolveImageUrl, sendSlipKomisi } from "@/services/api/payoutGuru.api";
 import type { PayoutGuruDTO } from "@/features/slices/payoutGuru/types";
 
 /* ===== Utils ===== */
@@ -36,6 +37,7 @@ type AuditRow = {
   recipientName: string;
   bankName: string;
   netCommission: number;
+  raw: PayoutGuruDTO;
   avatar?: string | null;
 };
 
@@ -63,7 +65,18 @@ const CommisionAuditPage: React.FC = () => {
   // selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // fetch awal: ambil semua yang status='paid'
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<PayoutGuruDTO | null>(null);
+  const openDetail = (row: AuditRow) => {
+    setDetailTarget(row.raw);
+    setDetailOpen(true);
+  };
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setDetailTarget(null);
+  };
+
+  // fetch awal: ambil semua yang status='approved'
   useEffect(() => {
     dispatch(
       fetchPayoutGuruListThunk({
@@ -71,23 +84,24 @@ const CommisionAuditPage: React.FC = () => {
         limit: 200,              // ambil cukup banyak dulu; pagination di FE
         sort_by: "paid_at",
         sort_dir: "DESC",
-        status: "paid",
+        status: "approved",
       })
     );
   }, [dispatch]);
 
   // mapping API -> rows, lalu filter transfer_reference === null
   const allRows: AuditRow[] = useMemo(() => {
-    const onlyPaidNoRef = (items as PayoutGuruDTO[]).filter(
-      (it) => it.status === "paid" && (it.transfer_reference == null || String(it.transfer_reference).trim() === "")
+    const onlyApprovedNoRef = (items as PayoutGuruDTO[]).filter(
+      (it) => it.status === "approved" && (it.transfer_reference == null || String(it.transfer_reference).trim() === "")
     );
-    return onlyPaidNoRef.map((r) => ({
+    return onlyApprovedNoRef.map((r) => ({
       id: String(r.id),
       teacherName: r.guru?.nama ?? `Guru #${r.id_guru}`,
       accountNumber: r.payout_account_number,
       recipientName: r.payout_account_name,
       bankName: r.payoutBank?.name ?? r.payoutBank?.code ?? r.payout_bank_code ?? "-",
-      netCommission: Number(r.amount ?? 0),
+      netCommission: (r.amount_requested ?? 0) - (r.deduction_transfer_fee ?? 0),
+      raw: r,
       avatar: resolveImageUrl(r.guru?.profile_pic_url ?? null),
     }));
   }, [items]);
@@ -127,24 +141,42 @@ const CommisionAuditPage: React.FC = () => {
   };
 
   // header metric
-  const DEADLINE_LABEL = "28 Sep 2025 | 23:59";
   const selectedTotal = useMemo(
     () => allRows.filter((r) => selected.has(r.id)).reduce((sum, r) => sum + r.netCommission, 0),
     [allRows, selected]
   );
   const selectedCount = selected.size;
 
-  // modal (placeholder, belum dihubungkan kirim slip)
+  // modal (kirim slip)
   type ModalStage = "none" | "confirm" | "success" | "error";
   const [modal, setModal] = useState<ModalStage>("none");
   const [sending, setSending] = useState(false);
   const openConfirm = () => setModal("confirm");
   const closeModal = () => !sending && setModal("none");
   const sendSlips = async () => {
+    const payoutIds = Array.from(selected)
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (!payoutIds.length) return false;
     setSending(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      return true;
+      const res = await sendSlipKomisi({ payout_ids: payoutIds });
+      const hasUpdated = (res.updated?.length ?? 0) > 0;
+      if (hasUpdated) {
+        setSelected(new Set());
+        dispatch(
+          fetchPayoutGuruListThunk({
+            page: 1,
+            limit: 200,
+            sort_by: "paid_at",
+            sort_dir: "DESC",
+            status: "approved",
+          })
+        );
+      }
+      return hasUpdated;
+    } catch {
+      return false;
     } finally {
       setSending(false);
     }
@@ -168,16 +200,12 @@ const CommisionAuditPage: React.FC = () => {
             Kembali
           </button>
 
-          <div className="flex-1 grid grid-cols-3 gap-6 max-w-3xl mx-auto text-center">
+          <div className="flex-1 grid grid-cols-2 gap-6 max-w-3xl mx-auto text-center">
             <div className="flex flex-col">
               <span className="text-[12px] text-neutral-500">Total Komisi</span>
               <span className="text-lg font-semibold text-neutral-900">
                 {formatRupiah(selectedTotal)}
               </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[12px] text-neutral-500">Berakhir Pada</span>
-              <span className="text-lg font-semibold text-neutral-900">{DEADLINE_LABEL}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[12px] text-neutral-500">Guru Dipilih</span>
@@ -287,7 +315,7 @@ const CommisionAuditPage: React.FC = () => {
                       <td className="py-4 pr-4 pl-3">
                         <div className="flex justify-end">
                           <button
-                            onClick={() => navigate(`/dashboard-admin/tutor-commision/detail/${r.id}`)}
+                            onClick={() => openDetail(r)}
                             className="inline-flex items-center rounded-full border border-[var(--secondary-color)] px-6 py-2 text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
                           >
                             Detail
@@ -352,6 +380,11 @@ const CommisionAuditPage: React.FC = () => {
       </section>
 
       {/* ===== Modals ===== */}
+      <PayoutDetailModal
+        isOpen={detailOpen}
+        onClose={closeDetail}
+        payout={detailTarget}
+      />
       <ConfirmationModal
         isOpen={modal === "confirm"}
         onClose={closeModal}
@@ -407,3 +440,5 @@ const CommisionAuditPage: React.FC = () => {
 };
 
 export default CommisionAuditPage;
+
+

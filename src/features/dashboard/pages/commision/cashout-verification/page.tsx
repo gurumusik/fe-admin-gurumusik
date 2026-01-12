@@ -82,7 +82,7 @@ const CashoutVerificationPage: React.FC = () => {
         accountNumber: r.payout_account_number,
         recipientName: r.payout_account_name,
         bankName,
-        netCommission: r.amount, // sesuai permintaan
+        netCommission: r.amount_requested - r.deduction_transfer_fee,
         raw: r,
       };
     });
@@ -418,12 +418,13 @@ const CashoutVerificationPage: React.FC = () => {
         title="Setujui Pencairan Komisi?"
         texts={[
           <>
-            Anda akan menyetujui pencairan untuk{" "}
+            Anda akan menyetujui pengajuan untuk{" "}
             <span className="font-semibold">{target?.teacherName}</span>
           </>,
           <>
-            Pastikan <span className="font-semibold">transfer sudah dilakukan</span>{" "}
-            sebelum melanjutkan.
+            Slip komisi akan{" "}
+            <span className="font-semibold">dibuat otomatis</span> setelah
+            disetujui.
           </>,
         ]}
         button1={{
@@ -447,7 +448,10 @@ const CashoutVerificationPage: React.FC = () => {
         icon={<RiCheckboxCircleFill />}
         iconTone="success"
         title="Pengajuan Disetujui"
-        texts={["Pengajuan komisi berhasil disetujui."]}
+        texts={[
+          "Pengajuan komisi berhasil disetujui.",
+          "Slip komisi berhasil dibuat.",
+        ]}
         showCloseIcon
         widthClass="max-w-md"
       />
@@ -503,3 +507,4 @@ const CashoutVerificationPage: React.FC = () => {
 };
 
 export default CashoutVerificationPage;
+
