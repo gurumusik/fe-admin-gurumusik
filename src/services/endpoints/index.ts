@@ -138,6 +138,9 @@ export const ENDPOINTS = {
     DECISION: (id: number | string) => `/payout-guru/${id}/decision`, 
     SEND_SLIP: () => `/payout-guru/send-slip`,
   },
+  WITHDRAW: {
+    SLIP: (id: number | string) => `/withdraw/slip/${id}`,
+  },
 
   EARNINGS: {
     LIST: () => `/earnings/guru/chart`,

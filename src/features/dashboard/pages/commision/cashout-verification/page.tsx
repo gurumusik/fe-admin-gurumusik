@@ -2,26 +2,19 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   RiArrowLeftLine,
   RiSearchLine,
-  RiCloseLine,
   RiArrowLeftSLine,
   RiArrowRightSLine,
-  RiQuestionFill,
-  RiCheckLine as RiCheckSolid,
-  RiCheckboxCircleFill,
+  RiShareBoxLine,
 } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
-import ConfirmationModal from "@/components/ui/common/ConfirmationModal";
-import CashoutRejectModal from "../../../components/CashoutRejectModal";
 import NoData from "@/assets/images/NoData.png";
 
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   fetchPayoutGuruListThunk,
   selectPayoutGuruState,
-  decidePayoutGuruThunk,
 } from "@/features/slices/payoutGuru/slice";
 import { resolveImageUrl } from "@/services/api/payoutGuru.api";
-import type { PayoutGuruDTO } from "@/features/slices/payoutGuru/types";
 
 /* ===== Utils ===== */
 const cls = (...xs: Array<string | false | null | undefined>) =>
@@ -40,7 +33,6 @@ type Row = {
   recipientName: string;
   bankName: string;
   netCommission: number | null;
-  raw: PayoutGuruDTO;
 };
 
 const EMPTY_IMG = NoData;
@@ -50,7 +42,7 @@ const CashoutVerificationPage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
-  const { items, total, page, limit, status, error, decideStatus } =
+  const { items, total, page, limit, status, error } =
     useAppSelector(selectPayoutGuruState);
 
   const [search, setSearch] = useState("");
@@ -83,7 +75,6 @@ const CashoutVerificationPage: React.FC = () => {
         recipientName: r.payout_account_name,
         bankName,
         netCommission: r.amount_requested - r.deduction_transfer_fee,
-        raw: r,
       };
     });
   }, [items]);
@@ -97,93 +88,6 @@ const CashoutVerificationPage: React.FC = () => {
 
   const pageCount = Math.max(1, Math.ceil(total / limit));
   const current = page;
-
-  // ====== Modal flow state ======
-  type Stage =
-    | "none"
-    | "confirm"
-    | "success"
-    | "error"
-    | "reportSuccess"
-    | "reportError";
-  const [stage, setStage] = useState<Stage>("none");
-  const [target, setTarget] = useState<Row | null>(null);
-  const [sending, setSending] = useState(false);
-
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectTarget, setRejectTarget] = useState<Row | null>(null);
-  const [sendingReport, setSendingReport] = useState(false);
-
-  const openConfirm = (row: Row) => {
-    setTarget(row);
-    setStage("confirm");
-  };
-  const openReject = (row: Row) => {
-    setRejectTarget(row);
-    setRejectOpen(true);
-  };
-  const closeModal = () => !sending && setStage("none");
-
-  // === APPROVE: panggil thunk decide (approve) lalu refresh list
-  const approveRequest = async (row: Row) => {
-    setSending(true);
-    try {
-      await dispatch(
-        decidePayoutGuruThunk({ id: row.id, action: "approve" })
-      ).unwrap();
-      setStage("success");
-      // refresh untuk sync total/page
-      dispatch(
-        fetchPayoutGuruListThunk({
-          page: 1,
-          limit,
-          sort_by: "requested_at",
-          sort_dir: "DESC",
-          status: "requested",
-          search: search.trim() || undefined,
-        })
-      );
-    } catch {
-      setStage("error");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  // === REJECT: panggil thunk decide (reject) + reason, lalu refresh list
-  async function handleRejectSubmit(payload: {
-    subject: string;
-    note: string;
-    file?: File | null;
-  }) {
-    if (!rejectTarget) return;
-    setSendingReport(true);
-    try {
-      await dispatch(
-        decidePayoutGuruThunk({
-          id: rejectTarget.id,
-          action: "reject",
-          reason: payload.note?.trim() || "Ditolak",
-        })
-      ).unwrap();
-      setRejectOpen(false);
-      setStage("reportSuccess");
-      dispatch(
-        fetchPayoutGuruListThunk({
-          page: 1,
-          limit,
-          sort_by: "requested_at",
-          sort_dir: "DESC",
-          status: "requested",
-          search: search.trim() || undefined,
-        })
-      );
-    } catch {
-      setStage("reportError");
-    } finally {
-      setSendingReport(false);
-    }
-  }
 
   /* ===== Empty logic flags ===== */
   const isSearching = search.trim().length > 0;
@@ -324,30 +228,15 @@ const CashoutVerificationPage: React.FC = () => {
                       {r.netCommission == null ? "-" : formatRupiah(r.netCommission)}
                     </td>
                     <td className="p-4">
-                      <div className="flex items-center justify-start gap-4">
-                        {/* APPROVE */}
-                        <button
-                          onClick={() => openConfirm(r)}
-                          className={cls(
-                            "grid h-10 w-10 place-items-center rounded-xl",
-                            "bg-[var(--accent-green-light-color)] text-[var(--accent-green-color)] hover:brightness-95"
-                          )}
-                          title="Setujui Pencairan"
-                          disabled={decideStatus === "loading"}
-                        >
-                          <RiCheckSolid size={24} />
-                        </button>
-
-                        {/* REJECT */}
-                        <button
-                          onClick={() => openReject(r)}
-                          className="text-[var(--accent-red-color)] hover:brightness-90"
-                          title="Tolak"
-                          disabled={decideStatus === "loading"}
-                        >
-                          <RiCloseLine size={20} />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/withdraw/slip/${r.id}`)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[var(--secondary-color)] px-3 py-2 text-sm font-semibold text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
+                        title="Slip Komisi"
+                      >
+                        <RiShareBoxLine size={18} />
+                        <span>Slip Komisi</span>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -409,99 +298,6 @@ const CashoutVerificationPage: React.FC = () => {
         </div>
       </section>
 
-      {/* ===== Modals ===== */}
-      <ConfirmationModal
-        isOpen={stage === "confirm"}
-        onClose={closeModal}
-        icon={<RiQuestionFill />}
-        iconTone="warning"
-        title="Setujui Pencairan Komisi?"
-        texts={[
-          <>
-            Anda akan menyetujui pengajuan untuk{" "}
-            <span className="font-semibold">{target?.teacherName}</span>
-          </>,
-          <>
-            Slip komisi akan{" "}
-            <span className="font-semibold">dibuat otomatis</span> setelah
-            disetujui.
-          </>,
-        ]}
-        button1={{
-          label: "Ya, Setujui",
-          onClick: () => target && approveRequest(target),
-          loading: sending || decideStatus === "loading",
-          variant: "primary" as const,
-        }}
-        button2={{
-          label: "Batal",
-          onClick: closeModal,
-          variant: "outline" as const,
-        }}
-        showCloseIcon={false}
-        widthClass="max-w-lg"
-      />
-
-      <ConfirmationModal
-        isOpen={stage === "success"}
-        onClose={() => setStage("none")}
-        icon={<RiCheckboxCircleFill />}
-        iconTone="success"
-        title="Pengajuan Disetujui"
-        texts={[
-          "Pengajuan komisi berhasil disetujui.",
-          "Slip komisi berhasil dibuat.",
-        ]}
-        showCloseIcon
-        widthClass="max-w-md"
-      />
-
-      <ConfirmationModal
-        isOpen={stage === "error"}
-        onClose={() => setStage("none")}
-        icon={<RiCloseLine />}
-        iconTone="danger"
-        title="Gagal Menyetujui"
-        texts={[
-          "Terjadi kendala saat menyetujui pengajuan.",
-          "Silakan coba lagi beberapa saat lagi.",
-        ]}
-        showCloseIcon
-        widthClass="max-w-md"
-      />
-
-      {/* Form Penolakan */}
-      <CashoutRejectModal
-        isOpen={rejectOpen}
-        onClose={() => !sendingReport && setRejectOpen(false)}
-        onSubmit={handleRejectSubmit}
-        submitting={sendingReport || decideStatus === "loading"}
-      />
-
-      {/* Sukses / Error kirim laporan */}
-      <ConfirmationModal
-        isOpen={stage === "reportSuccess"}
-        onClose={() => setStage("none")}
-        icon={<RiCheckboxCircleFill />}
-        iconTone="success"
-        title="Form Penolakan Terkirim"
-        texts={["Laporan penolakan telah berhasil dikirim."]}
-        showCloseIcon
-        widthClass="max-w-md"
-      />
-      <ConfirmationModal
-        isOpen={stage === "reportError"}
-        onClose={() => setStage("none")}
-        icon={<RiCloseLine />}
-        iconTone="danger"
-        title="Gagal Mengirim Formulir"
-        texts={[
-          "Maaf, terjadi kesalahan saat mengirim laporan.",
-          "Coba lagi beberapa saat lagi.",
-        ]}
-        showCloseIcon
-        widthClass="max-w-md"
-      />
     </div>
   );
 };

@@ -203,7 +203,6 @@ const AdminCommissionPage: React.FC = () => {
         id: "teachers",
         title: "Jumlah Guru",
         amount: jmlGuru,
-        footer: "Dibayar setiap tanggal 28",
         tone: "primary",
       },
       {
@@ -316,11 +315,6 @@ const AdminCommissionPage: React.FC = () => {
               >
                 <div className="flex items-center justify-between">
                   <p className="text-md text-[#0B1220]">{c.title}</p>
-                  {c.id === "teachers" && (
-                    <span className="text-sm text-[#6A7B98]">
-                      Dibayar setiap tanggal 28
-                    </span>
-                  )}
                 </div>
 
                 <div className="mt-2 flex items-start justify-between">
@@ -337,18 +331,6 @@ const AdminCommissionPage: React.FC = () => {
                   </div>
 
                   <div className="self-end">
-                    {c.id === "teachers" && (
-                      <button
-                        onClick={() =>
-                          navigate(
-                            "/dashboard-admin/tutor-commision/audit-commision"
-                          )
-                        }
-                        className="rounded-xl border border-[var(--secondary-color)] px-3 py-2 text-sm font-semibold text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
-                      >
-                        Kirim Komisi
-                      </button>
-                    )}
                     {c.id === "requests" && (
                       <button
                         onClick={() =>
