@@ -288,9 +288,43 @@ const DetailPromoPage: React.FC = () => {
   const handleToggleHeadline = async () => {
     if (!promoId) return;
     const nextVal = !isHeadline;
+    const nextCode = promo?.kode_promo ?? state?.code ?? '-';
 
-    // Matikan headline → langsung update
-    if (!nextVal) {
+    const runActivateHeadline = async () => {
+      try {
+        setHeadlineToggling(true);
+        await updatePromo(promoId, { is_headline_promo: true });
+        const refreshed = await getPromo(promoId);
+        const p = refreshed.data;
+        setPromo(p);
+        setIsHeadline(Boolean(p.is_headline_promo));
+        setConfirm({
+          isOpen: true,
+          onClose: closeConfirm,
+          icon: <RiCheckboxCircleFill />,
+          iconTone: 'success',
+          title: 'Headline promo diaktifkan',
+          texts: ['Status headline sekarang: ON.'],
+          align: 'center',
+          button1: { label: 'Tutup', onClick: closeConfirm, variant: 'primary' },
+        });
+      } catch (e: any) {
+        setConfirm({
+          isOpen: true,
+          onClose: closeConfirm,
+          icon: <RiCloseLine />,
+          iconTone: 'danger',
+          title: 'Gagal mengaktifkan headline promo',
+          texts: [e?.message || 'Terjadi kendala saat menyimpan perubahan.'],
+          align: 'center',
+          button1: { label: 'Tutup', onClick: closeConfirm, variant: 'primary' },
+        });
+      } finally {
+        setHeadlineToggling(false);
+      }
+    };
+
+    const runDeactivateHeadline = async () => {
       try {
         setHeadlineToggling(true);
         await updatePromo(promoId, { is_headline_promo: false });
@@ -322,27 +356,46 @@ const DetailPromoPage: React.FC = () => {
       } finally {
         setHeadlineToggling(false);
       }
+    };
+
+    const openHeadlineConfirm = (currentCode: string, action: () => Promise<void>) => {
+      const verb = nextVal ? 'Mengaktifkan' : 'Menonaktifkan';
+      setConfirm({
+        isOpen: true,
+        onClose: closeConfirm,
+        icon: <RiQuestionFill />,
+        iconTone: 'warning',
+        title: `Yakin...${verb} Headline Promo ${nextCode}?`,
+        texts: [`Saat ini kode promo ${currentCode} yang aktif sebagai headline.`],
+        align: 'center',
+        button2: { label: 'Ga jadi deh', variant: 'outline', onClick: closeConfirm },
+        button1: {
+          label: 'Ya, Saya Yakin',
+          variant: 'primary',
+          onClick: async () => {
+            closeConfirm();
+            await action();
+          },
+        },
+      });
+    };
+
+    // Matikan headline → confirm dulu
+    if (!nextVal) {
+      const currentCode = promo?.kode_promo ?? state?.code ?? '-';
+      openHeadlineConfirm(currentCode, runDeactivateHeadline);
       return;
     }
 
-    // Nyalakan headline → cek single-headline
+    // Nyalakan headline → cek status headline saat ini lalu confirm
     try {
       setHeadlineChecking(true);
       const availResp = await getHeadlineAvail();
-      const { available, current } = availResp.data || { available: true, current: null };
-      if (!available && current !== String(promoId)) {
-        setConfirm({
-          isOpen: true,
-          onClose: closeConfirm,
-          icon: <RiCloseLine />,
-          iconTone: 'warning',
-          title: 'Tidak dapat mengaktifkan sebagai Headline',
-          texts: ['Mohon non-aktifkan promo headline yang aktif saat ini.'],
-          align: 'center',
-          button1: { label: 'Tutup', onClick: closeConfirm, variant: 'primary' },
-        });
-        return;
-      }
+      const { current } = availResp.data || { current: null };
+      const currentPromo = current && typeof current === 'object' ? (current as any) : null;
+      const currentCode = currentPromo?.kode_promo || '-';
+      openHeadlineConfirm(currentCode, runActivateHeadline);
+      return;
     } catch (e: any) {
       setConfirm({
         isOpen: true,
@@ -357,38 +410,6 @@ const DetailPromoPage: React.FC = () => {
       return;
     } finally {
       setHeadlineChecking(false);
-    }
-
-    try {
-      setHeadlineToggling(true);
-      await updatePromo(promoId, { is_headline_promo: true });
-      const refreshed = await getPromo(promoId);
-      const p = refreshed.data;
-      setPromo(p);
-      setIsHeadline(Boolean(p.is_headline_promo));
-      setConfirm({
-        isOpen: true,
-        onClose: closeConfirm,
-        icon: <RiCheckboxCircleFill />,
-        iconTone: 'success',
-        title: 'Headline promo diaktifkan',
-        texts: ['Status headline sekarang: ON.'],
-        align: 'center',
-        button1: { label: 'Tutup', onClick: closeConfirm, variant: 'primary' },
-      });
-    } catch (e: any) {
-      setConfirm({
-        isOpen: true,
-        onClose: closeConfirm,
-        icon: <RiCloseLine />,
-        iconTone: 'danger',
-        title: 'Gagal mengaktifkan headline promo',
-        texts: [e?.message || 'Terjadi kendala saat menyimpan perubahan.'],
-        align: 'center',
-        button1: { label: 'Tutup', onClick: closeConfirm, variant: 'primary' },
-      });
-    } finally {
-      setHeadlineToggling(false);
     }
   };
 

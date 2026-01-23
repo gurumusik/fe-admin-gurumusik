@@ -12,6 +12,7 @@ import type {
   SyllabusDraft,
   ProgramLite,
   RowMeta,
+  CompletionPoint,
   WizardState,
 } from './types';
 
@@ -26,6 +27,7 @@ const initialState: WizardState & {
   draftName: '',
   draftIconBase64: null,
   draftIsAbk: false,
+  draftIsActive: true,
   existingIconUrl: null,
 
   // program/rows
@@ -54,6 +56,35 @@ const initialState: WizardState & {
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
 const hasValidSyllabus = (d?: SyllabusDraft) =>
   !!(d && d.title?.trim() && (d.file_base64 || d.file_url || d.link_url));
+const normalizeCompletionPts = (raw: unknown): CompletionPoint[] => {
+  if (!Array.isArray(raw)) return [];
+  const parsed = raw
+    .map((item) => {
+      if (typeof item === 'string') {
+        const label = item.trim();
+        return label ? { label } : null;
+      }
+      if (item && typeof item === 'object') {
+        const label = String((item as any).label ?? '').trim();
+        if (!label) return null;
+        const key = typeof (item as any).key === 'string' ? (item as any).key : undefined;
+        const weightNum = Number((item as any).weight);
+        return {
+          label,
+          key: key && key.trim() ? key : undefined,
+          weight: Number.isFinite(weightNum) ? weightNum : undefined,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean) as Array<{ label: string; key?: string; weight?: number }>;
+
+  return parsed.map((item, idx) => ({
+    key: item.key ? item.key : `p${idx + 1}`,
+    label: item.label,
+    weight: Number.isFinite(item.weight as number) ? (item.weight as number) : 1,
+  }));
+};
 
 /* ========================= THUNKS ========================= */
 
@@ -146,7 +177,7 @@ export const loadRowsForInstrumentProgramThunk = createAsyncThunk<
             id: Number(s0.id),
             id_detail_program: Number(s0.id_detail_program),
             title: s0.title || `Silabus - ${row.nama_grade}`,
-            completion_pts: Array.isArray(s0.completion_pts) ? (s0.completion_pts as string[]) : [],
+            completion_pts: normalizeCompletionPts(s0.completion_pts),
             ...(s0.link_url
               ? { link_url: s0.link_url as string }
               : s0.file_path
@@ -199,6 +230,7 @@ export const submitWizardThunk = createAsyncThunk<
       nama_instrumen: s.draftName.trim(),
       icon_base64: s.draftIconBase64 || undefined,
       is_abk: s.draftIsAbk,
+      is_active: s.draftIsActive,
     });
     const instrumenId = (ins as any).data?.id ?? (ins as any).id;
     if (!instrumenId) return rejectWithValue('Gagal membuat instrumen');
@@ -317,6 +349,7 @@ export const prefillFromInstrumentThunk = createAsyncThunk<
         programId: firstProgramId,
         rows,
         isAbk: (ins as any)?.is_abk ?? false,
+        isActive: (ins as any)?.is_active ?? true,
       })
     );
     dispatch(setEditMode(true));
@@ -354,7 +387,7 @@ export const prefillFromInstrumentThunk = createAsyncThunk<
             id: Number(s0.id),
             id_detail_program: Number(s0.id_detail_program),
             title: s0.title || `${(ins as any).nama_instrumen} - ${row.nama_grade}`,
-            completion_pts: Array.isArray(s0.completion_pts) ? (s0.completion_pts as string[]) : [],
+            completion_pts: normalizeCompletionPts(s0.completion_pts),
             ...(s0.link_url
               ? { link_url: s0.link_url as string }
               : s0.file_path
@@ -398,7 +431,11 @@ export const submitWizardEditThunk = createAsyncThunk<
     if (!allHasSyllabus) throw new Error('Silabus wajib diisi untuk setiap grade sebelum menyimpan.');
 
     // 1) Update instrument (tetap instrumen yang sama → hindari "nama instrumen sudah dipakai")
-    const body: any = { nama_instrumen: s.draftName.trim(), is_abk: s.draftIsAbk };
+    const body: any = {
+      nama_instrumen: s.draftName.trim(),
+      is_abk: s.draftIsAbk,
+      is_active: s.draftIsActive,
+    };
     if (s.draftIconBase64) body.icon_base64 = s.draftIconBase64;
     if (s.programId && Array.isArray(s.rows) && s.rows.length > 0) {
       body.program_id = s.programId;
@@ -488,11 +525,12 @@ const slice = createSlice({
       state.isEditMode = !!a.payload;
     },
 
-    startDraft(state, a: PayloadAction<{ name: string; iconBase64?: string | null; isAbk?: boolean }>) {
+    startDraft(state, a: PayloadAction<{ name: string; iconBase64?: string | null; isAbk?: boolean; isActive?: boolean }>) {
       state.isEditMode = false;
       state.draftName = a.payload.name;
       state.draftIconBase64 = a.payload.iconBase64 ?? null;
       state.draftIsAbk = !!a.payload.isAbk;
+      state.draftIsActive = typeof a.payload.isActive === 'boolean' ? a.payload.isActive : true;
       state.existingIconUrl = null;
 
       state.rows = [{ id_grade: null, nama_grade: 'Grade I', base_harga: 0 }];
@@ -509,10 +547,11 @@ const slice = createSlice({
       state.pendingDeletes = [];
     },
 
-    patchDraft(state, a: PayloadAction<{ name?: string; iconBase64?: string | null; isAbk?: boolean }>) {
+    patchDraft(state, a: PayloadAction<{ name?: string; iconBase64?: string | null; isAbk?: boolean; isActive?: boolean }>) {
       if (typeof a.payload.name === 'string') state.draftName = a.payload.name;
       if ('iconBase64' in a.payload) state.draftIconBase64 = a.payload.iconBase64 ?? null;
       if ('isAbk' in a.payload) state.draftIsAbk = !!a.payload.isAbk;
+      if ('isActive' in a.payload) state.draftIsActive = !!a.payload.isActive;
     },
 
     setPrograms(state, a: PayloadAction<ProgramLite[]>) {
@@ -630,11 +669,14 @@ const slice = createSlice({
         programId: number | null;
         rows: WizardRow[];
         isAbk?: boolean;
+        isActive?: boolean;
       }>
     ) {
       state.draftName = a.payload.name ?? '';
       state.existingIconUrl = a.payload.icon ?? null;
       state.draftIsAbk = !!a.payload.isAbk;
+      state.draftIsActive =
+        typeof a.payload.isActive === 'boolean' ? a.payload.isActive : true;
       state.programId = typeof a.payload.programId === 'number' ? a.payload.programId : null;
       state.rows = Array.isArray(a.payload.rows) ? a.payload.rows : [];
       state.draftIconBase64 = null;

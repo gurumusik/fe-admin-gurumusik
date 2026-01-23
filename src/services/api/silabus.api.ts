@@ -8,7 +8,7 @@ export type CreateSilabusPayload = {
   file_base64?: string;    // image (data:image/..)
   file_url?: string;       // pdf (data:application/pdf;.. atau path publik)
   link_url?: string;       // external
-  completion_pts?: string[];
+  completion_pts?: Array<{ key: string; label: string; weight: number }>;
 };
 
 export async function createSilabus(payload: CreateSilabusPayload) {

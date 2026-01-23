@@ -21,6 +21,22 @@ const cls = (...xs: Array<string | false | null | undefined>) =>
 
 const MAX_MB = 25;
 
+const toLabelTargets = (pts: unknown) => {
+  if (!Array.isArray(pts) || pts.length === 0) return ["", "", ""];
+  const labels = pts
+    .map((p) => {
+      if (typeof p === "string") return p;
+      if (p && typeof p === "object") {
+        const label = (p as any).label;
+        return typeof label === "string" ? label : "";
+      }
+      return "";
+    })
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return labels.length ? labels : ["", "", ""];
+};
+
 const SylabusModal: React.FC<SylabusModalProps> = ({
   open,
   onClose,
@@ -45,9 +61,7 @@ const SylabusModal: React.FC<SylabusModalProps> = ({
 
   const [link, setLink] = React.useState(initial?.link_url ?? "");
   const [targets, setTargets] = React.useState<string[]>(
-    Array.isArray(initial?.completion_pts) && initial!.completion_pts.length > 0
-      ? (initial!.completion_pts as string[])
-      : ["", "", ""]
+    toLabelTargets(initial?.completion_pts)
   );
   const [fileName, setFileName] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -62,11 +76,7 @@ const SylabusModal: React.FC<SylabusModalProps> = ({
       setImageBase64(initial?.file_base64 ?? null);
       setPdfDataUrl(initial?.file_url ?? null);
       setLink(initial?.link_url ?? "");
-      setTargets(
-        Array.isArray(initial?.completion_pts) && initial!.completion_pts.length > 0
-          ? (initial!.completion_pts as string[])
-          : ["", "", ""]
-      );
+      setTargets(toLabelTargets(initial?.completion_pts));
       setFileName(null);
       setError(null);
     }
@@ -152,7 +162,11 @@ const SylabusModal: React.FC<SylabusModalProps> = ({
 
     const draft: SyllabusDraft = {
       title: title.trim(),
-      completion_pts: cleanTargets,
+      completion_pts: cleanTargets.map((label, idx) => ({
+        key: `p${idx + 1}`,
+        label,
+        weight: 1,
+      })),
       // Jika file dipilih, kirim salah satu (image → file_base64, pdf → file_url)
       file_base64: tab === "file" ? imageBase64 ?? null : null,
       file_url: tab === "file" ? pdfDataUrl ?? null : null,

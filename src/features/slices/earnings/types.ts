@@ -1,11 +1,17 @@
 // src/features/slices/earnings/types.ts
 
 import type {
-  EarningsChartPoint,
-  EarningsChartRange,
-  GetEarningsChartParams,
-  GetEarningsChartResp,
-} from '@/services/api/earnings.api';
+  AllTransactionsRecap,
+  AllTransactionsRecapPoint,
+  GetAllTransactionsRecapParams,
+  GetAllTransactionsRecapResp,
+} from '@/services/api/transaksi.api';
+
+export type EarningsChartPoint = AllTransactionsRecapPoint;
+export type EarningsRecap = AllTransactionsRecap;
+export type EarningsChartRange = { start_month: string; end_month: string };
+export type GetEarningsChartParams = GetAllTransactionsRecapParams;
+export type GetEarningsChartResp = GetAllTransactionsRecapResp;
 
 /** Status umum untuk async lifecycle di slice */
 export type SliceStatus = 'idle' | 'loading' | 'succeeded' | 'failed';
@@ -15,6 +21,10 @@ export type EarningsChartState = {
   points: EarningsChartPoint[];
   /** Range yang dikembalikan BE (atau null sebelum fetch) */
   range: EarningsChartRange | null;
+  /** Rekap untuk cards */
+  recap: EarningsRecap | null;
+  /** Rekap bulan sebelumnya (opsional jika butuh detail) */
+  previousRecap: EarningsRecap | null;
 
   /** Filter terakhir yang dipakai (untuk kontrol UI) */
   start_month: string | null;
@@ -22,12 +32,4 @@ export type EarningsChartState = {
 
   status: SliceStatus;
   error?: string | null;
-};
-
-/** Re-exports supaya gampang diimport */
-export type {
-  EarningsChartPoint,
-  EarningsChartRange,
-  GetEarningsChartParams,
-  GetEarningsChartResp,
 };

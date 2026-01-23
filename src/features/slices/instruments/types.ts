@@ -77,5 +77,5 @@ export type SyllabusDraft = {
   file_base64?: string | null;
   file_url?: string | null;
   link_url?: string | null;
-  completion_pts?: string[]; // sesuaikan dengan struktur yang kamu pakai
+  completion_pts?: Array<{ key: string; label: string; weight: number }>;
 };

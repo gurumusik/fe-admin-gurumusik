@@ -166,6 +166,21 @@ export const ManageFlashsalePage: React.FC = () => {
     return () => { on = false; };
   }, [isEdit, state?.id]);
 
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const endDateTooEarly = useMemo(() => {
+    if (!endDate) return false;
+    const [yy, mm, dd] = endDate.split('-').map((v) => Number(v));
+    if (!yy || !mm || !dd) return false;
+    const d = new Date(yy, mm - 1, dd);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() <= today.getTime();
+  }, [endDate, today]);
+
   const isValid = useMemo(() => {
     if (!flashType) return false;
     if (!startDate || !endDate) return false;
@@ -174,10 +189,11 @@ export const ManageFlashsalePage: React.FC = () => {
     if (!Number.isFinite(p) || p <= 0) return false;
     if (!Number.isFinite(q) || q <= 0) return false;
     if (new Date(startDate) > new Date(endDate)) return false;
+    if (endDateTooEarly) return false;
     if (flashType === "Tutor") return tutors.length > 0;
     if (flashType === "Modul") return modules.length > 0;
     return false;
-  }, [flashType, percent, quota, startDate, endDate, tutors.length, modules.length]);
+  }, [flashType, percent, quota, startDate, endDate, tutors.length, modules.length, endDateTooEarly]);
 
   const onRemoveTutor = (id: string) => setTutors(xs => xs.filter(t => t.id !== id));
   const onRemoveModul = (id: string) => setModules(xs => xs.filter(m => m.id !== id));
@@ -406,9 +422,17 @@ export const ManageFlashsalePage: React.FC = () => {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full rounded-xl border border-black/10 py-3 pr-4 pl-9 text-md outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
+                  className={[
+                    "w-full rounded-xl border py-3 pr-4 pl-9 text-md outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40",
+                    endDateTooEarly ? "border-red-400" : "border-black/10",
+                  ].join(" ")}
                 />
               </div>
+              {endDateTooEarly && (
+                <div className="text-sm text-red-500">
+                  Tanggal berakhir promo harus lebih dari hari ini!
+                </div>
+              )}
             </div>
           </div>
         </section>

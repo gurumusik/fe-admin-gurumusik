@@ -90,6 +90,21 @@ const AddPromoModal: React.FC<Props> = ({
     }
   }, [open]);
 
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const endDateTooEarly = useMemo(() => {
+    if (!endDate) return false;
+    const [yy, mm, dd] = endDate.split('-').map((v) => Number(v));
+    if (!yy || !mm || !dd) return false;
+    const d = new Date(yy, mm - 1, dd);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() <= today.getTime();
+  }, [endDate, today]);
+
   const canSubmit = useMemo(() => {
     const pct = Number(discountPct);
     const quota = Number(maxUsage);
@@ -103,9 +118,10 @@ const AddPromoModal: React.FC<Props> = ({
       !Number.isNaN(quota) && quota > 0 &&
       startDate &&
       endDate &&
-      new Date(startDate) <= new Date(endDate)
+      new Date(startDate) <= new Date(endDate) &&
+      !endDateTooEarly
     );
-  }, [code, promoTitle, bannerHeadline, html, discountPct, maxUsage, startDate, endDate]);
+  }, [code, promoTitle, bannerHeadline, html, discountPct, maxUsage, startDate, endDate, endDateTooEarly]);
 
   if (!open) return null;
 
@@ -286,10 +302,18 @@ const AddPromoModal: React.FC<Props> = ({
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-black/15 bg-white py-3 pl-10 pr-9 text-neutral-900 outline-none focus:border-(--secondary-color)"
+                className={[
+                  "w-full appearance-none rounded-xl border bg-white py-3 pl-10 pr-9 text-neutral-900 outline-none focus:border-(--secondary-color)",
+                  endDateTooEarly ? "border-red-400" : "border-black/15",
+                ].join(" ")}
               />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">▾</span>
             </div>
+            {endDateTooEarly && (
+              <div className="mt-1 text-sm text-red-500">
+                Tanggal berakhir promo harus lebih dari hari ini!
+              </div>
+            )}
           </div>
         </div>
 

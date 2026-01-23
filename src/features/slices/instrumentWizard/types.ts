@@ -6,11 +6,17 @@ export type WizardRow = {
   base_harga: number | '';
 };
 
+export type CompletionPoint = {
+  key: string;
+  label: string;
+  weight: number;
+};
+
 export type SyllabusDraft = {
   id?: number;                 // id silabus existing (edit)
   id_detail_program?: number;  // dp id (opsional)
   title: string;
-  completion_pts: string[];
+  completion_pts: CompletionPoint[];
   file_base64?: string | null; // IMAGE (data:image/..)
   file_url?: string | null;    // PDF/path atau data:application/pdf;...
   link_url?: string | null;    // http/https
@@ -33,6 +39,7 @@ export type WizardState = {
   draftName: string;
   draftIconBase64: string | null;
   draftIsAbk: boolean;
+  draftIsActive: boolean;
   existingIconUrl: string | null;
 
   // program/rows

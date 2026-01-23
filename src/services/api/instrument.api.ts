@@ -26,6 +26,7 @@ export type CreateInstrumentPayload = {
   icon_base64?: string;
   icon_url?: string;
   is_abk?: boolean;
+  is_active?: boolean;
 };
 
 /**
