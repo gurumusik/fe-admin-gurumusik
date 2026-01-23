@@ -132,6 +132,28 @@ const SlipKomisiPage: React.FC = () => {
   const [rejectFormError, setRejectFormError] = useState<string | null>(null);
   const [rejectError, setRejectError] = useState<string | null>(null);
 
+  const applyPayoutUpdate = (nextPayout: any) => {
+    if (!nextPayout) return;
+    const nextStatusCode =
+      (nextPayout as any).status_code ?? nextPayout.status ?? "";
+    setSlip((prev) =>
+      prev
+        ? {
+            ...prev,
+            payout: {
+              ...prev.payout,
+              status: nextPayout.status ?? prev.payout.status,
+              status_code: nextStatusCode || prev.payout.status_code,
+              amount_paid:
+                nextPayout.amount ?? prev.payout.amount_paid ?? null,
+              reference:
+                nextPayout.transfer_reference ?? prev.payout.reference ?? null,
+            },
+          }
+        : prev
+    );
+  };
+
   const fetchSlip = useCallback(() => {
     if (!Number.isFinite(payoutId)) return;
     let mounted = true;
@@ -282,7 +304,8 @@ const SlipKomisiPage: React.FC = () => {
     setActionStatus("loading");
     setActionError(null);
     try {
-      await decidePayoutGuru(payout.id, { action: "approve" });
+      const res = await decidePayoutGuru(payout.id, { action: "approve" });
+      applyPayoutUpdate(res?.data);
       setActionStatus("succeeded");
       setIsSuccessOpen(true);
       fetchSlip();
@@ -308,7 +331,8 @@ const SlipKomisiPage: React.FC = () => {
     setRejectFormError(null);
     setRejectError(null);
     try {
-      await decidePayoutGuru(payout.id, { action: "reject", reason });
+      const res = await decidePayoutGuru(payout.id, { action: "reject", reason });
+      applyPayoutUpdate(res?.data);
       setActionStatus("succeeded");
       setIsRejectOpen(false);
       setIsRejectSuccessOpen(true);
@@ -326,6 +350,10 @@ const SlipKomisiPage: React.FC = () => {
     setIsSuccessOpen(false);
     navigate("/dashboard-admin/tutor-commision/cashout-verification");
   };
+  const handleCloseRejectSuccess = () => {
+    setIsRejectSuccessOpen(false);
+    navigate("/dashboard-admin/tutor-commision/cashout-verification");
+  };
 
   return (
     <div className="min-h-screen bg-white py-6 print:bg-white">
@@ -333,6 +361,13 @@ const SlipKomisiPage: React.FC = () => {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard-admin/tutor-commision")}
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--secondary-color)] px-3 py-1.5 text-xs font-semibold text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
+            >
+              Kembali
+            </button>
             <img src={Logo} alt="GuruMusik.ID" className="h-9 w-9" />
             <div className="text-lg font-bold text-neutral-900">GuruMusik</div>
           </div>
@@ -620,7 +655,7 @@ const SlipKomisiPage: React.FC = () => {
           <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <button
               type="button"
-              onClick={() => setIsRejectSuccessOpen(false)}
+              onClick={handleCloseRejectSuccess}
               className="absolute right-4 top-4 text-neutral-500 hover:text-neutral-700"
               aria-label="Tutup"
             >

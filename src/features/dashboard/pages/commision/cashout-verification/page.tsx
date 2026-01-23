@@ -112,7 +112,7 @@ const CashoutVerificationPage: React.FC = () => {
           </div>
         )}
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/dashboard-admin/tutor-commision")}
           className="inline-flex items-center gap-2 rounded-full border border-[var(--secondary-color)] px-6 py-2 text-sm font-semibold text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
         >
           Kembali
@@ -127,7 +127,7 @@ const CashoutVerificationPage: React.FC = () => {
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-5">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/dashboard-admin/tutor-commision")}
             className="inline-flex items-center gap-2 rounded-xl border border-neutral-300 p-2 text-sm text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
           >
             <RiArrowLeftLine className="text-xl" />
