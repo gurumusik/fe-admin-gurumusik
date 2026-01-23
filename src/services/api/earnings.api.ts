@@ -47,7 +47,7 @@ export async function getEarningsChart(params?: GetEarningsChartParams) {
   const qstr = qs.toString() ? `?${qs.toString()}` : '';
 
   return baseUrl.request<GetEarningsChartResp>(
-    `${ENDPOINTS.EARNINGS.LIST}${qstr}`,
+    `${ENDPOINTS.EARNINGS.LIST()}${qstr}`,
     { method: 'GET' }
   );
 }

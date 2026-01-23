@@ -197,6 +197,48 @@ export type ListAllTransactionsParams = {
 export type ListAllTransactionsResp = ListPromoTransactionsResp;
 export type AllTransactionDTO = PromoTransactionDTO;
 
+// --- untuk /transaksi/recap ---
+export type AllTransactionsRecap = {
+  total_sum: number;
+  course_sum: number;
+  module_sum: number;
+  promo_sum: number;
+  fee_sum: number;
+  course_count: number;
+  module_count: number;
+  promo_tx_count: number;
+  delta_percent?: {
+    total_sum?: number | null;
+    course_sum?: number | null;
+    module_sum?: number | null;
+    promo_sum?: number | null;
+    fee_sum?: number | null;
+  };
+};
+
+export type AllTransactionsRecapPoint = {
+  /** 'YYYY-MM' */
+  month: string;
+  kursus: number;
+  modul: number;
+  total: number;
+  promo?: number;
+  fee?: number;
+};
+
+export type GetAllTransactionsRecapParams = {
+  start_month?: string;
+  end_month?: string;
+  net?: boolean;
+};
+
+export type GetAllTransactionsRecapResp = {
+  recap: AllTransactionsRecap;
+  previous_total_recap: AllTransactionsRecap;
+  range: { start_month: string; end_month: string };
+  points: AllTransactionsRecapPoint[];
+};
+
 /* ========================= HELPERS ========================= */
 
 export function mapTxStatusLabel(raw: TxStatusRaw): TxStatusLabel {
@@ -237,6 +279,19 @@ export async function listAllTransactions(params: ListAllTransactionsParams = {}
 
   return baseUrl.request<ListAllTransactionsResp>(
     `${ENDPOINTS.TRANSAKSI.ALL()}${qstr}`,
+    { method: 'GET' }
+  );
+}
+
+export async function getAllTransactionsRecap(params: GetAllTransactionsRecapParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.start_month) qs.set('start_month', params.start_month);
+  if (params.end_month) qs.set('end_month', params.end_month);
+  if (params.net) qs.set('net', 'true');
+  const qstr = qs.toString() ? `?${qs.toString()}` : '';
+
+  return baseUrl.request<GetAllTransactionsRecapResp>(
+    `${ENDPOINTS.TRANSAKSI.RECAP()}${qstr}`,
     { method: 'GET' }
   );
 }

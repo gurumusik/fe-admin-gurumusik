@@ -1,7 +1,7 @@
 // src/features/slices/earnings/slice.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import * as API from '@/services/api/earnings.api';
+import { getAllTransactionsRecap } from '@/services/api/transaksi.api';
 import type {
   EarningsChartState,
   GetEarningsChartParams,
@@ -13,6 +13,8 @@ const initialState: EarningsChartState = {
   range: null,
   start_month: null,
   end_month: null,
+  recap: null,
+  previousRecap: null,
   status: 'idle',
   error: null,
 };
@@ -23,7 +25,7 @@ export const fetchEarningsChartThunk = createAsyncThunk<
   { rejectValue: string }
 >('earnings/chart/fetch', async (params, { rejectWithValue }) => {
   try {
-    const res = await API.getEarningsChart(params);
+    const res = await getAllTransactionsRecap(params);
     return res as GetEarningsChartResp;
   } catch (e: any) {
     return rejectWithValue(e?.message ?? 'Gagal memuat chart pendapatan');
@@ -54,8 +56,10 @@ const earningsChartSlice = createSlice({
       s.status = 'succeeded';
       s.points = a.payload.points || [];
       s.range = a.payload.range || null;
+      s.recap = a.payload.recap ?? null;
+      s.previousRecap = a.payload.previous_total_recap ?? null;
 
-      // Simpan kembali range yang efektif dipakai (kalau user tidak kirim param, BE default 8 bulan)
+      // Simpan kembali range yang efektif dipakai
       const effStart = a.meta.arg?.start_month ?? a.payload.range?.start_month ?? null;
       const effEnd = a.meta.arg?.end_month ?? a.payload.range?.end_month ?? null;
       s.start_month = effStart;

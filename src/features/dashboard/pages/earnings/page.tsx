@@ -45,14 +45,13 @@ import type {
   TxStatusLabel,
   AllTransactionItem,
   TxStatusRaw,
-  AllTxRecap,
 } from "@/features/slices/transaksi/types";
 
 import {
   fetchEarningsChartThunk,
   setRange as setChartRange,
 } from "@/features/slices/earnings/slice";
-import type { EarningsChartPoint } from "@/features/slices/earnings/types";
+import type { EarningsChartPoint, EarningsRecap } from "@/features/slices/earnings/types";
 
 import { resolveImageUrl } from "@/utils/resolveImageUrl";
 
@@ -85,6 +84,18 @@ const cls = (...xs: Array<string | false | null | undefined>) =>
   xs.filter(Boolean).join(" ");
 
 const PAGE_SIZE = 5 as const;
+
+const EMPTY_RECAP: EarningsRecap = {
+  total_sum: 0,
+  course_sum: 0,
+  module_sum: 0,
+  promo_sum: 0,
+  fee_sum: 0,
+  course_count: 0,
+  module_count: 0,
+  promo_tx_count: 0,
+  delta_percent: {},
+};
 
 const typeChipCls = (t: string) =>
   t === "Video"
@@ -137,21 +148,6 @@ const TopBorderBar: React.FC<any> = (props) => {
 /* ===== util bulan/range untuk chart & picker ===== */
 const ID_MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
-] as const;
-
-const ID_MONTHS_LONG = [
-  "januari",
-  "februari",
-  "maret",
-  "april",
-  "mei",
-  "juni",
-  "juli",
-  "agustus",
-  "september",
-  "oktober",
-  "november",
-  "desember",
 ] as const;
 
 const MONTH_NAME_TO_INDEX: Record<string, number> = {
@@ -503,7 +499,7 @@ const AdminEarningsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // init chart earnings (default range)
+  // init/update chart earnings (range + mode)
   React.useEffect(() => {
     const months = parseRangeLabel(rangeLabel);
     if (!months.length) return;
@@ -513,9 +509,8 @@ const AdminEarningsPage: React.FC = () => {
     const endMonth = toYYYYMM(end.year, end.mIdx);
 
     dispatch(setChartRange({ start_month: startMonth, end_month: endMonth }));
-    dispatch(fetchEarningsChartThunk({ start_month: startMonth, end_month: endMonth }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    dispatch(fetchEarningsChartThunk({ start_month: startMonth, end_month: endMonth, net: netOnly }));
+  }, [dispatch, rangeLabel, netOnly]);
 
   // tab -> category
   React.useEffect(() => {
@@ -634,60 +629,14 @@ const AdminEarningsPage: React.FC = () => {
       });
   }, [tx.allItems, tab]);
 
-  /* ====== REKAP DINAMIS (gunakan recap dari BE; fallback FE) ====== */
-  const recap = React.useMemo(() => {
-    const r = tx.allRecap as AllTxRecap | (AllTxRecap & { by_month?: any[] }) | null | undefined;
-    if (r) return r;
-
-    // fallback: hitung dari items halaman ini
-    const rows = (tx.allItems as AllTransactionItem[] | any[]) || [];
-    let course_sum = 0, module_sum = 0, promo_sum = 0;
-    let course_count = 0, module_count = 0, promo_tx_count = 0;
-
-    for (const it of rows) {
-      const typeStr = String(it?.type || it?.category_transaksi || "").toLowerCase();
-      const price = Number(it?.price ?? it?.total_harga ?? 0);
-      if (typeStr === "modul") { module_sum += price; module_count += 1; }
-      else { course_sum += price; course_count += 1; }
-      const percent = Number(it?.promo?.percent ?? 0);
-      if (percent > 0) { promo_sum += price * (percent / 100); promo_tx_count += 1; }
-    }
-
-    return {
-      total_sum: course_sum + module_sum,
-      course_sum,
-      module_sum,
-      promo_sum,
-      course_count,
-      module_count,
-      promo_tx_count,
-    } as any;
-  }, [tx.allRecap, tx.allItems]);
+  /* ====== REKAP DINAMIS (langsung dari API) ====== */
+  const recap = React.useMemo(() => earnings.recap ?? EMPTY_RECAP, [earnings.recap]);
 
   // ====== DATA CHART PER BULAN ======
   const monthlyPerfData = React.useMemo(() => {
     const months = parseRangeLabel(rangeLabel);
+    if (!months.length) return [];
 
-    // 1) Coba pakai monthlyrecap dari endpoint listAllTransactions
-    const recapThisYear = (tx as any).monthlyrecap?.["this year"];
-
-    if (recapThisYear && months.length > 0) {
-      return months.map((p) => {
-        const longKey = ID_MONTHS_LONG[p.mIdx]; // "desember", "juli", dll
-        const src = recapThisYear[longKey] || {};
-
-        return {
-          month: p.label, // "Des", "Jul", dst (dipakai XAxis & tooltip)
-          total: Number(src.total_sum ?? 0),
-          course: Number(src.course_sum ?? 0),
-          module: Number(src.module_sum ?? 0),
-          promo: Number(src.promo_sum ?? 0),
-          fee: Number(src.fee_sum ?? 0),
-        };
-      });
-    }
-
-    // 2) Fallback: kalau nanti kamu bener2 pakai endpoint earnings (GetEarningsChartResp)
     const base = months.map((p) => {
       const key = toYYYYMM(p.year, p.mIdx); // 'YYYY-MM'
       return {
@@ -728,9 +677,9 @@ const AdminEarningsPage: React.FC = () => {
     // buang _k sebelum dikirim ke Recharts
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     return base.map(({ _k, ...rest }) => rest);
-  }, [rangeLabel, tx, earnings.points]);
+  }, [rangeLabel, earnings.points]);
 
-    // Y-axis dinamis (kelipatan 10.000)
+  // Y-axis dinamis (kelipatan 10.000)
   const { yDomainMax, yTicks } = React.useMemo(() => {
     if (!monthlyPerfData.length) {
       // default kalau belum ada data
@@ -752,6 +701,66 @@ const AdminEarningsPage: React.FC = () => {
 
     return { yDomainMax: roundedMax, yTicks: ticks };
   }, [monthlyPerfData]);
+
+  const monthlyPerfDelta = React.useMemo(() => {
+    const months = parseRangeLabel(rangeLabel);
+    if (!months.length || monthlyPerfData.length < 2) {
+      return { ready: false } as const;
+    }
+
+    const now = new Date();
+    let targetIdx = months.findIndex(
+      (m) => m.year === now.getFullYear() && m.mIdx === now.getMonth()
+    );
+    if (targetIdx < 0) targetIdx = months.length - 1;
+    const prevIdx = targetIdx - 1;
+    if (prevIdx < 0) {
+      return { ready: false } as const;
+    }
+
+    const curr = monthlyPerfData[targetIdx] || {};
+    const prev = monthlyPerfData[prevIdx] || {};
+
+    const calc = (key: "total" | "course" | "module" | "promo" | "fee") => {
+      const c = Number((curr as any)[key] ?? 0);
+      const p = Number((prev as any)[key] ?? 0);
+      if (!(p > 0)) return null;
+      return ((c - p) / p) * 100;
+    };
+
+    return {
+      ready: true,
+      values: {
+        total: calc("total"),
+        course: calc("course"),
+        module: calc("module"),
+        promo: calc("promo"),
+        fee: calc("fee"),
+      },
+    } as const;
+  }, [monthlyPerfData, rangeLabel]);
+
+  const deltaValue = React.useCallback(
+    (key: "total" | "course" | "module" | "promo" | "fee") => {
+      if (monthlyPerfDelta.ready) {
+        return monthlyPerfDelta.values?.[key] ?? null;
+      }
+
+      const mapKey =
+        key === "total"
+          ? "total_sum"
+          : key === "course"
+          ? "course_sum"
+          : key === "module"
+          ? "module_sum"
+          : key === "promo"
+          ? "promo_sum"
+          : "fee_sum";
+
+      return (recap as any)?.delta_percent?.[mapKey];
+    },
+    [monthlyPerfDelta, recap]
+  );
 
   const fmt = (n: number) =>
     n.toLocaleString("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 });
@@ -830,7 +839,7 @@ const AdminEarningsPage: React.FC = () => {
                     {fmt((recap as any).total_sum ?? 0)}
                   </div>
                   <div className="mt-1 inline-flex items-center text-sm text-[var(--accent-green-color)]">
-                    <DeltaBadge value={(recap as any)?.delta_percent?.total_sum} />
+                    <DeltaBadge value={deltaValue("total")} />
                   </div>
                 </div>
                 <div className="mt-3 text-sm text-[#0B1220]">
@@ -846,7 +855,7 @@ const AdminEarningsPage: React.FC = () => {
                     {fmt((recap as any).course_sum ?? 0)}
                   </div>
                   <div className="mt-1 inline-flex items-center text-sm text-[var(--accent-green-color)]">
-                    <DeltaBadge value={(recap as any)?.delta_percent?.course_sum} />
+                    <DeltaBadge value={deltaValue("course")} />
                   </div>
                 </div>
                 <div className="mt-3 text-sm text-[#0B1220]">
@@ -862,7 +871,7 @@ const AdminEarningsPage: React.FC = () => {
                     {fmt((recap as any).module_sum ?? 0)}
                   </div>
                   <div className="mt-1 inline-flex items-center text-sm text-[var(--accent-green-color)]">
-                    <DeltaBadge value={(recap as any)?.delta_percent?.module_sum} />
+                    <DeltaBadge value={deltaValue("module")} />
                   </div>
                 </div>
                 <div className="mt-3 text-sm text-[#0B1220]">
@@ -878,7 +887,7 @@ const AdminEarningsPage: React.FC = () => {
                     {`-${fmt((recap as any).promo_sum ?? 0)}`}
                   </div>
                   <div className="mt-1 inline-flex items-center text-sm text-[var(--accent-green-color)]">
-                    <DeltaBadge value={(recap as any)?.delta_percent?.promo_sum} />
+                    <DeltaBadge value={deltaValue("promo")} />
                   </div>
                 </div>
                 <div className="mt-3 text-sm text-[#0B1220]">
@@ -894,7 +903,7 @@ const AdminEarningsPage: React.FC = () => {
                   </div>
                   {/* kalau nanti BE kirim delta_percent.fee_sum bisa langsung kebaca */}
                   <div className="mt-1 inline-flex items-center text-sm text-[var(--accent-green-color)]">
-                    <DeltaBadge value={(recap as any)?.delta_percent?.fee_sum} />
+                    <DeltaBadge value={deltaValue("fee")} />
                   </div>
                 </div>
                 <div className="mt-3 text-sm text-[#0B1220]">
@@ -1207,16 +1216,6 @@ const AdminEarningsPage: React.FC = () => {
         onApply={(lbl) => {
           setRangeLabel(lbl);
           setRangeOpen(false);
-
-          const months = parseRangeLabel(lbl);
-          if (!months.length) return;
-          const start = months[0];
-          const end = months[months.length - 1];
-          const startMonth = toYYYYMM(start.year, start.mIdx);
-          const endMonth = toYYYYMM(end.year, end.mIdx);
-
-          dispatch(setChartRange({ start_month: startMonth, end_month: endMonth }));
-          dispatch(fetchEarningsChartThunk({ start_month: startMonth, end_month: endMonth }));
         }}
         onClose={() => setRangeOpen(false)}
       />

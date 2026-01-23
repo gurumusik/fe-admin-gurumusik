@@ -352,14 +352,6 @@ const ManageProgramPage: React.FC = () => {
                       >
                         Edit
                       </button>
-                      <button
-                        type="button"
-                        disabled //menunggu alur hapus
-                        onClick={() => openDeleteConfirm(program)}
-                        className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium text-white bg-red-500 hover:bg-red-600"
-                      >
-                        Hapus
-                      </button>
                     </td>
                   </tr>
                 ))

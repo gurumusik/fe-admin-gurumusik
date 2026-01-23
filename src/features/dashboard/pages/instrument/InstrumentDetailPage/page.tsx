@@ -50,9 +50,33 @@ import { resolveImageUrl } from "@/utils/resolveImageUrl";
 const toTitle = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const slugify = (s: string) =>
   s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+const formatRupiahInput = (n: number) =>
+  `Rp. ${new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(n)}`;
 
 const hasValidSyllabus = (d?: WizardSyllabusDraft) =>
   !!(d && d.title?.trim() && (d.file_base64 || d.file_url || d.link_url));
+const normalizeCompletionPts = (pts: unknown) => {
+  if (!Array.isArray(pts) || pts.length === 0) return [];
+  const labels = pts
+    .map((p) => {
+      if (typeof p === "string") return p;
+      if (p && typeof p === "object") {
+        const label = (p as any).label;
+        return typeof label === "string" ? label : "";
+      }
+      return "";
+    })
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return labels.map((label, idx) => ({
+    key: `p${idx + 1}`,
+    label,
+    weight: 1,
+  }));
+};
 
 const InstrumentDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -189,6 +213,18 @@ const InstrumentDetailPage: React.FC = () => {
   // Lazy load flag (grade + detail program + silabus)
   const isContentLoading = wizard.status === "loading";
 
+  const handleToggleActive = () => {
+    if (isSubmitting) return;
+    setHasUnsavedChanges(true);
+    dispatch(patchDraft({ isActive: !wizard.draftIsActive }));
+  };
+
+  const handleToggleAbk = () => {
+    if (isSubmitting) return;
+    setHasUnsavedChanges(true);
+    dispatch(patchDraft({ isAbk: !wizard.draftIsAbk }));
+  };
+
   // ====== Sylabus (draft) handlers ======
   const handleOpenSylabus = (idx: number) => {
     setCurrentRowIndex(idx);
@@ -217,8 +253,9 @@ const InstrumentDetailPage: React.FC = () => {
           ...(prev || {}),
           ...draft,
           title,
-          completion_pts:
-            draft.completion_pts ?? prev?.completion_pts ?? [],
+          completion_pts: normalizeCompletionPts(
+            draft.completion_pts ?? prev?.completion_pts
+          ),
         },
       })
     );
@@ -393,6 +430,41 @@ const InstrumentDetailPage: React.FC = () => {
               <p className="text-[13px] text-[#6B7E93]">
                 Total Level: {Math.max(1, wizard.rows.length)}
               </p>
+              <div className="mt-1 flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    wizard.draftIsActive
+                      ? "bg-[var(--accent-green-light-color)] text-[var(--accent-green-color)]"
+                      : "bg-[var(--primary-light-color)] text-[var(--accent-red-color)]"
+                  }`}
+                  title={wizard.draftIsActive ? "Aktif" : "Nonaktif"}
+                >
+                  {wizard.draftIsActive ? "Aktif" : "Nonaktif"}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleToggleActive}
+                  aria-pressed={wizard.draftIsActive}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full border transition disabled:opacity-60 ${
+                    wizard.draftIsActive
+                      ? "bg-[#10B981] border-[#10B981]"
+                      : "bg-[#E6EDF5] border-[#C7D5E5]"
+                  }`}
+                  title={
+                    wizard.draftIsActive
+                      ? "Nonaktifkan instrumen"
+                      : "Aktifkan instrumen"
+                  }
+                  disabled={isSubmitting}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${
+                      wizard.draftIsActive ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                  <span className="sr-only">Toggle status instrumen</span>
+                </button>
+              </div>
             </div>
             <button
               type="button"
@@ -409,6 +481,30 @@ const InstrumentDetailPage: React.FC = () => {
             className="flex items-center gap-3 relative"
             data-program-dropdown
           >
+            <div className="flex items-center gap-2 rounded-full border border-[#B8C8DA] px-3 h-10">
+              <span className="text-[13px] font-semibold text-[#6B7E93]">
+                ABK
+              </span>
+              <button
+                type="button"
+                onClick={handleToggleAbk}
+                aria-pressed={wizard.draftIsAbk}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full border transition disabled:opacity-60 ${
+                  wizard.draftIsAbk
+                    ? "bg-[var(--secondary-color,#0682DF)] border-[var(--secondary-color,#0682DF)]"
+                    : "bg-[#E6EDF5] border-[#C7D5E5]"
+                }`}
+                title={wizard.draftIsAbk ? "Instrumen ABK" : "Instrumen reguler"}
+                disabled={isSubmitting}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${
+                    wizard.draftIsAbk ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+                <span className="sr-only">Toggle instrumen ABK</span>
+              </button>
+            </div>
             <button
               type="button"
               onClick={handleProgramButtonClick}
@@ -539,12 +635,16 @@ const InstrumentDetailPage: React.FC = () => {
                             Harga Per Sesi
                           </label>
                           <input
-                            value={String(row.base_harga ?? "")}
+                            value={
+                              row.base_harga === "" || row.base_harga == null
+                                ? ""
+                                : formatRupiahInput(row.base_harga)
+                            }
                             onChange={(e) =>
                               handleChangeHarga(idx, e.target.value)
                             }
                             className="w-full rounded-xl border border-[#B8C8DA] bg-white px-4 py-3 text-[15px] outline-none focus:ring-2 focus:ring-neutral-200"
-                            placeholder="Rp0"
+                            placeholder="Rp. 0"
                             inputMode="numeric"
                             disabled={isSubmitting || isMarkedDelete}
                           />
