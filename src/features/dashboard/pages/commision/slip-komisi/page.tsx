@@ -51,8 +51,7 @@ const fmtTanggalID = (iso?: string | null) => {
   return `${d.getDate()} ${bulanID[d.getMonth()]} ${d.getFullYear()}`;
 };
 
-const fmtPeriode = (start?: string | null, end?: string | null) =>
-  start && end ? `${fmtTanggalID(start)} - ${fmtTanggalID(end)}` : "-";
+const fmtTanggal = (value?: string | null) => fmtTanggalID(value);
 
 const toWordsID = (n: number): string => {
   const angka = [
@@ -220,7 +219,6 @@ const SlipKomisiPage: React.FC = () => {
   const {
     slip_no,
     untuk,
-    periode,
     tanggal_pencairan,
     pendapatan,
     potongan,
@@ -358,7 +356,7 @@ const SlipKomisiPage: React.FC = () => {
               Aplikator : PT PRIMAVISTA NADA NUSANTARA
             </div>
             <div className="font-semibold">
-              Periode : {fmtPeriode(periode?.start, periode?.end)}
+              Tanggal : {fmtTanggal(tanggal_pencairan)}
             </div>
           </div>
 
