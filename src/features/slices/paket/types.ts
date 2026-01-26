@@ -18,6 +18,7 @@ export type Paket = {
   diskon_promo?: number | null;
   is_hobby?: boolean | null;
   is_internasional?: boolean | null;
+  is_trial?: boolean | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -60,6 +61,7 @@ export type CreatePaketPayload = {
   package_by?: PaketGroupKey;
   is_hobby?: boolean | null;
   is_internasional?: boolean | null;
+  is_trial?: boolean | null;
 };
 
 export type UpdatePaketPayload = {
