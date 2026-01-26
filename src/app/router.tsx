@@ -25,6 +25,7 @@ import ManageFlashsalePage from "@/features/dashboard/pages/manage-promo/manage-
 import TutorCommisionPage from "@/features/dashboard/pages/commision/page";
 import AuditCommisionPage from "@/features/dashboard/pages/commision/audit-commision/page";
 import CashoutVerificationPage from "@/features/dashboard/pages/commision/cashout-verification/page";
+import SlipKomisiPage from "@/features/dashboard/pages/commision/slip-komisi/page";
 import RequestModulePage from "@/features/dashboard/pages/module/request-module/page";
 import DetailRequestModulePage from "@/features/dashboard/pages/module/request-module/detail-request/page";
 import ProfileTutorPage from "@/features/dashboard/pages/tutor-list/class-list-tutor/profile-tutor/page";
@@ -44,6 +45,14 @@ export const router = createBrowserRouter([
       { path: "/login", element: <LoginPage /> },
       // ...public routes
     ],
+  },
+  {
+    path: "/withdraw/slip/:id",
+    element: (
+      <AdminGuard>
+        <SlipKomisiPage />
+      </AdminGuard>
+    ),
   },
   {
     element: (

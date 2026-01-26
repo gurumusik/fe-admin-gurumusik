@@ -158,7 +158,7 @@ const AdminCommissionPage: React.FC = () => {
 
   /* ------- State: Riwayat Komisi (UI) ------- */
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] =
+  const [typeFilter] =
     useState<"Semua" | "Regular" | "Early">("Semua");
 
   // server-side pagination (dari slice)
@@ -203,7 +203,6 @@ const AdminCommissionPage: React.FC = () => {
         id: "teachers",
         title: "Jumlah Guru",
         amount: jmlGuru,
-        footer: "Dibayar setiap tanggal 28",
         tone: "primary",
       },
       {
@@ -316,11 +315,6 @@ const AdminCommissionPage: React.FC = () => {
               >
                 <div className="flex items-center justify-between">
                   <p className="text-md text-[#0B1220]">{c.title}</p>
-                  {c.id === "teachers" && (
-                    <span className="text-sm text-[#6A7B98]">
-                      Dibayar setiap tanggal 28
-                    </span>
-                  )}
                 </div>
 
                 <div className="mt-2 flex items-start justify-between">
@@ -337,18 +331,6 @@ const AdminCommissionPage: React.FC = () => {
                   </div>
 
                   <div className="self-end">
-                    {c.id === "teachers" && (
-                      <button
-                        onClick={() =>
-                          navigate(
-                            "/dashboard-admin/tutor-commision/audit-commision"
-                          )
-                        }
-                        className="rounded-xl border border-[var(--secondary-color)] px-3 py-2 text-sm font-semibold text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
-                      >
-                        Kirim Komisi
-                      </button>
-                    )}
                     {c.id === "requests" && (
                       <button
                         onClick={() =>
@@ -535,46 +517,14 @@ const AdminCommissionPage: React.FC = () => {
                 />
               </div>
 
-              <button
-                onClick={() => {
-                  const next =
-                    typeFilter === "Semua"
-                      ? "Regular"
-                      : typeFilter === "Regular"
-                      ? "Early"
-                      : "Semua";
-                  dispatch(
-                    fetchPayoutGuruListThunk({
-                      page: 1,
-                      limit,
-                      sort_by: "paid_at",
-                      sort_dir: "DESC",
-                      status: "paid", // tetap paid
-                      type:
-                        next === "Semua"
-                          ? undefined
-                          : next === "Regular"
-                          ? "regular"
-                          : "early",
-                      search: search.trim() || undefined,
-                    })
-                  );
-                  setTypeFilter(next);
-                }}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--secondary-light-color)] bg-white px-4 text-sm hover:bg-[var(--secondary-light-color)]"
-                title="Klik untuk berganti: Semua → Regular → Early"
-              >
-                <span>{typeFilter === "Semua" ? "Pilih Tipe" : typeFilter}</span>
-                <RiArrowDownSLine size={18} />
-              </button>
 
               <button
                 type="button"
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--secondary-light-color)] bg-white px-4 text-sm hover:bg-[var(--secondary-light-color)]"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--secondary-light-color)] bg-white px-4 text-sm hover:bg-[var(--secondary-light-color)] focused:border-[var(--secondary-light-color)]"
               >
                 <RiCalendar2Line
                   size={18}
-                  className="text:[var(--secondary-color)]"
+                  className="text-[var(--secondary-color)]"
                 />
                 <span>30 Hari Terakhir</span>
                 <RiArrowDownSLine size={18} />
@@ -619,12 +569,11 @@ const AdminCommissionPage: React.FC = () => {
                     const foto = resolveImageUrl(r.guru?.profile_pic_url ?? null);
                     const nama = r.guru?.nama ?? `Guru #${r.id_guru}`;
                     const tipeLabel = r.type === "early" ? "Pengajuan" : "Otomatis";
-                    const komisi = r.amount == null ? "-" : formatRupiah(r.amount);
+                    const komisi = r.amount_requested == null ? "-" : formatRupiah(r.amount_requested);
                     const tanggal = r.paid_at ? new Date(r.paid_at).toLocaleDateString("id-ID") : "-";
 
                     // ⬇️ NEW: boleh unduh slip hanya jika ada transfer_reference
-                    const canDownloadSlip =
-                      !!(r.transfer_reference && String(r.transfer_reference).trim());
+                    const canOpenSlip = Number.isFinite(r.id);
 
                     return (
                       <tr key={r.id} className="border-t border-[var(--secondary-light-color)]">
@@ -643,20 +592,20 @@ const AdminCommissionPage: React.FC = () => {
                           <button
                             className={cls(
                               "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold",
-                              canDownloadSlip
+                              canOpenSlip
                                 ? "border-[var(--secondary-color)] text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
                                 : "border-slate-300 text-slate-400 cursor-not-allowed opacity-60"
                             )}
                             onClick={() => {
-                              if (!canDownloadSlip) return;
-                              /* TODO: download slip by r.files?. */
+                              if (!canOpenSlip) return;
+                              navigate(`/withdraw/slip/${r.id}`);
                             }}
                             title={
-                              canDownloadSlip
-                                ? "Unduh Slip Komisi"
-                                : "Slip belum tersedia (transfer reference belum ada)"
+                              canOpenSlip
+                                ? "Lihat Slip Komisi"
+                                : "Slip tidak tersedia"
                             }
-                            disabled={!canDownloadSlip}
+                            disabled={!canOpenSlip}
                           >
                             <RiDownloadLine />
                             <span>Slip Komisi</span>
