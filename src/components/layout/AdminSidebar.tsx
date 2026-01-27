@@ -181,7 +181,7 @@ const AdminSidebar: React.FC = () => {
                 />
                 <SubItem
                   to="/dashboard-admin/certificate-instrument"
-                  label="Certificate Instruments"
+                  label="Certificate Instrument"
                   active={isUnder("/dashboard-admin/certificate-instrument")}
                 />
               </div>
