@@ -222,7 +222,7 @@ const CommisionAuditPage: React.FC = () => {
               selectedCount === 0 && "opacity-60 cursor-not-allowed"
             )}
           >
-            Kirim Slip Komisi
+            Kirim Slip Komisi 
           </button>
         </div>
       </header>
