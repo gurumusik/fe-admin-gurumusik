@@ -148,7 +148,8 @@ export const ENDPOINTS = {
   },
 
   SERTIFIKAT: {
-    UPDATE: (id: number | string) => `/sertifikat/${id}/status`
+    UPDATE: (id: number | string) => `/sertifikat/${id}/status`,
+    PENDING: '/sertifikat/pending',
   },
 
   WILAYAH: {

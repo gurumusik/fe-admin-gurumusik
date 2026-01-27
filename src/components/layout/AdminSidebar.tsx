@@ -21,7 +21,7 @@ const DropWrap: React.FC<{ open: boolean; className?: string; children: React.Re
 }) => (
   <div
     className={`overflow-hidden transition-all duration-200 ease-out origin-top ${
-      open ? "max-h-64 opacity-100 scale-y-100" : "max-h-0 opacity-0 scale-y-95"
+      open ? "max-h-[80vh] opacity-100 scale-y-100" : "max-h-0 opacity-0 scale-y-95"
     } ${className}`}
   >
     {children}
@@ -62,6 +62,7 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/paket",
     "/dashboard-admin/instrument",
     "/dashboard-admin/module",
+    "/dashboard-admin/certificate-instrument",
   ];
   const financePrefixes = [
     "/dashboard-admin/earnings",
@@ -177,6 +178,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/module"
                   label="Module"
                   active={isUnder("/dashboard-admin/module")}
+                />
+                <SubItem
+                  to="/dashboard-admin/certificate-instrument"
+                  label="Certificate Instruments"
+                  active={isUnder("/dashboard-admin/certificate-instrument")}
                 />
               </div>
             </DropWrap>

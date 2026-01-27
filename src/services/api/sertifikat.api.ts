@@ -32,6 +32,11 @@ export async function patchSertifikatStatus(
   });
 }
 
+// List pending sertifikat (admin)
+export async function listPendingGuruSertifikat() {
+  return baseUrl.request<any>(ENDPOINTS.SERTIFIKAT.PENDING, { method: 'GET' });
+}
+
 // Helper
 export async function approveSertifikat(id: number | string) {
   return patchSertifikatStatus(id, { status: 'approved' });
