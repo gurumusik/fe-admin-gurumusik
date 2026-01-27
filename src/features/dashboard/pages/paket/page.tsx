@@ -1,5 +1,6 @@
 // src/features/dashboard/pages/paket/page.tsx
 import React, {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -34,6 +35,7 @@ type PaketForm = {
   benefits: string[];
   details: PaketDetail[];
   diskon_promo: string;
+  is_trial: boolean;
 };
 
 const initialForm: PaketForm = {
@@ -43,6 +45,7 @@ const initialForm: PaketForm = {
   benefits: [],
   details: [],
   diskon_promo: "",
+  is_trial: false,
 };
 
 const toStringArray = (value?: string | string[] | null): string[] => {
@@ -171,6 +174,9 @@ const ManagePaketPage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<Paket | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [trialWarningOpen, setTrialWarningOpen] = useState(false);
+  const [trialWarningMessage, setTrialWarningMessage] = useState("");
+  const [trialWarningTitle, setTrialWarningTitle] = useState("");
 
   const openResultModal = (
     kind: "success" | "error",
@@ -206,6 +212,37 @@ const ManagePaketPage: React.FC = () => {
       internasional: normalize(grouped?.internasional),
     };
   }, [grouped]);
+
+  const groupTitleMap = useMemo(
+    () => ({
+      general: "General",
+      hobby: "Hobby",
+      internasional: "Internasional",
+    }),
+    []
+  );
+
+  const findTrialConflict = useCallback(
+    (groupKey: PaketGroupKey, ignoreId?: number | null) =>
+      (safeGrouped?.[groupKey] || []).find(
+        (p) => p?.is_trial && p?.id !== ignoreId
+      ),
+    [safeGrouped]
+  );
+
+  const openTrialWarning = useCallback(
+    (groupKey: PaketGroupKey, existing?: Paket | null) => {
+      const groupTitle = groupTitleMap[groupKey] || "paket";
+      setTrialWarningTitle("Paket trial sudah ada");
+      setTrialWarningMessage(
+        existing?.nama_paket
+          ? `Paket trial untuk kategori ${groupTitle} sudah ditetapkan pada "${existing.nama_paket}". Nonaktifkan dulu paket trial tersebut sebelum memilih paket trial lain.`
+          : `Paket trial untuk kategori ${groupTitle} sudah ditetapkan. Nonaktifkan dulu paket trial yang ada sebelum memilih paket trial lain.`
+      );
+      setTrialWarningOpen(true);
+    },
+    [groupTitleMap]
+  );
 
   const filteredGrouped = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -267,6 +304,7 @@ const ManagePaketPage: React.FC = () => {
         paket?.diskon_promo !== undefined && paket.diskon_promo !== null
           ? String(paket.diskon_promo)
           : "",
+      is_trial: Boolean(paket?.is_trial),
     });
     setBenefitInput("");
     setDetailLabel("");
@@ -284,6 +322,28 @@ const ManagePaketPage: React.FC = () => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
+
+  const handleTrialToggle = (nextValue: boolean) => {
+    if (!nextValue) {
+      setForm((prev) => ({ ...prev, is_trial: false }));
+      return;
+    }
+    const conflict = findTrialConflict(packageType, selectedPaket?.id ?? null);
+    if (conflict) {
+      openTrialWarning(packageType, conflict);
+      return;
+    }
+    setForm((prev) => ({ ...prev, is_trial: true }));
+  };
+
+  useEffect(() => {
+    if (!form.is_trial) return;
+    const conflict = findTrialConflict(packageType, selectedPaket?.id ?? null);
+    if (conflict) {
+      setForm((prev) => ({ ...prev, is_trial: false }));
+      openTrialWarning(packageType, conflict);
+    }
+  }, [form.is_trial, packageType, selectedPaket?.id, findTrialConflict, openTrialWarning]);
 
   const handleAddBenefit = () => {
     const trimmed = benefitInput.trim();
@@ -350,6 +410,7 @@ const ManagePaketPage: React.FC = () => {
       package_by: packageType,
       is_hobby: isHobby,
       is_internasional: isInternasional,
+      is_trial: form.is_trial,
     };
 
     setSubmitting(true);
@@ -460,8 +521,15 @@ const ManagePaketPage: React.FC = () => {
           className="border-b border-neutral-100 hover:bg-neutral-50/60 transition"
         >
           <td className="px-4 py-3 align-top">
-            <div className="font-medium text-lg">
-              {paket?.nama_paket ?? "(tanpa nama)"}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-medium text-lg">
+                {paket?.nama_paket ?? "(tanpa nama)"}
+              </div>
+              {paket?.is_trial ? (
+                <span className="inline-flex items-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold">
+                  Trial
+                </span>
+              ) : null}
             </div>
             {paket?.deskripsi && (
               <p className="mt-1 text-sm text-neutral-500 line-clamp-2">
@@ -744,6 +812,28 @@ const ManagePaketPage: React.FC = () => {
                 </div>
               </div>
 
+              <div className="flex items-center gap-2">
+                <input
+                  id="is_trial"
+                  type="checkbox"
+                  checked={form.is_trial}
+                  onChange={(e) => handleTrialToggle(e.target.checked)}
+                  className="h-4 w-4 rounded border-neutral-300 text-[var(--primary-color,#111827)] focus:ring-[var(--primary-color,#111827)]"
+                />
+                <label htmlFor="is_trial" className="text-sm text-neutral-700">
+                  Tandai sebagai paket trial
+                </label>
+                <span
+                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                    form.is_trial
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-neutral-100 text-neutral-500 border-neutral-200"
+                  }`}
+                >
+                  {form.is_trial ? "Aktif" : "Nonaktif"}
+                </span>
+              </div>
+
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium text-neutral-700">
                   Jenis Paket
@@ -971,6 +1061,23 @@ const ManagePaketPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={trialWarningOpen}
+        onClose={() => setTrialWarningOpen(false)}
+        icon={<RiQuestionFill />}
+        iconTone="warning"
+        title={trialWarningTitle || "Peringatan"}
+        texts={[trialWarningMessage]}
+        align="center"
+        widthClass="max-w-lg"
+        button1={{
+          label: "Mengerti",
+          onClick: () => setTrialWarningOpen(false),
+          variant: "primary",
+        }}
+        showCloseIcon
+      />
 
       <ConfirmationModal
         isOpen={deleteModalOpen}
