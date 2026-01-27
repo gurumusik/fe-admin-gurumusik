@@ -90,10 +90,10 @@ const ManageProgramPage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<Program | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const openDeleteConfirm = (program: Program) => {
-    setDeleteTarget(program);
-    setDeleteModalOpen(true);
-  };
+  // const openDeleteConfirm = (program: Program) => {
+  //   setDeleteTarget(program);
+  //   setDeleteModalOpen(true);
+  // };
   const closeDeleteConfirm = () => {
     if (deleting) return;
     setDeleteModalOpen(false);
