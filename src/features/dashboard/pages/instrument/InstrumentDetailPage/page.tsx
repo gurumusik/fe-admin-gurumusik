@@ -428,7 +428,7 @@ const InstrumentDetailPage: React.FC = () => {
                 </h1>
               </div>
               <p className="text-[13px] text-[#6B7E93]">
-                Total Level: {Math.max(1, wizard.rows.length)} 
+                Total Level: {Math.max(1, wizard.rows.length)}
               </p>
               <div className="mt-1 flex items-center gap-2">
                 <span
