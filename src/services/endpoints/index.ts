@@ -124,11 +124,14 @@ export const ENDPOINTS = {
     CLASSES_RATINGS: (muridId: number | string) => `/murid/${muridId}/classes/ratings`,
   },
 
-   TRANSAKSI: {
+  TRANSAKSI: {
     DETAIL: (id: number | string) => `/transaksi/${id}`,
     BY_PROMO: (promoId: number | string) => `/transaksi/promo/${promoId}/transactions`,
     ALL: () => `/transaksi/all`,
     RECAP: () => `/transaksi/recap`,
+  },
+  INVOICE: {
+    DETAIL: (id: number | string) => `/invoice/${id}`,
   },
   RESCHEDULE: {
     ADMIN_LIST: '/reschedule/admin',

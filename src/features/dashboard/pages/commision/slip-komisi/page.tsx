@@ -366,7 +366,7 @@ const SlipKomisiPage: React.FC = () => {
               onClick={() => navigate("/dashboard-admin/tutor-commision")}
               className="inline-flex items-center gap-2 rounded-full border border-[var(--secondary-color)] px-3 py-1.5 text-xs font-semibold text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
             >
-              Kembali
+              Kembali 
             </button>
             <img src={Logo} alt="GuruMusik.ID" className="h-9 w-9" />
             <div className="text-lg font-bold text-neutral-900">GuruMusik</div>

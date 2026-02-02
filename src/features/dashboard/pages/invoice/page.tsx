@@ -1,6 +1,6 @@
 // src/features/dashboard/pages/invoice/page.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   useLocation,
   useParams,
@@ -13,6 +13,7 @@ import {
   fetchAllTxThunk,
   getTxDetailThunk,
 } from '@/features/slices/transaksi/slice';
+import { getInvoice } from '@/services/api/invoice.api';
 import guruMusik from '@/assets/images/gurumusik.png';
 
 /* ===================== Utils ===================== */
@@ -37,7 +38,7 @@ const SkBar = ({ className = '' }: { className?: string }) => (
   <div className={`animate-pulse rounded bg-neutral-200/80 ${className}`} />
 );
 
-const SkeletonInvoice = ({ transaksiId }: { transaksiId: number }) => (
+const SkeletonInvoice = ({ transaksiId }: { transaksiId: string | number }) => (
   <section className="min-h-screen bg-white px-4 sm:px-6 py-8 grid place-items-center">
     <div className="invoice-container mx-auto w-full max-w-4xl bg-white">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -126,16 +127,45 @@ const SkeletonInvoice = ({ transaksiId }: { transaksiId: number }) => (
 /* ===================== Page ===================== */
 const InvoicePage: React.FC = () => {
   const { id = '' } = useParams();
-  const transaksiId = Number(id);
+  const rawId = String(id || '').trim();
+  const transaksiId = Number(rawId);
+  const isNumericId = Number.isFinite(transaksiId);
   const dispatch = useDispatch();
   const location = useLocation();
   const [search] = useSearchParams();
   const navigate = useNavigate();
+  const [invoiceState, setInvoiceState] = useState<{
+    status: 'idle' | 'loading' | 'succeeded' | 'failed';
+    error: string | null;
+    data: any | null;
+  }>({ status: 'idle', error: null, data: null });
 
   // promoId opsional (tetap dipakai hanya untuk sumber data fetch, BUKAN untuk logika harga)
   const promoIdFromQuery = search.get('promoId');
   const promoIdFromState = (location.state as any)?.promoId;
   const promoId = promoIdFromQuery ?? promoIdFromState ?? null;
+
+  useEffect(() => {
+    if (!rawId) return;
+    let active = true;
+    setInvoiceState((prev) => ({ ...prev, status: 'loading', error: null }));
+    getInvoice(rawId)
+      .then((data) => {
+        if (!active) return;
+        setInvoiceState({ status: 'succeeded', error: null, data });
+      })
+      .catch((err) => {
+        if (!active) return;
+        setInvoiceState({
+          status: 'failed',
+          error: err?.message ?? 'Gagal memuat invoice',
+          data: null,
+        });
+      });
+    return () => {
+      active = false;
+    };
+  }, [rawId]);
 
   // Slice (bisa mounted sbg transaksiByPromo atau transaksi)
   const txState = useSelector((s: any) => s.transaksi ?? s.transaksiByPromo ?? {});
@@ -161,12 +191,14 @@ const InvoicePage: React.FC = () => {
   );
 
   // Loading / Error flag (hanya untuk UX, tidak mempengaruhi kalkulasi)
-  const isLoading = promoId ? status === 'loading' : (allStatus === 'loading' || detailStatus === 'loading');
-  const errMsg    = promoId ? (error as string | null) : (allError as string | null);
+  const isLoading =
+    invoiceState.status === 'loading' ||
+    (promoId ? status === 'loading' : (allStatus === 'loading' || detailStatus === 'loading'));
+  const errMsg = invoiceState.error ?? (promoId ? (error as string | null) : (allError as string | null));
 
   // Fetch data: byPromo jika ada promoId, selain itu ambil list umum; fallback ke detail jika belum ketemu
   useEffect(() => {
-    if (!Number.isFinite(transaksiId)) return;
+    if (!isNumericId) return;
 
     if (promoId) {
       dispatch(
@@ -178,7 +210,7 @@ const InvoicePage: React.FC = () => {
     } else {
       dispatch(fetchAllTxThunk({ page: 1, limit: 100, q: '' }) as any);
     }
-  }, [dispatch, transaksiId, promoId]);
+  }, [dispatch, transaksiId, promoId, isNumericId]);
 
   const rowFromList = useMemo(
     () => (Array.isArray(list) ? list.find((t: any) => Number(t?.id) === transaksiId) : null),
@@ -187,10 +219,11 @@ const InvoicePage: React.FC = () => {
 
   useEffect(() => {
     if (rowFromList) return;
+    if (!isNumericId) return;
     if (!promoId && (allStatus === 'succeeded' || allStatus === 'failed')) {
       dispatch(getTxDetailThunk({ id: transaksiId }) as any);
     }
-  }, [dispatch, promoId, rowFromList, allStatus, transaksiId]);
+  }, [dispatch, promoId, rowFromList, allStatus, transaksiId, isNumericId]);
 
   // Adapt detail → bentuk list item (kalau perlu)
   const rowFromDetail = useMemo(() => {
@@ -248,43 +281,60 @@ const InvoicePage: React.FC = () => {
   }, [detail]);
 
   const row: any = rowFromList || rowFromDetail;
+  const invoiceFromApi = invoiceState.data?.invoice ?? null;
 
   // ========= Derivasi (prioritas invoice.*) =========
-  const invoice = row?.invoice ?? null;
+  const invoice = invoiceFromApi ?? row?.invoice ?? null;
 
-  const issueDateISO = invoice?.issue_date || row?.date || row?.tanggal_transaksi || '';
+  const issueDateISO = invoice?.issued_at || invoice?.issue_date || row?.date || row?.tanggal_transaksi || '';
 
   const isModule =
-    String(invoice?.category || row?.type || '').toLowerCase() === 'modul';
+    String(
+      invoice?.category ||
+      invoice?.meta?.category_transaksi ||
+      invoice?.meta?.category ||
+      row?.type ||
+      ''
+    ).toLowerCase() === 'modul' ||
+    (!!invoice && !row && !invoice?.program_name && !invoice?.paket_name);
 
   // Buyer/bill-to
-  const bill = invoice?.bill_to || row?.student || {};
+  const bill = invoice?.buyer || invoice?.bill_to || row?.student || {};
   const buyerName = bill?.name ?? row?.student?.name ?? '-';
   const buyerEmail = bill?.email ?? row?.student?.email ?? '-';
   const buyerPhone = bill?.phone ?? row?.student?.phone ?? row?.student?.no_telp ?? '-';
-  const buyerAddress = bill?.city ?? row?.student?.alamat ?? '-';
+  const buyerAddress = bill?.address ?? bill?.city ?? row?.student?.alamat ?? '-';
 
   // Item
   const invItem = Array.isArray(invoice?.items) && invoice.items.length > 0 ? invoice.items[0] : null;
+  const invoiceItemName =
+    invoice?.program_name || invoice?.paket_name
+      ? `${invoice?.program_name || 'Program'}${invoice?.paket_name ? ` - ${invoice.paket_name}` : ''}`
+      : null;
 
   const itemName =
     invItem?.name ||
+    invoiceItemName ||
     (isModule
       ? row?.module?.title || 'Modul'
-      : `${row?.program?.name || 'Program'}${row?.paket?.name ? ` — ${row.paket.name}` : ''}`) ||
+      : `${row?.program?.name || 'Program'}${row?.paket?.name ? ` - ${row.paket.name}` : ''}`) ||
     (isModule ? 'Modul' : 'Program');
 
-  const teacherName = !isModule ? (row?.teacher?.name || '-') : undefined;
+  const teacherName = !isModule ? (invoice?.teacher_name || row?.teacher?.name || '-') : undefined;
 
   // Instrument (opsional)
   const instrumentName =
-    invoice?.context?.instrument?.name ||
+    invoice?.instrument_name ||
     row?.instrument?.name ||
     undefined;
 
   // Status label
   const statusLabel = mapStatus(
-    invoice?.payment?.status_label || row?.status_label || row?.status
+    invoice?.transaction_status ||
+    invoice?.status ||
+    invoice?.payment?.status_label ||
+    row?.status_label ||
+    row?.status
   );
 
   /* ===================== HARGA & PROMO (UNIFIED) ===================== */
@@ -386,6 +436,42 @@ const InvoicePage: React.FC = () => {
     0
   );
 
+  // Override dari endpoint invoice (prioritas)
+  const invoiceSubtotal = Number(invoice?.subtotal ?? NaN);
+  const invoiceDiscount = Number(invoice?.discount_total ?? NaN);
+  const invoiceTotal = Number(invoice?.total ?? NaN);
+  const invoiceServiceFee = Number(invoice?.service_fee ?? NaN);
+  const invoiceRegistrationFee = Number(invoice?.registration_fee ?? NaN);
+  const invoiceTax = Number(invoice?.ppn_on_service ?? NaN);
+
+  const promoPercentFromInvoice =
+    Number.isFinite(invoiceSubtotal) && Number.isFinite(invoiceDiscount) && invoiceSubtotal > 0
+      ? Math.round((invoiceDiscount / invoiceSubtotal) * 100)
+      : NaN;
+
+  const promoPercentToShowFinal = Number.isFinite(promoPercentFromInvoice)
+    ? Math.max(0, Math.min(99, promoPercentFromInvoice))
+    : promoPercentToShow;
+
+  const hargaItemDisplayFinal = Number.isFinite(invoiceSubtotal)
+    ? Math.max(0, invoiceSubtotal)
+    : hargaItemDisplay;
+  const promoValueFinal = Number.isFinite(invoiceDiscount)
+    ? Math.max(0, invoiceDiscount)
+    : promoValue;
+  const totalTagihanFinal = Number.isFinite(invoiceTotal)
+    ? Math.max(0, invoiceTotal)
+    : totalTagihan;
+  const taxAmountFinal = Number.isFinite(invoiceTax)
+    ? Math.max(0, invoiceTax)
+    : taxAmount;
+  const feesAmountFinal = Number.isFinite(invoiceServiceFee)
+    ? Math.max(0, invoiceServiceFee)
+    : feesAmount;
+  const registrationFeeFinal = Number.isFinite(invoiceRegistrationFee)
+    ? Math.max(0, invoiceRegistrationFee)
+    : 0;
+
   // Kode Invoice → INV/{ddmmyy}/{Program|Modul}/{id}
   const ddmmyy = useMemo(() => {
     if (!issueDateISO) return '';
@@ -397,7 +483,9 @@ const InvoicePage: React.FC = () => {
     return `${dd}${mm}${yy}`;
   }, [issueDateISO]);
 
-  const invoiceCode = `INV/${ddmmyy}/${isModule ? 'Modul' : 'Program'}/${row?.id ?? transaksiId}`;
+  const invoiceCode =
+    invoice?.invoice_number ||
+    `INV/${ddmmyy}/${isModule ? 'Modul' : 'Program'}/${row?.id ?? (isNumericId ? transaksiId : rawId)}`;
 
   const onDownload = () => {
     const oldTitle = document.title;
@@ -409,10 +497,10 @@ const InvoicePage: React.FC = () => {
   };
 
   /* ===================== Guards ===================== */
-  if (!Number.isFinite(transaksiId)) return <div className="p-8">ID invoice tidak valid.</div>;
-  if (isLoading && !row) return <SkeletonInvoice transaksiId={transaksiId} />;
+  if (!rawId) return <div className="p-8">ID invoice tidak valid.</div>;
+  if (isLoading && !row && !invoice) return <SkeletonInvoice transaksiId={rawId} />;
 
-  if (!row) {
+  if (!row && !invoice) {
     return (
       <section className="min-h-screen grid place-items-center px-4">
         <div className="rounded-xl border bg-white px-6 py-5 shadow-sm w-full max-w-lg">
@@ -490,7 +578,7 @@ const InvoicePage: React.FC = () => {
               <tbody>
                 <tr>
                   <td className="p-4">{itemName}</td>
-                  <td className="p-4">{formatIDR(hargaItemDisplay)}</td>
+                  <td className="p-4">{formatIDR(hargaItemDisplayFinal)}</td>
                   {!isModule && <td className="p-4">{teacherName}</td>}
                   <td className="p-4">
                     <span
@@ -520,34 +608,39 @@ const InvoicePage: React.FC = () => {
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between">
                 <span>Harga Item</span>
-                <span className="tabular-nums">{formatIDR(hargaItemDisplay - taxAmount)}</span>
+                <span className="tabular-nums">{formatIDR(hargaItemDisplayFinal)}</span>
               </div>
 
-              {promoValue > 0 && (
+              {promoValueFinal > 0 && (
                 <div className="flex items-center justify-between">
                   <span>
                     Promo
-                    {promoPercentToShow > 0 || promoCode ? (
-                      <> ({promoPercentToShow > 0 ? `${promoPercentToShow}%` : ''}{promoPercentToShow > 0 && promoCode ? ', ' : ''}{promoCode ? promoCode : ''})</>
+                    {promoPercentToShowFinal > 0 || promoCode ? (
+                      <> ({promoPercentToShowFinal > 0 ? `${promoPercentToShowFinal}%` : ''}{promoPercentToShowFinal > 0 && promoCode ? ', ' : ''}{promoCode ? promoCode : ''})</>
                     ) : null}
                   </span>
-                  <span className="tabular-nums">−{formatIDR(promoValue)}</span>
+                  <span className="tabular-nums">−{formatIDR(promoValueFinal)}</span>
                 </div>
               )}
 
               <div className="flex items-center justify-between">
                 <span>Pajak</span>
-                <span className="tabular-nums">{formatIDR(taxAmount)}</span>
+                <span className="tabular-nums">{formatIDR(taxAmountFinal)}</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <span>Biaya Lain</span>
-                <span className="tabular-nums">{formatIDR(feesAmount)}</span>
+                <span className="tabular-nums">{formatIDR(feesAmountFinal)}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span>Biaya Pendaftaran</span>
+                <span className="tabular-nums">{formatIDR(registrationFeeFinal)}</span>
               </div>
 
               <div className="flex items-center justify-between font-semibold">
                 <span>Total Tagihan</span>
-                <span className="tabular-nums text-xl">{formatIDR(totalTagihan)}</span>
+                <span className="tabular-nums text-xl">{formatIDR(totalTagihanFinal)}</span>
               </div>
             </div>
 
