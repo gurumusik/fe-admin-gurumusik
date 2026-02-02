@@ -75,7 +75,11 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/tutor-report",
     "/dashboard-admin/student-report",
   ];
-  const usersPrefixes = ["/dashboard-admin/tutor-list", "/dashboard-admin/student-list"];
+  const usersPrefixes = [
+    "/dashboard-admin/tutor-list",
+    "/dashboard-admin/student-list",
+    "/dashboard-admin/employees",
+  ];
 
   // cek aktif per grup
   const groupActiveManage = starts(managePrefixes);
@@ -334,6 +338,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/student-list"
                   label="Student List"
                   active={isUnder("/dashboard-admin/student-list")}
+                />
+                <SubItem
+                  to="/dashboard-admin/employees"
+                  label="Employee Access"
+                  active={isUnder("/dashboard-admin/employees")}
                 />
               </div>
             </DropWrap>

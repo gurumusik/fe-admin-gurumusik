@@ -158,4 +158,9 @@ export const ENDPOINTS = {
     CITIES: '/wilayah/cities',                             // GET ?province_id=&q=&page=&limit=
     CITY: (id: number | string) => `/wilayah/cities/${id}`,
   },
+  EMPLOYEES: {
+    LIST: '/admin/employees',
+    CREATE: '/admin/employees',
+    UPDATE: (id: number | string) => `/admin/employees/${id}`,
+  },
 };

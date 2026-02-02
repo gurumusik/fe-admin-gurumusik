@@ -37,6 +37,7 @@ import InvoicePage from '@/features/dashboard/pages/invoice/page';
 import ManageProgramPage from '@/features/dashboard/pages/programs/page';
 import ManagePaketPage from '@/features/dashboard/pages/paket/page';
 import CertificateInstrumentPage from '@/features/dashboard/pages/certificate-instrument/page';
+import EmployeePage from '@/features/dashboard/pages/employee/page';
 
 export const router = createBrowserRouter([
   {
@@ -94,6 +95,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/programs", element: <ManageProgramPage /> },
       { path: "/dashboard-admin/paket", element: <ManagePaketPage /> },
       { path: "/dashboard-admin/certificate-instrument", element: <CertificateInstrumentPage /> },
+      { path: "/dashboard-admin/employees", element: <EmployeePage /> },
     ],
   },
 ]);
