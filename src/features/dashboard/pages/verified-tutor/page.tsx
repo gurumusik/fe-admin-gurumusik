@@ -259,6 +259,7 @@ const buildCertificatesFromApplication = (
   const userAny: any = row.user as any;
   const detailGuru = userAny?.detailGuru;
   const list: any[] = detailGuru?.sertifikat ?? [];
+  const clips: any[] = detailGuru?.cuplikan ?? [];
   if (!Array.isArray(list) || !list.length) return [];
 
   return list.map((s: any): CertificateItem => {
@@ -277,6 +278,28 @@ const buildCertificatesFromApplication = (
 
     const gradeName = (s.grade && (s.grade.nama_grade as string)) || "—";
 
+    const instrumentId = s.instrument_id ?? s.instrument?.id ?? null;
+    const instrumentNameRaw =
+      (s.instrument && (s.instrument.nama_instrumen as string)) || "";
+    const instrumentNameNormalized = instrumentNameRaw.trim();
+
+    const clip =
+      clips.find((c: any) => {
+        const clipInstrumentId = c?.instrument_id ?? c?.instrument?.id ?? null;
+        if (instrumentId && clipInstrumentId) {
+          return Number(clipInstrumentId) === Number(instrumentId);
+        }
+        const clipName =
+          (c?.instrument?.nama_instrumen as string) ||
+          (c?.instrument?.nama as string) ||
+          "";
+        return (
+          instrumentNameNormalized &&
+          clipName &&
+          clipName.toLowerCase() === instrumentNameNormalized.toLowerCase()
+        );
+      }) ?? null;
+
     return {
       id: s.id,
       title: s.keterangan || "Sertifikat",
@@ -287,6 +310,13 @@ const buildCertificatesFromApplication = (
       status: mapCertStatus(s.status),
       link: fileUrl,         // sekarang: string | undefined
       rejectReason: s.alasan_penolakan ?? null,
+      video: clip
+        ? {
+            title: clip.title ?? undefined,
+            description: clip.deskripsi ?? undefined,
+            link: clip.link ?? undefined,
+          }
+        : null,
     };
   });
 };
@@ -325,6 +355,13 @@ const VerifiedTutorPage: React.FC = () => {
   const [certModalTitle, setCertModalTitle] =
     useState<string>('Kelola Sertifikat');
 
+  const [certDrafts, setCertDrafts] = useState<
+    Record<
+      string,
+      { status: 'approved' | 'rejected'; reason?: string | null }
+    >
+  >({});
+
   // Load awal: hanya status 'proses'
   useEffect(() => {
     dispatch(setGALimit(PAGE_SIZE));
@@ -343,7 +380,40 @@ const VerifiedTutorPage: React.FC = () => {
     setSelected(row);
     setModalMode(mode);
     setModalOpen(true);
+    if (mode === 'approved') {
+      setCertDrafts({});
+    }
   };
+
+  const applyDrafts = (items: CertificateItem[]) =>
+    items.map((item) => {
+      const draft = certDrafts[String(item.id)];
+      return {
+        ...item,
+        draftStatus: draft?.status ?? null,
+        draftReason: draft?.reason ?? null,
+      };
+    });
+
+  const buildCertDecisions = (items: CertificateItem[]) =>
+    items.map((item) => {
+      const draft = certDrafts[String(item.id)];
+      if (draft?.status === 'approved') {
+        return { id: item.id, status: 'approved' as const };
+      }
+      return {
+        id: item.id,
+        status: 'rejected' as const,
+        alasan_penolakan: draft?.reason ?? 'Ditolak oleh sistem',
+      };
+    });
+
+  const approvedDraftCount = useMemo(() => {
+    const items = buildCertificatesFromApplication(selected);
+    return items.filter(
+      (item) => certDrafts[String(item.id)]?.status === 'approved'
+    ).length;
+  }, [certDrafts, selected]);
 
   // Panggil endpoint APPROVE/REJECT via thunk + tampilkan LoadingScreen
   const handleSubmitModal = async (payload: ApproveTeacherPayload) => {
@@ -353,10 +423,19 @@ const VerifiedTutorPage: React.FC = () => {
 
     try {
       if (payload.mode === 'approved') {
+        const certItems = buildCertificatesFromApplication(selected);
+        const cert_decisions = buildCertDecisions(certItems);
+        const approvedCount = cert_decisions.filter(
+          (c) => c.status === 'approved'
+        ).length;
+        if (approvedCount < 1) {
+          throw new Error('Minimal 1 sertifikat harus disetujui');
+        }
         await dispatch(
           approveApplicationThunk({
             id: selected.id,
             note: (payload as any)?.notes,
+            cert_decisions,
           })
         ).unwrap();
       } else {
@@ -463,6 +542,8 @@ const VerifiedTutorPage: React.FC = () => {
         mode={modalMode}
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmitModal}
+        approveDisabled={modalMode === 'approved' && approvedDraftCount < 1}
+        approveDisabledHint="Pilih minimal 1 sertifikat untuk disetujui."
         data={{
           image: resolveImageUrl(selected?.user?.profile_pic_url ?? null) || defaultUser,
           name: selected?.nama ?? undefined,
@@ -470,13 +551,23 @@ const VerifiedTutorPage: React.FC = () => {
           email: selected?.email ?? undefined,
           phone: selected?.no_telp ?? undefined,
           city: selected?.domisili ?? '-',
-          videoUrl: selected?.demo_url ?? undefined,
+          videoUrl: selected?.user?.detailGuru?.intro_link ?? undefined,
           cvUrl: selected?.cv_url ?? undefined,
           certificateUrl: selected?.portfolio_url ?? undefined,
+          awardCertificateUrl:
+            selected?.sertifikat_penghargaan_url ?? undefined,
           certificates: buildCertificatesFromApplication(selected),
+          education: {
+            campusName: selected?.user?.pendidikanGuru?.nama_kampus ?? undefined,
+            majorMinor:
+              selected?.user?.pendidikanGuru?.prodi_major_minor ?? undefined,
+            graduationCertUrl:
+              selected?.user?.pendidikanGuru?.url_sertifikat_kelulusan ??
+              undefined,
+          },
         }}
         onOpenCertificates={(opts) => {
-          const all = buildCertificatesFromApplication(selected);
+          const all = applyDrafts(buildCertificatesFromApplication(selected));
           let filtered = all;
           if (opts?.instrumentName) {
             const key = opts.instrumentName.toLowerCase();
@@ -514,7 +605,28 @@ const VerifiedTutorPage: React.FC = () => {
         onClose={() => setCertModalOpen(false)}
         certificates={certModalItems}
         title={certModalTitle}
-        canDecide={false}
+        canDecide
+        decisionMode="draft"
+        onDraftChange={(item, payload) => {
+          setCertDrafts((prev) => ({
+            ...prev,
+            [String(item.id)]: {
+              status: payload.status,
+              reason: payload.reason ?? null,
+            },
+          }));
+          setCertModalItems((prev) =>
+            prev.map((c) =>
+              String(c.id) === String(item.id)
+                ? {
+                    ...c,
+                    draftStatus: payload.status,
+                    draftReason: payload.reason ?? null,
+                  }
+                : c
+            )
+          );
+        }}
       />
     </div>
   );

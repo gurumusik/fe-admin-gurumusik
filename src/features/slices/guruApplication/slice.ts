@@ -115,11 +115,23 @@ export const fetchGuruApplicationDetailThunk = createAsyncThunk<
 
 export const approveApplicationThunk = createAsyncThunk<
   { message: string },
-  { id: number | string; note?: string },
+  {
+    id: number | string;
+    note?: string;
+    cert_decisions: Array<{
+      id: number | string;
+      status: 'approved' | 'rejected';
+      alasan_penolakan?: string | null;
+    }>;
+  },
   { rejectValue: string }
->('guruApplication/approve', async ({ id, note }, thunkApi) => {
+>('guruApplication/approve', async ({ id, note, cert_decisions }, thunkApi) => {
   try {
-    const resp = await decideApplication(id, { decision: 'approve', note });
+    const resp = await decideApplication(id, {
+      decision: 'approve',
+      note,
+      cert_decisions,
+    });
     return resp;
   } catch (err: any) {
     return thunkApi.rejectWithValue(err?.message || 'Gagal menyetujui aplikasi guru');

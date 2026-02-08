@@ -25,7 +25,13 @@ type BaseData = {
   videoUrl?: string;
   cvUrl?: string;
   certificateUrl?: string;
+  awardCertificateUrl?: string;
   certificates?: CertificateItem[];
+  education?: {
+    campusName?: string;
+    majorMinor?: string;
+    graduationCertUrl?: string;
+  };
 };
 
 type ApproveTeacherModalProps = {
@@ -35,6 +41,8 @@ type ApproveTeacherModalProps = {
   onSubmit: (payload: ApproveTeacherPayload) => void;
   data?: BaseData;
   onOpenCertificates?: (opts?: { instrumentName?: string | null }) => void;
+  approveDisabled?: boolean;
+  approveDisabledHint?: string;
 };
 
 const inputCls =
@@ -78,6 +86,8 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   onSubmit,
   data,
   onOpenCertificates,
+  approveDisabled = false,
+  approveDisabledHint,
 }) => {
   const [file] = useState<File | null>(null);
   const [reason, setReason] = useState('');
@@ -114,11 +124,17 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   // resolve URL backend (contoh: http://localhost:3000/uploads/cv/xxx.pdf)
   const cvResolved = resolveHttpsUrl(data?.cvUrl);
   const certResolved = resolveHttpsUrl(data?.certificateUrl);
+  const awardResolved = resolveHttpsUrl(data?.awardCertificateUrl);
   const demoResolved = resolveHttpsUrl(data?.videoUrl);
 
   const cvDisabled = !cvResolved;
   const certDisabled = !certResolved;
+  const awardDisabled = !awardResolved;
   const demoDisabled = !demoResolved;
+
+  const edu = data?.education;
+  const hasEducation =
+    !!edu?.campusName || !!edu?.majorMinor || !!edu?.graduationCertUrl;
 
   return (
     <div className="fixed inset-0 z-[80]">
@@ -130,7 +146,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
       />
       {/* dialog */}
       <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
+        <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl max-h-[calc(100vh-2rem)] overflow-hidden">
           {/* header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#E6EAF0]">
             <h3 className="text-lg font-semibold text-neutral-900">
@@ -151,7 +167,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
 
           {/* body */}
           {mode === 'approved' ? (
-            <div className="px-5 pb-5 pt-4">
+            <div className="px-5 pb-5 pt-4 max-h-[calc(100vh-7.5rem)] overflow-y-auto">
               {/* Profile */}
               <div className="mb-4">
                 <p className="text-md font-medium text-neutral-900 mb-2">
@@ -275,6 +291,67 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                   </div>
                 </div>
 
+                
+
+                {/* Pendidikan Guru */}
+                {hasEducation && (
+                  <div className="mt-3">
+                    <label className={labelCls}>Pendidikan Guru</label>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <label className={labelCls}>Nama Kampus</label>
+                        <input
+                          className={inputCls}
+                          value={edu?.campusName ?? ''}
+                          readOnly
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>
+                          Prodi / Major / Minor
+                        </label>
+                        <input
+                          className={inputCls}
+                          value={edu?.majorMinor ?? ''}
+                          readOnly
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>
+                          Sertifikat Kelulusan
+                        </label>
+                        <a
+                          href={resolveHttpsUrl(edu?.graduationCertUrl) || '#'}
+                          target={
+                            resolveHttpsUrl(edu?.graduationCertUrl)
+                              ? '_blank'
+                              : undefined
+                          }
+                          rel={
+                            resolveHttpsUrl(edu?.graduationCertUrl)
+                              ? 'noopener noreferrer'
+                              : undefined
+                          }
+                          aria-disabled={
+                            !resolveHttpsUrl(edu?.graduationCertUrl)
+                          }
+                          onClick={(e) => {
+                            if (!resolveHttpsUrl(edu?.graduationCertUrl))
+                              e.preventDefault();
+                          }}
+                          className={`${pillBase} ${
+                            resolveHttpsUrl(edu?.graduationCertUrl)
+                              ? pillEnabled
+                              : pillDisabled
+                          }`}
+                        >
+                          <RiDownloadLine /> Lihat Sertifikat
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* File Pendukung */}
                 <div className="mt-1">
                   <label className={labelCls}>File Pendukung</label>
@@ -308,7 +385,23 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                         certDisabled ? pillDisabled : pillEnabled
                       }`}
                     >
-                      <RiDownloadLine /> Sertifikat
+                      <RiDownloadLine /> Portfolio
+                    </a>
+
+                    {/* Sertifikat Penghargaan */}
+                    <a
+                      href={awardResolved || '#'}
+                      target={awardDisabled ? undefined : '_blank'}
+                      rel={awardDisabled ? undefined : 'noopener noreferrer'}
+                      aria-disabled={awardDisabled}
+                      onClick={(e) => {
+                        if (awardDisabled) e.preventDefault();
+                      }}
+                      className={`${pillBase} ${
+                        awardDisabled ? pillDisabled : pillEnabled
+                      }`}
+                    >
+                      <RiDownloadLine /> Sertifikat Penghargaan
                     </a>
 
                     {/* Video Demo */}
@@ -324,7 +417,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                         demoDisabled ? pillDisabled : pillEnabled
                       }`}
                     >
-                      <RiDownloadLine /> Video Demo
+                      <RiDownloadLine /> Video Perkenalan
                     </a>
                   </div>
                 </div>
@@ -335,14 +428,25 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                 <button
                   type="button"
                   onClick={submitApproved}
-                  className="w-full h-11 rounded-full font-semibold bg-[var(--primary-color)] text-neutral-900 cursor-pointer"
+                  disabled={approveDisabled}
+                  className={[
+                    "w-full h-11 rounded-full font-semibold text-neutral-900",
+                    approveDisabled
+                      ? "bg-neutral-200 text-neutral-500 cursor-not-allowed"
+                      : "bg-[var(--primary-color)] cursor-pointer",
+                  ].join(" ")}
                 >
                   Setujui
                 </button>
+                {approveDisabled && approveDisabledHint && (
+                  <p className="mt-2 text-sm text-neutral-600">
+                    {approveDisabledHint}
+                  </p>
+                )}
               </div>
             </div>
           ) : (
-            <div className="px-5 pb-5 pt-4">
+            <div className="px-5 pb-5 pt-4 max-h-[calc(100vh-7.5rem)] overflow-y-auto">
               {/* Perihal */}
               <div className="mb-3">
                 <p className="text-sm text-neutral-600">Perihal:</p>

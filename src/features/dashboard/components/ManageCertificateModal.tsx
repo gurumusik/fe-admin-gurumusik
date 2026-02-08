@@ -23,6 +23,13 @@ export type CertificateItem = {
   status: CertStatus;
   link?: string;
   instrumentIcon?: string;
+  video?: {
+    title?: string;
+    description?: string;
+    link?: string;
+  } | null;
+  draftStatus?: "approved" | "rejected" | null;
+  draftReason?: string | null;
   /** alasan penolakan dari backend (nullable) */
   rejectReason?: string | null;
 };
@@ -35,11 +42,16 @@ type Props = {
   certificates?: CertificateItem[];
   title?: string;
   canDecide?: boolean;
+  decisionMode?: "immediate" | "draft";
   onPreview?: (item: CertificateItem) => void;
   onApprove?: (item: CertificateItem) => void;
   onReject?: (item: CertificateItem) => void; // legacy
   onRejectSubmit?: (item: CertificateItem, payload: RejectPayload) => void | Promise<void>;
   onShowRejectNote?: (item: CertificateItem) => void; // tidak dipakai (kita handle internal)
+  onDraftChange?: (
+    item: CertificateItem,
+    payload: { status: "approved" | "rejected"; reason?: string | null }
+  ) => void;
   
 };
 
@@ -72,6 +84,44 @@ const isPdfTypeOrUrl = (contentType?: string | null, url?: string) => {
 };
 const resolveCertUrl = (raw?: string) => resolveImageUrl(raw ?? null) ?? raw ?? undefined;
 
+const resolveHttpsUrl = (raw?: string | null): string => {
+  if (!raw) return "";
+  const url = raw.trim();
+  if (!url) return "";
+  if (url.startsWith("https://")) return url;
+  if (/^https?:\/\//i.test(url)) return url.replace(/^http:\/\//i, "https://");
+  if (/^www\./i.test(url)) return `https://${url}`;
+  if (/^(tiktok\.com|www\.tiktok\.com|youtu\.be|youtube\.com|www\.youtube\.com)\//i.test(url)) {
+    return `https://${url}`;
+  }
+  return "";
+};
+
+const resolveVideoEmbedUrl = (raw?: string | null): string | null => {
+  const url = resolveHttpsUrl(raw);
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") {
+      const id = u.pathname.slice(1);
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      const id = u.searchParams.get("v");
+      if (id) return `https://www.youtube.com/embed/${id}`;
+      if (u.pathname.startsWith("/embed/")) return `https://www.youtube.com${u.pathname}`;
+    }
+    if (host === "tiktok.com" || host === "www.tiktok.com") {
+      const match = u.pathname.match(/\/video\/(\d+)/);
+      if (match?.[1]) return `https://www.tiktok.com/embed/v2/${match[1]}`;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
+
 const ManageCertificateModal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -82,11 +132,20 @@ const ManageCertificateModal: React.FC<Props> = ({
   onRejectSubmit,     // kirim reason saja
   onPreview,
   canDecide = true,
+  decisionMode = "immediate",
+  onDraftChange,
 }) => {
   const items = useMemo(
     () => (certificates && certificates.length ? certificates : FALLBACK),
     [certificates]
   );
+
+  const getDisplayStatus = (item: CertificateItem): CertStatus => {
+    if (decisionMode === "draft" && item.draftStatus) {
+      return item.draftStatus === "approved" ? "Disetujui" : "Tidak Disetujui";
+    }
+    return item.status;
+  };
 
   /** ===== PHASE HANDLING ===== */
   const [phase, setPhase] = useState<"list" | "detail" | "preview" | "reject">("list");
@@ -203,6 +262,15 @@ const ManageCertificateModal: React.FC<Props> = ({
     if (!selected) return;
     try {
       setSubmitting(true);
+      if (decisionMode === "draft") {
+        onDraftChange?.(selected, {
+          status: "rejected",
+          reason: reason.trim() || null,
+        });
+        setPhase("list");
+        setSelected(null);
+        return;
+      }
       if (onRejectSubmit) {
         await onRejectSubmit(selected, { reason: reason.trim() });
       } else if (onReject) {
@@ -226,7 +294,7 @@ const ManageCertificateModal: React.FC<Props> = ({
       onMouseDown={handleClose} // ⬅ langsung tutup
     >
       <div
-        className="w-full max-w-2xl rounded-2xl bg-white shadow-xl"
+        className="w-full max-w-2xl rounded-2xl bg-white shadow-xl max-h-[calc(100vh-2rem)] overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()} // cegah bubble
       >
         {/* ========== PHASE 1: LIST ========== */}
@@ -247,7 +315,7 @@ const ManageCertificateModal: React.FC<Props> = ({
               </button>
             </div>
             <hr className="border-t border-neutral-300 mb-2 mx-5" />
-            <div className="px-5 pb-5">
+            <div className="px-5 pb-5 max-h-[calc(100vh-9rem)] overflow-y-auto">
               <ul>
                 {items.map((item) => (
                   <li key={item.id} className="py-3 border-b border-neutral-300 px-3">
@@ -266,7 +334,14 @@ const ManageCertificateModal: React.FC<Props> = ({
                             <span className="text-neutral-400">•</span>
                             <span className="font-medium">{item.grade}</span>
                           </span>
-                          <span className={`text-md font-medium ${getStatusColor(item.status)}`}>{item.status}</span>
+                          {(() => {
+                            const displayStatus = getDisplayStatus(item);
+                            return (
+                              <span className={`text-md font-medium ${getStatusColor(displayStatus)}`}>
+                                {displayStatus}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -329,7 +404,7 @@ const ManageCertificateModal: React.FC<Props> = ({
               </div>
             </div>
 
-            <div className="px-6 pb-6">
+            <div className="px-6 pb-6 max-h-[calc(100vh-9rem)] overflow-y-auto">
               <div className="mb-4">
                 <div className="text-[15px] font-semibold text-neutral-900 mb-2">Nama Sertifikasi</div>
                 <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 px-4 py-3 text-neutral-700">{selected.title || "-"}</div>
@@ -359,6 +434,46 @@ const ManageCertificateModal: React.FC<Props> = ({
                     {selected.grade || "-"}
                   </div>
                 </div>
+              </div>
+
+              <div className="mb-6">
+                <div className="text-[15px] font-semibold text-neutral-900 mb-2">Video Instrumen</div>
+                {selected.video?.link ? (
+                  <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 p-3">
+                    <div className="text-sm font-medium text-neutral-900 mb-1">
+                      {selected.video?.title || "Cuplikan Video"}
+                    </div>
+                    {selected.video?.description && (
+                      <div className="text-sm text-neutral-600 mb-3">
+                        {selected.video.description}
+                      </div>
+                    )}
+                    {resolveVideoEmbedUrl(selected.video.link) ? (
+                      <div className="aspect-video rounded-lg overflow-hidden bg-black/5">
+                        <iframe
+                          src={resolveVideoEmbedUrl(selected.video.link) || undefined}
+                          title={selected.video?.title || "Video Instrumen"}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      </div>
+                    ) : (
+                      <a
+                        href={resolveHttpsUrl(selected.video.link)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-[var(--secondary-color)] underline"
+                      >
+                        Buka video
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 px-4 py-3 text-neutral-600">
+                    Belum ada video instrumen.
+                  </div>
+                )}
               </div>
 
               <div>
@@ -399,7 +514,7 @@ const ManageCertificateModal: React.FC<Props> = ({
 
             <hr className="text-neutral-300 m-6 mt-0" />
 
-            <div className="px-5 mb-6">
+            <div className="px-5 mb-6 max-h-[calc(100vh-9rem)] overflow-y-auto">
               <div className="w-full rounded-2xl overflow-hidden bg-neutral-200">
                 <div className="w-full">
                   {blobLoading && (
@@ -473,7 +588,15 @@ const ManageCertificateModal: React.FC<Props> = ({
                   Tolak
                 </button>
                 <button
-                  onClick={() => (onApprove ? onApprove(selected) : null)}
+                  onClick={() => {
+                    if (decisionMode === "draft") {
+                      onDraftChange?.(selected, { status: "approved", reason: null });
+                      setPhase("list");
+                      setSelected(null);
+                      return;
+                    }
+                    if (onApprove) onApprove(selected);
+                  }}
                   className="rounded-full px-8 py-3 font-semibold shadow
                            bg-[var(--primary-color)] text-neutral-900 hover:brightness-95"
                 >
@@ -500,7 +623,7 @@ const ManageCertificateModal: React.FC<Props> = ({
 
             <hr className="border-t border-neutral-300 mb-2 mx-5" />
 
-            <div className="px-5 md:px-6 pb-4 space-y-4">
+            <div className="px-5 md:px-6 pb-4 space-y-4 max-h-[calc(100vh-9rem)] overflow-y-auto">
               <div className="text-sm">
                 <span className="text-neutral-500 mr-1">Perihal:</span>
                 <span className="font-medium text-neutral-900">

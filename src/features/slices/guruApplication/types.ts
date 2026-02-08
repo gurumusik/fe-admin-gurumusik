@@ -36,6 +36,28 @@ export type GADetailGuruLite = {
   title: string | null;
   value_teacher: any | null;
   sertifikat?: GASertifikatLite[];
+  cuplikan?: GACuplikanLite[];
+};
+
+export type GACuplikanLite = {
+  id: number;
+  instrument_id: number;
+  title: string | null;
+  deskripsi: string | null;
+  link: string | null;
+  instrument?: {
+    id: number;
+    nama_instrumen?: string | null;
+    nama?: string | null;
+    icon?: string | null;
+  } | null;
+};
+
+export type GAPendidikanGuruLite = {
+  id: number;
+  nama_kampus: string | null;
+  prodi_major_minor: string | null;
+  url_sertifikat_kelulusan: string | null;
 };
 
 export type GAUserLite = {
@@ -46,6 +68,7 @@ export type GAUserLite = {
   nama_panggilan?: string;
   status_akun?: 'aktif' | 'cuti' | 'non_aktif';
   detailGuru?: GADetailGuruLite | null;
+  pendidikanGuru?: GAPendidikanGuruLite | null;
 };
 
 export type GADeciderLite = {
@@ -62,6 +85,7 @@ export type GuruApplicationDTO = {
   no_telp: string | null;
   domisili: string | null;
   portfolio_url: string | null;
+  sertifikat_penghargaan_url: string | null;
   cv_url: string | null;
   demo_url: string | null;
   status: GAStatus;

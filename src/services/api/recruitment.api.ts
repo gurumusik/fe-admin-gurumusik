@@ -8,6 +8,11 @@ import type { GuruApplicationDTO } from '@/features/slices/guruApplication/types
 export type DecideApplicationPayload = {
   decision: 'approve' | 'reject';
   note?: string;
+  cert_decisions?: Array<{
+    id: number | string;
+    status: 'approved' | 'rejected';
+    alasan_penolakan?: string | null;
+  }>;
 };
 
 export type RecruitmentListResp = {
@@ -45,7 +50,7 @@ export async function listRecruitmentApplications(params?: { status?: 'proses' |
  */
 export async function decideApplication(
   id: number | string,
-  payload: { decision: 'approve' | 'reject'; note?: string }
+  payload: DecideApplicationPayload
 ) {
   return baseUrl.request<{ message: string }>(
     ENDPOINTS.RECRUITMENT.DECIDE(id),
