@@ -452,7 +452,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                 <p className="text-sm text-neutral-600">Perihal:</p>
                 <p className="text-md text-neutral-900">
                   <span className="font-medium">
-                    Hasil Seleksi Calon Tutor Guru Musik
+                    Hasil Seleksi Calon Tutor Guru Musik 
                   </span>
                 </p>
               </div>
