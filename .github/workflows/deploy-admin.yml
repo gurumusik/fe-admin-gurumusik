@@ -40,7 +40,10 @@ jobs:
           cut -d= -f1 .env
 
       - name: Stop old container (compose)
-        run: docker compose down --remove-orphans || true
+        run: |
+          docker compose down --remove-orphans || true
+          docker rm -f $(docker ps -aq || true
+          docker network prune -f
 
       - name: Force remove conflicting container if exists
         run: |
