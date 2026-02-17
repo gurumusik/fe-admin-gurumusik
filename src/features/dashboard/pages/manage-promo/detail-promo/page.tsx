@@ -97,12 +97,7 @@ function computeDateRange(range: TxRange): { date_from?: string; date_to?: strin
   return { date_from: toYmd(start), date_to: toYmd(end) };
 }
 
-function ymdTo1659Z(ymd: string, ms = 0): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
-  if (!m) return ymd;
-  const dt = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 16, 59, 59, ms));
-  return dt.toISOString();
-}
+// NOTE: promo hanya pakai tanggal (tanpa jam). Kirim YYYY-MM-DD agar BE set start/end of day.
 
 const DetailPromoPage: React.FC = () => {
   const navigate = useNavigate();
@@ -247,7 +242,7 @@ const DetailPromoPage: React.FC = () => {
         headline_text: data.bannerHeadline ?? null,
         persentase_diskon: Number(data.discountPct),
         max_usage: Number(data.maxUsage),
-        started_at: data.startDate ? ymdTo1659Z(data.startDate, 0) : null,
+        started_at: data.startDate || null,
         expired_at: data.endDate || null,
       });
       const refreshed = await getPromo(promoId);
@@ -522,7 +517,7 @@ const DetailPromoPage: React.FC = () => {
         headline_text: data.bannerHeadline ?? null,
         persentase_diskon: Number(data.discountPct),
         max_usage: Number(data.maxUsage),
-        started_at: data.startDate ? ymdTo1659Z(data.startDate, 0) : null,
+        started_at: data.startDate || null,
         expired_at: data.endDate || null,
       });
       setEditOpen(false);
