@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   RiCloseLine,
-  RiDownloadLine,
   RiArrowRightSLine,
   RiMusic2Line,
 } from 'react-icons/ri';
 import type { CertificateItem } from '@/features/dashboard/components/ManageCertificateModal';
+import type { EducationCertificateData } from '@/features/dashboard/components/EducationCertificateModal';
+import type { AwardCertificateData } from '@/features/dashboard/components/AwardCertificateModal';
+import { resolveImageUrl } from '@/utils/resolveImageUrl';
+import { getLanguageIcon } from '@/utils/getLanguageIcon';
 
 export type ApproveMode = 'approved' | 'rejected';
 
@@ -21,17 +24,31 @@ type BaseData = {
   short_name?: string;
   email?: string;
   phone?: string;
+  province?: string;
   city?: string;
+  address?: string;
   videoUrl?: string;
   cvUrl?: string;
   certificateUrl?: string;
   awardCertificateUrl?: string;
   certificates?: CertificateItem[];
-  education?: {
-    campusName?: string;
-    majorMinor?: string;
-    graduationCertUrl?: string;
+  languages?: Array<{ code: string; label: string }>;
+  classInfo?: {
+    title?: string;
+    about?: string;
+    values?: string[];
   };
+  awards?: Array<{
+    title?: string;
+    organizer?: string;
+    detail?: string;
+    instrument?: string;
+    instrumentIcon?: string;
+    videoUrl?: string;
+    certUrl?: string;
+  }>;
+  awardList?: AwardCertificateData[];
+  educationList?: EducationCertificateData[];
 };
 
 type ApproveTeacherModalProps = {
@@ -41,6 +58,9 @@ type ApproveTeacherModalProps = {
   onSubmit: (payload: ApproveTeacherPayload) => void;
   data?: BaseData;
   onOpenCertificates?: (opts?: { instrumentName?: string | null }) => void;
+  onOpenCertificateDetail?: (item: CertificateItem) => void;
+  onOpenEducationDetail?: (item: EducationCertificateData) => void;
+  onOpenAwardDetail?: (item: AwardCertificateData) => void;
   approveDisabled?: boolean;
   approveDisabledHint?: string;
 };
@@ -49,35 +69,11 @@ const inputCls =
   'w-full h-11 rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 text-sm text-neutral-800 outline-none';
 const labelCls = 'text-md text-neutral-900 mb-1 block';
 
-// style badge/link
-const pillBase =
-  'inline-flex items-center gap-2 h-8 px-3 rounded-full border text-sm';
-const pillEnabled =
-  'border-[var(--secondary-color)] text-[var(--secondary-color)] bg-white';
-const pillDisabled =
-  'border-neutral-300 text-neutral-400 bg-neutral-100 cursor-not-allowed pointer-events-none';
-
-const resolveHttpsUrl = (raw?: string | null): string => {
-  if (!raw) return '';
-  const url = raw.trim();
-  if (!url) return '';
-
-  if (url.startsWith('https://')) {
-    return url;
-  }
-
-  if (/^drive\.google\.com\//i.test(url)) {
-    return `https://${url}`;
-  }
-
-  if (/^youtube\.com\//i.test(url)) {
-    return `https://${url}`;
-  }
-
-  return '';
+const getDisplayCertStatus = (c: CertificateItem) => {
+  if (c.draftStatus === 'approved') return 'Disetujui';
+  if (c.draftStatus === 'rejected') return 'Tidak Disetujui';
+  return c.status;
 };
-
-
 
 const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   open,
@@ -86,34 +82,24 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   onSubmit,
   data,
   onOpenCertificates,
+  onOpenCertificateDetail,
+  onOpenEducationDetail,
+  onOpenAwardDetail,
   approveDisabled = false,
   approveDisabledHint,
 }) => {
   const [file] = useState<File | null>(null);
   const [reason, setReason] = useState('');
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  useEffect(() => {
+    if (open && mode === 'approved') setStep(1);
+  }, [open, mode]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const certs = data?.certificates ?? [];
 
-  type InstrumentChip = { name: string; icon?: string; grade?: string };
-
-  const instrumentChips = useMemo<InstrumentChip[]>(() => {
-    const map = new Map<string, InstrumentChip>();
-    certs.forEach((c) => {
-      const key = (c.instrument || '').trim();
-      if (!key) return;
-      if (!map.has(key)) {
-        map.set(key, {
-          name: key,
-          icon: c.instrumentIcon,
-          grade: c.grade,
-        });
-      }
-    });
-    return Array.from(map.values());
-  }, [certs]);
-
-  const [activeInstrument, setActiveInstrument] = useState<string | null>(null);
+  const [, setActiveInstrument] = useState<string | null>(null);
 
   if (!open) return null;
 
@@ -121,20 +107,11 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   const submitRejected = () =>
     onSubmit({ mode: 'rejected', reason, attachment: file });
 
-  // resolve URL backend (contoh: http://localhost:3000/uploads/cv/xxx.pdf)
-  const cvResolved = resolveHttpsUrl(data?.cvUrl);
-  const certResolved = resolveHttpsUrl(data?.certificateUrl);
-  const awardResolved = resolveHttpsUrl(data?.awardCertificateUrl);
-  const demoResolved = resolveHttpsUrl(data?.videoUrl);
-
-  const cvDisabled = !cvResolved;
-  const certDisabled = !certResolved;
-  const awardDisabled = !awardResolved;
-  const demoDisabled = !demoResolved;
-
-  const edu = data?.education;
   const hasEducation =
-    !!edu?.campusName || !!edu?.majorMinor || !!edu?.graduationCertUrl;
+    Array.isArray(data?.educationList) && data!.educationList!.length > 0;
+  const hasAwards = Array.isArray(data?.awardList) && data!.awardList!.length > 0;
+  const hasLanguages =
+    Array.isArray(data?.languages) && data!.languages!.length > 0;
 
   return (
     <div className="fixed inset-0 z-[80]">
@@ -168,282 +145,284 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
           {/* body */}
           {mode === 'approved' ? (
             <div className="px-5 pb-5 pt-4 max-h-[calc(100vh-7.5rem)] overflow-y-auto">
-              {/* Profile */}
-              <div className="mb-4">
-                <p className="text-md font-medium text-neutral-900 mb-2">
-                  Profile
-                </p>
-                <div className="w-20 h-20 rounded-full overflow-hidden">
-                  <img
-                    src={data?.image ?? 'https://i.pravatar.cc/100?img=1'}
-                    alt="avatar"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
+              <div className="mb-4 text-sm text-neutral-600">Step {step} dari 3</div>
 
-              {/* Fields */}
-              <div className="grid grid-cols-1 gap-3">
-                <div className="flex gap-2">
-                  <div className="w-1/2">
-                    <label className={labelCls}>Nama Calon Tutor</label>
-                    <input
-                      className={inputCls}
-                      value={data?.name ?? ''}
-                      readOnly
-                    />
+              {step === 1 ? (
+                <>
+                  {/* Profile */}
+                  <div className="mb-4">
+                    <p className="text-md font-medium text-neutral-900 mb-2">
+                      Data Pribadi
+                    </p>
+                    <div className="w-20 h-20 rounded-full overflow-hidden">
+                      <img
+                        src={data?.image ?? 'https://i.pravatar.cc/100?img=1'}
+                        alt="avatar"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                   </div>
-                  <div className="w-1/2">
-                    <label className={labelCls}>Nama Panggilan</label>
-                    <input
-                      className={inputCls}
-                      value={data?.short_name ?? ''}
-                      readOnly
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <div className="w-1/2">
-                    <label className={labelCls}>Email</label>
-                    <input
-                      className={inputCls}
-                      value={data?.email ?? ''}
-                      readOnly
-                    />
-                  </div>
-                  <div className="w-1/2">
-                    <label className={labelCls}>No Telepon</label>
-                    <input
-                      className={inputCls}
-                      value={data?.phone ?? ''}
-                      readOnly
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className={labelCls}>Asal Kota</label>
-                  <input
-                    className={inputCls}
-                    value={data?.city ?? ''}
-                    readOnly
-                  />
-                </div>
 
-                {/* Sertifikat instrumen */}
-                <div>
-                  <label className={labelCls}>Sertifikat Instrumen</label>
-                  <div className="flex flex-wrap gap-2 items-center rounded-xl border border-neutral-300 p-1.5">
-                    {instrumentChips.length ? (
-                      instrumentChips.map((ins) => (
-                        <button
-                          key={ins.name}
-                          type="button"
-                          onClick={() => {
-                            setActiveInstrument(ins.name);
-                            onOpenCertificates?.({
-                              instrumentName: ins.name,
-                            });
-                          }}
-                          className={[
-                            'inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40',
-                            activeInstrument === ins.name
-                              ? 'bg-[var(--secondary-light-color)] text-neutral-900'
-                              : 'text-black/80 hover:bg-neutral-50',
-                          ].join(' ')}
-                          title={
-                            ins.grade ? `${ins.name} • ${ins.grade}` : ins.name
-                          }
-                        >
-                          {ins.icon ? (
-                            <img
-                              src={ins.icon}
-                              alt={ins.name}
-                              className="h-5 w-5 object-contain"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <RiMusic2Line className="text-[var(--secondary-color)]" />
-                          )}
-                          <span>
-                            {ins.name}
-                            {ins.grade ? ` • ${ins.grade}` : ''}
-                          </span>
-                        </button>
-                      ))
-                    ) : (
-                      <span className="px-3 py-2 text-sm text-black/50">
-                        Belum ada sertifikat instrumen.
-                      </span>
-                    )}
-
-                    {!!certs.length && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveInstrument(null);
-                          onOpenCertificates?.(); // semua sertifikat
-                        }}
-                        className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-sm text-[var(--secondary-color)] rounded-lg hover:bg-neutral-50"
-                      >
-                        Lihat Semua <RiArrowRightSLine size={18} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                
-
-                {/* Pendidikan Guru */}
-                {hasEducation && (
-                  <div className="mt-3">
-                    <label className={labelCls}>Pendidikan Guru</label>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div>
-                        <label className={labelCls}>Nama Kampus</label>
-                        <input
-                          className={inputCls}
-                          value={edu?.campusName ?? ''}
-                          readOnly
-                        />
+                  {/* Fields */}
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex gap-2">
+                      <div className="w-1/2">
+                        <label className={labelCls}>Nama Lengkap</label>
+                        <input className={inputCls} value={data?.name ?? ''} readOnly />
                       </div>
-                      <div>
-                        <label className={labelCls}>
-                          Prodi / Major / Minor
-                        </label>
-                        <input
-                          className={inputCls}
-                          value={edu?.majorMinor ?? ''}
-                          readOnly
-                        />
+                      <div className="w-1/2">
+                        <label className={labelCls}>Nama Panggilan</label>
+                        <input className={inputCls} value={data?.short_name ?? ''} readOnly />
                       </div>
-                      <div>
-                        <label className={labelCls}>
-                          Sertifikat Kelulusan
-                        </label>
-                        <a
-                          href={resolveHttpsUrl(edu?.graduationCertUrl) || '#'}
-                          target={
-                            resolveHttpsUrl(edu?.graduationCertUrl)
-                              ? '_blank'
-                              : undefined
-                          }
-                          rel={
-                            resolveHttpsUrl(edu?.graduationCertUrl)
-                              ? 'noopener noreferrer'
-                              : undefined
-                          }
-                          aria-disabled={
-                            !resolveHttpsUrl(edu?.graduationCertUrl)
-                          }
-                          onClick={(e) => {
-                            if (!resolveHttpsUrl(edu?.graduationCertUrl))
-                              e.preventDefault();
-                          }}
-                          className={`${pillBase} ${
-                            resolveHttpsUrl(edu?.graduationCertUrl)
-                              ? pillEnabled
-                              : pillDisabled
-                          }`}
-                        >
-                          <RiDownloadLine /> Lihat Sertifikat
-                        </a>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="w-1/2">
+                        <label className={labelCls}>Email</label>
+                        <input className={inputCls} value={data?.email ?? ''} readOnly />
+                      </div>
+                      <div className="w-1/2">
+                        <label className={labelCls}>No Telepon</label>
+                        <input className={inputCls} value={data?.phone ?? ''} readOnly />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="w-1/2">
+                        <label className={labelCls}>Kota</label>
+                        <input className={inputCls} value={data?.city ?? ''} readOnly />
                       </div>
                     </div>
                   </div>
-                )}
 
-                {/* File Pendukung */}
-                <div className="mt-1">
-                  <label className={labelCls}>File Pendukung</label>
-                  <div className="flex items-center gap-3">
-                    {/* CV */}
-                    <a
-                      href={cvResolved || '#'}
-                      target={cvDisabled ? undefined : '_blank'}
-                      rel={cvDisabled ? undefined : 'noopener noreferrer'}
-                      aria-disabled={cvDisabled}
-                      onClick={(e) => {
-                        if (cvDisabled) e.preventDefault();
-                      }}
-                      className={`${pillBase} ${
-                        cvDisabled ? pillDisabled : pillEnabled
-                      }`}
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setStep(2)}
+                      className="h-11 px-6 rounded-full font-semibold bg-[var(--primary-color)] text-neutral-900 cursor-pointer"
                     >
-                      <RiDownloadLine /> CV
-                    </a>
+                      Lanjut
+                    </button>
+                  </div>
+                </>
+              ) : step === 2 ? (
+                <>
+                  <div className="grid grid-cols-1 gap-3">
+                    {/* Bahasa */}
+                    {hasLanguages && (
+                      <div>
+                        <label className={labelCls}>Bahasa</label>
+                        <div className="flex flex-wrap gap-2">
+                          {data!.languages!.map((lang) => (
+                            <span
+                              key={lang.code}
+                              className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-300 text-sm text-neutral-800"
+                            >
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 border border-neutral-300 text-[11px] font-semibold text-neutral-700">
+                              <img src={getLanguageIcon(lang.code)} alt={lang.label} className="w-4 h-4 object-contain" loading="lazy" />
+                              </span>
+                              {lang.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                    {/* Sertifikat (legacy – dari portfolio_url kalau ada) */}
-                    <a
-                      href={certResolved || '#'}
-                      target={certDisabled ? undefined : '_blank'}
-                      rel={certDisabled ? undefined : 'noopener noreferrer'}
-                      aria-disabled={certDisabled}
-                      onClick={(e) => {
-                        if (certDisabled) e.preventDefault();
-                      }}
-                      className={`${pillBase} ${
-                        certDisabled ? pillDisabled : pillEnabled
-                      }`}
-                    >
-                      <RiDownloadLine /> Portfolio
-                    </a>
+                    {/* Sertifikat instrumen (lokal/internasional) */}
+                    <div>
+                      <label className={labelCls}>
+                        Sertifikat Instrumen (Lokal/Internasional)
+                      </label>
+                      <div className="rounded-xl border border-neutral-300 p-2">
+                        {certs.length ? (
+                          <ul className="space-y-2">
+                            {certs.map((c) => (
+                              <li
+                                key={c.id}
+                                className="rounded-lg border border-neutral-200 p-3 hover:bg-neutral-50 cursor-pointer"
+                                onClick={() => onOpenCertificateDetail?.(c)}
+                              >
+                              <div className="flex items-center gap-2">
+                                {c.instrumentIcon ? (
+                                  <img
+                                    src={c.instrumentIcon}
+                                    alt={c.instrument}
+                                    className="h-5 w-5 object-contain"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <RiMusic2Line className="text-[var(--secondary-color)]" />
+                                )}
+                                <div className="font-medium text-neutral-900">
+                                  {c.instrument} {c.grade ? `- ${c.grade}` : ''}
+                                </div>
+                                <span className="ml-auto text-xs font-medium text-neutral-700">
+                                  {getDisplayCertStatus(c)}
+                                </span>
+                              </div>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-neutral-500">
+                            Belum ada sertifikat instrumen.
+                          </div>
+                        )}
+                        {!!certs.length && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveInstrument(null);
+                              onOpenCertificates?.();
+                            }}
+                            className="mt-2 inline-flex items-center gap-2 px-3 py-2 text-sm text-[var(--secondary-color)] rounded-lg hover:bg-neutral-50"
+                          >
+                            Lihat Semua <RiArrowRightSLine size={18} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
                     {/* Sertifikat Penghargaan */}
-                    <a
-                      href={awardResolved || '#'}
-                      target={awardDisabled ? undefined : '_blank'}
-                      rel={awardDisabled ? undefined : 'noopener noreferrer'}
-                      aria-disabled={awardDisabled}
-                      onClick={(e) => {
-                        if (awardDisabled) e.preventDefault();
-                      }}
-                      className={`${pillBase} ${
-                        awardDisabled ? pillDisabled : pillEnabled
-                      }`}
-                    >
-                      <RiDownloadLine /> Sertifikat Penghargaan
-                    </a>
+                    {hasAwards && (
+                      <div className="mt-3">
+                        <label className={labelCls}>Sertifikat Penghargaan</label>
+                        <div className="grid grid-cols-1 gap-3">
+                          {data!.awardList!.map((a, idx) => (
+                            <div
+                              key={`${a.judul_penghargaan ?? 'award'}-${idx}`}
+                              className="rounded-xl border border-neutral-200 p-3 hover:bg-neutral-50 cursor-pointer"
+                              onClick={() => onOpenAwardDetail?.(a)}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                {a.instrument?.icon ? (
+                                  <img
+                                    src={resolveImageUrl(a.instrument?.icon) || ''}
+                                    alt={a.instrument?.nama_instrumen ?? 'Instrumen'}
+                                    className="h-5 w-5 object-contain"
+                                  />
+                                ) : (
+                                  <RiMusic2Line className="text-[var(--secondary-color)]" />
+                                )}
+                                <span className="text-sm text-neutral-700">
+                                  {a.instrument?.nama_instrumen || '-'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                    {/* Video Demo */}
-                    <a
-                      href={demoResolved || '#'}
-                      target={demoDisabled ? undefined : '_blank'}
-                      rel={demoDisabled ? undefined : 'noopener noreferrer'}
-                      aria-disabled={demoDisabled}
-                      onClick={(e) => {
-                        if (demoDisabled) e.preventDefault();
-                      }}
-                      className={`${pillBase} ${
-                        demoDisabled ? pillDisabled : pillEnabled
-                      }`}
-                    >
-                      <RiDownloadLine /> Video Perkenalan
-                    </a>
+                    {/* Sertifikat Pendidikan */}
+                    {hasEducation && (
+                      <div className="mt-3">
+                        <label className={labelCls}>Sertifikat Pendidikan</label>
+                        <div className="grid grid-cols-1 gap-3">
+                          {data!.educationList!.map((e, idx) => (
+                            <div
+                              key={String(e.id ?? idx)}
+                              className="rounded-xl border border-neutral-200 p-3 hover:bg-neutral-50 cursor-pointer"
+                              onClick={() => onOpenEducationDetail?.(e)}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                {e.majorInstrument?.icon ? (
+                                  <img
+                                    src={resolveImageUrl(e.majorInstrument?.icon) || ''}
+                                    alt={e.majorInstrument?.nama_instrumen ?? 'Instrumen'}
+                                    className="h-5 w-5 object-contain"
+                                  />
+                                ) : (
+                                  <RiMusic2Line className="text-[var(--secondary-color)]" />
+                                )}
+                                <span className="text-sm text-neutral-700">
+                                  {e.majorInstrument?.nama_instrumen || '-'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
 
-              {/* actions */}
-              <div className="pt-4">
-                <button
-                  type="button"
-                  onClick={submitApproved}
-                  disabled={approveDisabled}
-                  className={[
-                    "w-full h-11 rounded-full font-semibold text-neutral-900",
-                    approveDisabled
-                      ? "bg-neutral-200 text-neutral-500 cursor-not-allowed"
-                      : "bg-[var(--primary-color)] cursor-pointer",
-                  ].join(" ")}
-                >
-                  Setujui
-                </button>
-                {approveDisabled && approveDisabledHint && (
-                  <p className="mt-2 text-sm text-neutral-600">
-                    {approveDisabledHint}
-                  </p>
-                )}
-              </div>
+                  <div className="pt-4 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="h-11 px-6 rounded-full font-semibold border border-[#DDE3EA] text-neutral-900 hover:bg-neutral-50"
+                    >
+                      Kembali
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStep(3)}
+                      className="h-11 px-6 rounded-full font-semibold bg-[var(--primary-color)] text-neutral-900 cursor-pointer"
+                    >
+                      Lanjut
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className={labelCls}>Judul Kelas</label>
+                      <input
+                        className={inputCls}
+                        value={data?.classInfo?.title ?? ''}
+                        readOnly
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Tentang Kelas</label>
+                      <textarea
+                        className="w-full min-h-[90px] rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 py-2 text-sm text-neutral-800 outline-none"
+                        value={data?.classInfo?.about ?? ''}
+                        readOnly
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Value Kelas</label>
+                      <input
+                        className={inputCls}
+                        value={
+                          Array.isArray(data?.classInfo?.values)
+                            ? data!.classInfo!.values!.join(', ')
+                            : ''
+                        }
+                        readOnly
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setStep(2)}
+                      className="h-11 px-6 rounded-full font-semibold border border-[#DDE3EA] text-neutral-900 hover:bg-neutral-50"
+                    >
+                      Kembali
+                    </button>
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={submitApproved}
+                        disabled={approveDisabled}
+                        className={[
+                          'h-11 px-6 rounded-full font-semibold text-neutral-900',
+                          approveDisabled
+                            ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed'
+                            : 'bg-[var(--primary-color)] cursor-pointer',
+                        ].join(' ')}
+                      >
+                        Setujui (Guru)
+                      </button>
+                      {approveDisabled && approveDisabledHint && (
+                        <p className="mt-2 text-sm text-neutral-600">{approveDisabledHint}</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="px-5 pb-5 pt-4 max-h-[calc(100vh-7.5rem)] overflow-y-auto">

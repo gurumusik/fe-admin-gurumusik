@@ -64,12 +64,14 @@ export const ENDPOINTS = {
 
   GURU_APPLICATION: {
     LIST: '/guru-applications',
-    DETAIL: (id: number|string) => `/guru-applications/${id}`
+    DETAIL: (id: number|string) => `/guru-applications/${id}`,
+    APPLICATIONS: '/guru-applications/applications',
+    DECIDE: (id: number | string) => `/guru-applications/applications/${id}/decision`,
   },
   
   RECRUITMENT: {
-      LIST: '/recruitment/applications',
-      DECIDE: (id: number | string) => `/recruitment/applications/${id}/decision`,
+      LIST: '/guru-applications/applications',
+      DECIDE: (id: number | string) => `/guru-applications/applications/${id}/decision`,
     },
 
   SILABUS: {

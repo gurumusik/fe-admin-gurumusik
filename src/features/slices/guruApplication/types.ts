@@ -16,13 +16,17 @@ export type GASertifikatLite = {
   alasan_penolakan: string | null;
   instrument?: {
     id: number;
-    nama: string;
+    nama?: string | null;
+    nama_instrumen?: string | null;
     icon?: string | null;
   } | null;
   grade?: {
     id: number;
-    nama: string;
+    nama?: string | null;
+    nama_grade?: string | null;
   } | null;
+  tahun_berlaku?: number | null;
+  tipe_sertifikat?: string | null;
 };
 
 export type GADetailGuruLite = {
@@ -56,8 +60,21 @@ export type GACuplikanLite = {
 export type GAPendidikanGuruLite = {
   id: number;
   nama_kampus: string | null;
-  prodi_major_minor: string | null;
+  prodi_major_minor?: string | null;
   url_sertifikat_kelulusan: string | null;
+  major_instrument_id?: number | null;
+  minor_instrument_id?: number | null;
+  video_url?: string | null;
+  majorInstrument?: {
+    id: number;
+    nama_instrumen?: string | null;
+    icon?: string | null;
+  } | null;
+  minorInstrument?: {
+    id: number;
+    nama_instrumen?: string | null;
+    icon?: string | null;
+  } | null;
 };
 
 export type GAUserLite = {
@@ -67,6 +84,9 @@ export type GAUserLite = {
   profile_pic_url?: string | null;
   nama_panggilan?: string;
   status_akun?: 'aktif' | 'cuti' | 'non_aktif';
+  province?: string | null;
+  city?: string | null;
+  alamat?: string | null;
   detailGuru?: GADetailGuruLite | null;
   pendidikanGuru?: GAPendidikanGuruLite | null;
 };
@@ -84,10 +104,16 @@ export type GuruApplicationDTO = {
   email: string;
   no_telp: string | null;
   domisili: string | null;
+  domisili_provinsi?: string | null;
+  alamat?: string | null;
   portfolio_url: string | null;
   sertifikat_penghargaan_url: string | null;
   cv_url: string | null;
   demo_url: string | null;
+  judul_kelas?: string | null;
+  tentang_kelas?: string | null;
+  value_kelas?: string[] | null;
+  bahasa?: string[] | null;
   status: GAStatus;
   decided_by: number | null;
   decided_at: string | null; // ISO dari backend
@@ -98,6 +124,22 @@ export type GuruApplicationDTO = {
 
   user?: GAUserLite | null;
   decider?: GADeciderLite | null;
+  list_sertifikat?: GASertifikatLite[] | null;
+  pendidikan_guru?: GAPendidikanGuruLite[] | null;
+  sertifikat_penghargaan?: Array<{
+    id: number;
+    instrument_id?: number | null;
+    judul_penghargaan?: string | null;
+    penyelenggara?: string | null;
+    detail_penghargaan?: string | null;
+    video_url?: string | null;
+    instrument?: {
+      id: number;
+      nama?: string | null;
+      nama_instrumen?: string | null;
+      icon?: string | null;
+    } | null;
+  }> | null;
 };
 
 export type GARecap = {
