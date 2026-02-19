@@ -4,9 +4,11 @@ export type StudentListItem = {
   uuid: string;
   image: string | null;
   name: string;
+  email?: string | null;
   phone: string | null;
   city: string | null;
   status: 'Aktif' | 'Non-Aktif' | 'Cuti' | string;
+  created_at?: string | null;
 };
 
 export type StudentRecap = {

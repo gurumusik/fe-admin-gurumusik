@@ -51,6 +51,17 @@ const statusClass = (s: string) =>
     ? 'text-(--accent-red-color)'
     : 'text-(--accent-orange-color)';
 
+const formatDateShort = (iso?: string | null) => {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleDateString('id-ID', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  });
+};
+
 function pageWindow(total: number, current: number) {
   const out: (number | '…')[] = [];
   const push = (x: number | '…') => {
@@ -157,8 +168,10 @@ export default function StudentListPage() {
               <tr className="bg-neutral-100 text-left text-md text-neutral-900">
                 <th className="w-[120px] p-4 font-semibold">Profile</th>
                 <th className="p-4 font-semibold">Nama Murid</th>
+                <th className="p-4 font-semibold">Gmail</th>
                 <th className="p-4 font-semibold">No Telepon</th>
                 <th className="p-4 font-semibold">Asal Kota</th>
+                <th className="p-4 font-semibold">Tanggal Daftar</th>
                 <th className="p-4 font-semibold">Status</th>
                 <th className="w-[120px] p-4 font-semibold">Aksi</th>
               </tr>
@@ -167,13 +180,13 @@ export default function StudentListPage() {
             <tbody>
               {list.status === 'loading' && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-neutral-500">memuat data…</td>
+                  <td colSpan={8} className="p-6 text-center text-neutral-500">memuat data…</td>
                 </tr>
               )}
 
               {list.status === 'failed' && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-red-600">
+                  <td colSpan={8} className="p-6 text-center text-red-600">
                     {list.error || 'Gagal memuat data'}
                   </td>
                 </tr>
@@ -181,11 +194,12 @@ export default function StudentListPage() {
 
               {list.status !== 'loading' && rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-neutral-500">Belum ada data.</td>
+                  <td colSpan={8} className="p-6 text-center text-neutral-500">Belum ada data.</td>
                 </tr>
               )}
 
               {list.status !== 'loading' && rows.map((s) => {
+                const createdAtLabel = formatDateShort(s.created_at);
                 return (
                   <tr key={s.uuid}>
                     <td className="px-4 py-4">
@@ -194,8 +208,10 @@ export default function StudentListPage() {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-black">{s.name}</td>
+                    <td className="px-4 py-4 text-neutral-900 break-all">{s.email || '-'}</td>
                     <td className="px-4 py-4 text-neutral-900">{s.phone || '-'}</td>
                     <td className="px-4 py-4 text-neutral-900">{s.city || '-'}</td>
+                    <td className="px-4 py-4 text-neutral-900">{createdAtLabel}</td>
                     <td className="px-4 py-4">
                       <span className={`font-medium ${statusClass(s.status)}`}>{s.status}</span>
                     </td>

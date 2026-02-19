@@ -38,6 +38,7 @@ import ManageProgramPage from '@/features/dashboard/pages/programs/page';
 import ManagePaketPage from '@/features/dashboard/pages/paket/page';
 import CertificateInstrumentPage from '@/features/dashboard/pages/certificate-instrument/page';
 import EmployeePage from '@/features/dashboard/pages/employee/page';
+import TransactionListPage from '@/features/dashboard/pages/transaction-list/page';
 
 export const router = createBrowserRouter([
   {
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/student-list", element: <StudentListPage /> },
       { path: "/dashboard-admin/student-list/detail-student", element: <DetailStudentPage /> },
       { path: "/dashboard-admin/student-list/detail-student/detail-class/:classId", element: <DetailStudentClassPage /> },
+      { path: "/dashboard-admin/transaction-list", element: <TransactionListPage /> },
       { path: "/dashboard-admin/manage-promo", element: <AdminManagePromoPage /> },
       { path: "/dashboard-admin/manage-promo/detail-promo", element: <DetailPromoPage /> },
       { path: "/dashboard-admin/manage-promo/manage-flashsale", element: <ManageFlashsalePage /> },

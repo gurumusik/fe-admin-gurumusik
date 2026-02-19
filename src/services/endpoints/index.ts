@@ -131,6 +131,7 @@ export const ENDPOINTS = {
     BY_PROMO: (promoId: number | string) => `/transaksi/promo/${promoId}/transactions`,
     ALL: () => `/transaksi/all`,
     RECAP: () => `/transaksi/recap`,
+    MONTHLY_STATS: () => `/transaksi/monthly-stats`,
   },
   INVOICE: {
     DETAIL: (id: number | string) => `/invoice/${id}`,
