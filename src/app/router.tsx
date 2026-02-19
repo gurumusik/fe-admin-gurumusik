@@ -38,6 +38,7 @@ import ManageProgramPage from '@/features/dashboard/pages/programs/page';
 import ManagePaketPage from '@/features/dashboard/pages/paket/page';
 import CertificateInstrumentPage from '@/features/dashboard/pages/certificate-instrument/page';
 import EmployeePage from '@/features/dashboard/pages/employee/page';
+import RequestAssistPage from "@/features/dashboard/pages/request-assist/page";
 
 export const router = createBrowserRouter([
   {
@@ -70,6 +71,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/tutor-report", element: <TutorReportPage /> },
       { path: "/dashboard-admin/student-report", element: <StudentReportPage /> },
       { path: "/dashboard-admin/reschedule", element: <ReschedulePage /> },
+      { path: "/dashboard-admin/request-assist", element: <RequestAssistPage /> },
       { path: "/dashboard-admin/verified-tutor", element: <VerifiedTutorPage /> },
       { path: "/dashboard-admin/earnings", element: <AdminEarningsPage /> },
       { path: "/dashboard-admin/tutor-list", element: <TutorListPage /> },

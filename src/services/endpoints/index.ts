@@ -138,6 +138,10 @@ export const ENDPOINTS = {
   RESCHEDULE: {
     ADMIN_LIST: '/reschedule/admin',
   },
+  REQUEST_ASSIST: {
+    LIST: '/request-assist',
+    UPDATE_STATUS: (id: number | string) => `/request-assist/${id}/status`,
+  },
   PAYOUT_GURU: {
     LIST: () => `/payout-guru`,
     ITEM: (id: number | string) => `/payout-guru/${id}`,
