@@ -80,6 +80,7 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/tutor-list",
     "/dashboard-admin/student-list",
     "/dashboard-admin/employees",
+    "/dashboard-admin/transaction-list",
   ];
 
   // cek aktif per grup
@@ -322,7 +323,7 @@ const AdminSidebar: React.FC = () => {
                     groupActiveUsers ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
                   }`}
                 >
-                  List User
+                  Data Lists
                 </span>
               </div>
               <RiArrowDownSLine
@@ -349,6 +350,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/employees"
                   label="Employee Access"
                   active={isUnder("/dashboard-admin/employees")}
+                />
+                <SubItem
+                  to="/dashboard-admin/transaction-list"
+                  label="Transaction List"
+                  active={isUnder("/dashboard-admin/transaction-list")}
                 />
               </div>
             </DropWrap>
