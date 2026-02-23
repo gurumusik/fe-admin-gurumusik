@@ -219,7 +219,7 @@ export default function StudentListPage() {
                       <button
                         onClick={() =>
                           navigate('/dashboard-admin/student-list/detail-student', {
-                            state: { studentUuid: s.uuid },
+                            state: { studentUuid: s.uuid, studentSnapshot: s },
                           })
                         }
                         className="rounded-full cursor-pointer border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"

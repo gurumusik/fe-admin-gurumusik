@@ -118,6 +118,7 @@ export const ENDPOINTS = {
 
   MURID: {
     ADMIN_LIST: '/murid', 
+    STATUS: '/murid/status',
     DETAIL_BY_UUID: (uuid: string) => `/murid/by-uuid/${uuid}`, 
     CLASSES_BY_UUID: (uuid: string) => `/murid/by-uuid/${uuid}/classes`,
     CLASS_HISTORY: (uuid: string, classId: string | number) => `/murid/by-uuid/${uuid}/classes/${classId}/history`, 

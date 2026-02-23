@@ -2,7 +2,7 @@
 // src/pages/dashboard-admin/tutor-list/ManageRatingPage.tsx
 'use client';
 
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import {
   RiStarFill,
   RiArrowRightUpLine,
@@ -37,8 +37,11 @@ import {
 import type { PerformaCard, RatingHistoryRow } from '@/features/slices/rating/types';
 
 import ProgramAvatarBadge from '@/components/ui/badge/ProgramAvatarBadge';
+import TutorReviewModal from '@/features/dashboard/components/TutorReviewModal';
 import { getInstrumentIcon } from '@/utils/getInstrumentIcon';
 import { resolveImageUrl } from '@/utils/resolveImageUrl';
+import { listTransaksiRatings, updateRatingIsShow } from '@/services/api/guruClasses.api';
+import type { RatingRow, RatingsGuruInfo } from '@/features/slices/guru/classes/types';
 
 /** helper: local date -> "YYYY-MM-DD" (tanpa zona waktu UTC shift) */
 const toLocalISODate = (d: Date) => {
@@ -73,7 +76,13 @@ const dayDiffInclusive = (startISO: string, endISO: string) => {
 // ====== Page size tabel riwayat
 const PAGE_SIZE = 5;
 
-type RowWithIcon = RatingHistoryRow & { instrumentIcon?: string | null };
+type RowWithIcon = RatingHistoryRow & {
+  instrumentIcon?: string | null;
+  guruId?: number | null;
+  muridId?: number | null;
+  transaksiId?: number | null;
+  teacherName?: string | null;
+};
 
 export default function ManageRatingPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -336,11 +345,22 @@ export default function ManageRatingPage() {
   // ====== Riwayat (data dari endpoint) + filter lokal ======
   const [query, setQuery] = useState('');
   const [below4, setBelow4] = useState(false);
+  const [visibleOverrides, setVisibleOverrides] = useState<Record<string, boolean>>({});
+
+  // ====== Review Modal ======
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewRow, setReviewRow] = useState<RowWithIcon | null>(null);
+  const [reviewRating, setReviewRating] = useState<RatingRow | null>(null);
+  const [reviewGuru, setReviewGuru] = useState<RatingsGuruInfo | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   // Map payload API → bentuk row tabel existing + icon backend
   const apiRows = useMemo<Array<RowWithIcon>>(() => {
     return (listData ?? []).map((i: any) => {
       const iconUrl = resolveImageUrl(i?.instrument?.icon ?? null);
+      const rateValue = typeof i?.rate === 'number' ? i.rate : Number(i?.rate ?? 0);
+      const override = visibleOverrides[String(i?.id ?? '')];
 
       return {
         id: String(i.id),
@@ -356,11 +376,16 @@ export default function ManageRatingPage() {
 
         date: i?.date_display ?? '-',                          // dd/mm/yyyy dari backend
         scoreText: i?.rate_text ?? '-',
-        scoreValue: typeof i?.rate === 'number' ? i.rate : Number(i?.rate ?? 0),
-        visible: !!i?.is_show,
+        scoreValue: Number.isFinite(rateValue) ? rateValue : 0,
+        visible: typeof override === 'boolean' ? override : !!i?.is_show,
+
+        guruId: i?.id_guru ?? null,
+        muridId: i?.id_murid ?? null,
+        transaksiId: i?.id_transaksi ?? null,
+        teacherName: i?.teacher?.nama ?? null,
       };
     });
-  }, [listData]);
+  }, [listData, visibleOverrides]);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -434,6 +459,90 @@ export default function ManageRatingPage() {
     setShowPicker(false);
     setRangeError(null);
   };
+
+  const openReview = useCallback(async (row: RowWithIcon) => {
+    setReviewRow(row);
+    setReviewRating(null);
+    setReviewGuru(null);
+    setReviewError(null);
+    setReviewOpen(true);
+
+    const guruId = row.guruId ?? null;
+    const transaksiId = row.transaksiId ?? null;
+    if (!guruId || !transaksiId) {
+      setReviewError('Detail transaksi tidak tersedia untuk review ini.');
+      return;
+    }
+
+    setReviewLoading(true);
+    try {
+      const res = await listTransaksiRatings({
+        guruId,
+        transaksiId,
+        muridId: row.muridId ?? undefined,
+      });
+      const found = (res.data ?? []).find((r) => String(r.id) === String(row.id));
+      setReviewRating(found ?? res.data?.[0] ?? null);
+      setReviewGuru(res.guru ?? null);
+      if (!found) {
+        setReviewError('Detail rating tidak ditemukan, menampilkan data yang tersedia.');
+      }
+    } catch (e: any) {
+      setReviewError(e?.message ?? 'Gagal memuat detail review.');
+    } finally {
+      setReviewLoading(false);
+    }
+  }, []);
+
+  const handleSetShown = useCallback(
+    async (value: boolean) => {
+      const ratingId = reviewRating?.id;
+      const guruId = reviewGuru?.id ?? reviewRow?.guruId;
+      if (!ratingId || !guruId) return;
+
+      try {
+        setReviewError(null);
+        setReviewLoading(true);
+        await updateRatingIsShow(guruId, ratingId, value);
+        setReviewRating((prev) => (prev ? { ...prev, is_show: value } : prev));
+        if (reviewRow?.id) {
+          setVisibleOverrides((prev) => ({ ...prev, [reviewRow.id]: value }));
+        }
+      } catch (e: any) {
+        setReviewError(e?.message ?? 'Gagal mengubah status tampil rating.');
+      } finally {
+        setReviewLoading(false);
+      }
+    },
+    [reviewRating?.id, reviewGuru?.id, reviewRow?.guruId, reviewRow?.id]
+  );
+
+  const modalRow = useMemo(() => {
+    if (!reviewRow) return null;
+    const status =
+      typeof reviewRating?.is_show === 'boolean'
+        ? reviewRating.is_show
+          ? 'Tampil'
+          : 'Tidak Tampil'
+        : reviewRow.visible
+        ? 'Tampil'
+        : 'Tidak Tampil';
+
+    const scoreText = reviewRow.scoreText || (reviewRating?.rate != null ? `${reviewRating.rate}/5` : '—');
+
+    return {
+      no: '1',
+      nilai: scoreText,
+      date: (reviewRating?.created_at as string) ?? reviewRow.date ?? '—',
+      status,
+    };
+  }, [reviewRow, reviewRating]);
+
+  const modalTutorName = reviewGuru?.nama ?? reviewRow?.teacherName ?? '—';
+  const modalTutorImage = resolveImageUrl(reviewGuru?.profile_pic_url ?? null) ?? '';
+  const modalInstrumentLabel = reviewRow?.instrument ?? '—';
+  const modalProgramLabel = reviewRow?.program ?? '—';
+  const modalNilai = reviewRow?.scoreText ?? '—';
 
   return (
     <div className="w-full">
@@ -769,9 +878,11 @@ export default function ManageRatingPage() {
                     <td className="px-4 py-4">
                       <button
                         type="button"
+                        onClick={() => openReview(r)}
+                        disabled={reviewLoading && reviewRow?.id === r.id}
                         className="inline-block rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
                       >
-                        Lihat Review
+                        {reviewLoading && reviewRow?.id === r.id ? 'Memuat...' : 'Lihat Review'}
                       </button>
                     </td>
                   </tr>
@@ -812,6 +923,29 @@ export default function ManageRatingPage() {
           </div>
         </div>
       </section>
+
+      {/* ===== Review Modal ===== */}
+      <TutorReviewModal
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        tutorImage={modalTutorImage}
+        tutorName={modalTutorName}
+        instrumentLabel={modalInstrumentLabel}
+        schedule="—"
+        programLabel={modalProgramLabel}
+        nilaiKelas={modalNilai}
+        nilaiAsli={modalNilai}
+        row={modalRow ?? undefined}
+        defaultVisible={typeof reviewRating?.is_show === 'boolean' ? reviewRating.is_show : reviewRow?.visible}
+        selectedIndicators={reviewRating?.selected_indicator ?? []}
+        attachments={reviewRating?.rating_attachment ?? []}
+        feedbackText={reviewRating?.feedback ?? ''}
+        guruId={reviewGuru?.id ?? reviewRow?.guruId ?? undefined}
+        ratingId={reviewRating?.id ?? undefined}
+        onSetShown={handleSetShown}
+        submitting={reviewLoading}
+        errorText={reviewError}
+      />
     </div>
   );
 }

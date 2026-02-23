@@ -88,4 +88,8 @@ export type StudentHeader = {
   image: string | null;
   name: string;
   status: 'Aktif' | 'Non-Aktif' | 'Cuti' | string;
+  email?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  created_at?: string | null;
 };

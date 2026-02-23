@@ -181,8 +181,10 @@ const Pagination: React.FC<{
   page: number;
   onChange: (p: number) => void;
   pageSize?: number;
-}> = ({ total, page, onChange, pageSize = PAGE_SIZE }) => {
-  const pages = Math.ceil(Math.max(0, Number(total) || 0) / pageSize);
+  totalPages?: number;
+}> = ({ total, page, onChange, pageSize = PAGE_SIZE, totalPages }) => {
+  const pages = totalPages ?? Math.ceil(Math.max(0, Number(total) || 0) / pageSize);
+  const current = Math.min(Math.max(1, page), Math.max(1, pages));
 
   const btnCls =
     'min-w-9 h-9 px-3 rounded-lg border border-[#E3E8EF] text-md text-[#202020] hover:bg-[#F5F7FA]';
@@ -195,11 +197,11 @@ const Pagination: React.FC<{
       arr[arr.length - 1] === v ? undefined : arr.push(v);
 
     for (let i = 1; i <= pages; i++) {
-      if (i <= 3 || i > pages - 2 || Math.abs(i - page) <= 1) push(i);
+      if (i <= 3 || i > pages - 2 || Math.abs(i - current) <= 1) push(i);
       else if (arr[arr.length - 1] !== '...') push('...');
     }
     return arr;
-  }, [pages, page]);
+  }, [pages, current]);
 
   if (pages <= 1) return null;
 
@@ -207,8 +209,8 @@ const Pagination: React.FC<{
     <div className="flex items-center gap-2 mt-5">
       <button
         className={arrowBtnCls}
-        disabled={page === 1}
-        onClick={() => onChange(Math.max(1, page - 1))}
+        disabled={current === 1}
+        onClick={() => onChange(Math.max(1, current - 1))}
         aria-label="Sebelumnya"
         title="Sebelumnya"
       >
@@ -225,7 +227,7 @@ const Pagination: React.FC<{
             key={v}
             className={cls(
               btnCls,
-              v === page &&
+              v === current &&
                 'bg-[var(--secondary-light-color)] border-[var(--secondary-color)] font-medium'
             )}
             onClick={() => onChange(v)}
@@ -237,8 +239,8 @@ const Pagination: React.FC<{
 
       <button
         className={arrowBtnCls}
-        disabled={page === pages}
-        onClick={() => onChange(Math.min(pages, page + 1))}
+        disabled={current === pages}
+        onClick={() => onChange(Math.min(pages, current + 1))}
         aria-label="Berikutnya"
         title="Berikutnya"
       >
@@ -404,8 +406,9 @@ const VerifiedTutorPage: React.FC = () => {
   const total: number = typeof gaList?.total === 'number' ? gaList.total : 0;
   const loading: boolean = !!gaList?.loading;
   const errorMsg: string | null = gaList?.error ?? null;
-
-  const [page, setPage] = useState<number>(gaList?.page || 1);
+  const page = gaList?.page || 1;
+  const limit = gaList?.limit || PAGE_SIZE;
+  const totalPages = gaList?.totalPages || Math.ceil(Math.max(0, total) / limit);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ApproveMode>('approved');
@@ -438,20 +441,46 @@ const VerifiedTutorPage: React.FC = () => {
       { status: 'approved' | 'rejected'; reason?: string | null }
     >
   >({});
+  const [hiddenIds, setHiddenIds] = useState<Record<number, true>>({});
 
-  // Load awal: hanya status 'proses'
+  // Set default filter sekali (status proses + limit)
   useEffect(() => {
     dispatch(setGALimit(PAGE_SIZE));
-    dispatch(setGAPage(page));
     dispatch(setGAStatus('proses'));
+  }, [dispatch]);
+
+  // Fetch saat query berubah (page/limit/status/sort/search)
+  useEffect(() => {
     dispatch(fetchGuruApplicationsThunk());
-  }, [dispatch, page]);
+  }, [
+    dispatch,
+    gaList?.page,
+    gaList?.limit,
+    gaList?.status,
+    gaList?.q,
+    gaList?.created_from,
+    gaList?.created_to,
+    gaList?.sort?.by,
+    gaList?.sort?.dir,
+  ]);
 
   // Filter client-side juga (untuk berjaga)
   const items = useMemo(
-    () => itemsAll.filter((r) => r.status === 'proses'),
-    [itemsAll]
+    () =>
+      itemsAll.filter((r) => r.status === 'proses' && !hiddenIds[Number(r.id)]),
+    [itemsAll, hiddenIds]
   );
+
+  useEffect(() => {
+    setHiddenIds({});
+  }, [itemsAll]);
+
+  // Jika halaman kosong setelah keputusan, mundur 1 halaman
+  useEffect(() => {
+    if (!loading && items.length === 0 && page > 1) {
+      dispatch(setGAPage(page - 1));
+    }
+  }, [loading, items.length, page, dispatch]);
 
   const openModal = (mode: ApproveMode, row: GuruApplicationDTO) => {
     setSelected(row);
@@ -562,6 +591,9 @@ const VerifiedTutorPage: React.FC = () => {
         ).unwrap();
       }
       setConfirmKind('success');
+      setHiddenIds((prev) =>
+        selected?.id ? { ...prev, [Number(selected.id)]: true } : prev
+      );
     } catch {
       setConfirmKind('error');
     } finally {
@@ -647,7 +679,13 @@ const VerifiedTutorPage: React.FC = () => {
       </div>
 
       <div className="flex justify-center">
-        <Pagination total={total} page={page} onChange={setPage} />
+        <Pagination
+          total={total}
+          totalPages={totalPages}
+          page={page}
+          pageSize={limit}
+          onChange={(p) => dispatch(setGAPage(p))}
+        />
       </div>
 
       {/* Modal Approve / Reject */}
