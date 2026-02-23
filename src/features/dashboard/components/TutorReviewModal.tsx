@@ -35,7 +35,6 @@ type TutorReviewModalProps = {
   // kontrol toggle
   onSetShown?: (next: boolean) => Promise<void> | void;
   submitting?: boolean;
-  errorText?: string | null;
 
   // fallback PUT
   guruId?: number | string;
