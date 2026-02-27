@@ -1,9 +1,5 @@
-import { createFetchClient } from "../http/fetcher";
+import { baseUrl } from "../http/url";
 import { ENDPOINTS } from "../endpoints";
-
-const ROOT_BASE =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/v\d+\/?$/, "").replace(/\/$/, "") ?? "";
-const rootUrl = createFetchClient({ baseUrl: ROOT_BASE });
 
 export type WaHandoffItem = {
   id: number | string;
@@ -41,11 +37,11 @@ export async function listWaHandoffs(params: ListWaHandoffsParams = {}) {
 
   const qstr = qs.toString();
   const url = qstr ? `${ENDPOINTS.WA_HANDOFFS.LIST}?${qstr}` : ENDPOINTS.WA_HANDOFFS.LIST;
-  return rootUrl.request<ListWaHandoffsResponse>(url, { method: "GET" });
+  return baseUrl.request<ListWaHandoffsResponse>(url, { method: "GET" });
 }
 
 export async function resolveWaHandoff(id: number | string) {
-  return rootUrl.request<{ message?: string; data?: WaHandoffItem }>(
+  return baseUrl.request<{ message?: string; data?: WaHandoffItem }>(
     ENDPOINTS.WA_HANDOFFS.RESOLVE(id),
     { method: "PATCH" }
   );
