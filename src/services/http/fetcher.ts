@@ -18,10 +18,11 @@ export function createFetchClient({ baseUrl }: { baseUrl: string }) {
       headers.set('Authorization', `Bearer ${token}`);
     }
 
+    const credentials = rest.credentials ?? 'include';
     const res = await fetch(baseUrl + path, {
       ...rest,
       headers,
-      credentials: 'include',
+      credentials,
       body: json instanceof FormData ? json : json !== undefined ? JSON.stringify(json) : rest.body,
     });
 
@@ -34,7 +35,7 @@ export function createFetchClient({ baseUrl }: { baseUrl: string }) {
         const res2 = await fetch(baseUrl + path, {
           ...rest,
           headers: h2,
-          credentials: 'include',
+          credentials,
           body: json instanceof FormData ? json : json !== undefined ? JSON.stringify(json) : rest.body,
         });
         return handleResponse<T>(res2);

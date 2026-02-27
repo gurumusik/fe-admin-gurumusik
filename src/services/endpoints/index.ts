@@ -144,6 +144,10 @@ export const ENDPOINTS = {
     LIST: '/request-assist',
     UPDATE_STATUS: (id: number | string) => `/request-assist/${id}/status`,
   },
+  WA_HANDOFFS: {
+    LIST: '/wa/admin/handoffs',
+    RESOLVE: (id: number | string) => `/wa/admin/handoffs/${id}/resolve`,
+  },
   PAYOUT_GURU: {
     LIST: () => `/payout-guru`,
     ITEM: (id: number | string) => `/payout-guru/${id}`,

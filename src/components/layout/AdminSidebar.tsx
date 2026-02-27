@@ -73,6 +73,7 @@ const AdminSidebar: React.FC = () => {
   const reportPrefixes = [
     "/dashboard-admin/reschedule",
     "/dashboard-admin/request-assist",
+    "/dashboard-admin/wa-handoffs",
     "/dashboard-admin/tutor-report",
     "/dashboard-admin/student-report",
   ];
@@ -288,6 +289,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/request-assist"
                   label="Request Assist"
                   active={isExact("/dashboard-admin/request-assist")}
+                />
+                <SubItem
+                  to="/dashboard-admin/wa-handoffs"
+                  label="WA Admin Queue"
+                  active={isExact("/dashboard-admin/wa-handoffs")}
                 />
                 <SubItem
                   to="/dashboard-admin/tutor-report"

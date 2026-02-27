@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "@/app/store";
 import { meThunk, logoutThunk } from "@/features/slices/auth/slice";
 import defaultUser from "@/assets/images/default-user.png";
-import { RiArrowDownSFill, RiLogoutBoxRLine } from "react-icons/ri";
+import { RiArrowDownSFill, RiLogoutBoxRLine, RiMessage2Line } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
 import { resolveImageUrl } from "@/utils/resolveImageUrl";
 import { getWaAgentSettings, updateWaAgentSettings } from "@/services/api/waGateway.api";
@@ -182,6 +182,18 @@ const AdminNavbar: React.FC = () => {
               <p className="text-xs uppercase tracking-wider text-neutral-500">Admin,</p>
               <p className="text-[15px] font-semibold text-neutral-900 truncate">{name}</p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                navigate("/dashboard-admin/wa-handoffs");
+              }}
+              className="mb-3 w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl font-semibold text-[var(--secondary-color,#0682DF)] border border-[var(--secondary-color,#0682DF)]/30 hover:bg-[var(--secondary-light-color,#E6F4FF)]"
+            >
+              <RiMessage2Line size={18} />
+              WA Admin Queue
+            </button>
 
             <button
               type="button"

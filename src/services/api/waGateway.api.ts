@@ -14,7 +14,10 @@ export type WaAgentSettings = {
 };
 
 export async function getWaAgentSettings() {
-  return rootUrl.request<WaAgentSettings>('/wa/agent/settings', { method: 'GET' });
+  return rootUrl.request<WaAgentSettings>('/wa/agent/settings', {
+    method: 'GET',
+    credentials: 'omit',
+  });
 }
 
 export async function updateWaAgentSettings(payload: {
@@ -29,5 +32,6 @@ export async function updateWaAgentSettings(payload: {
   return rootUrl.request<WaAgentSettings>('/wa/agent/settings', {
     method: 'POST',
     json: payload,
+    credentials: 'omit',
   });
 }
