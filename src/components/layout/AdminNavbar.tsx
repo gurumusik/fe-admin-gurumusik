@@ -8,6 +8,7 @@ import defaultUser from "@/assets/images/default-user.png";
 import { RiArrowDownSFill, RiLogoutBoxRLine } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
 import { resolveImageUrl } from "@/utils/resolveImageUrl";
+import { getWaAgentSettings, updateWaAgentSettings } from "@/services/api/waGateway.api";
 
 const AdminNavbar: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -24,8 +25,35 @@ const AdminNavbar: React.FC = () => {
     }
   }, [dispatch, user]);
 
+  useEffect(() => {
+    let active = true;
+    setWaLoading(true);
+    getWaAgentSettings()
+      .then((data) => {
+        if (!active) return;
+        setWaEnabled(Boolean((data as any)?.enabled));
+        setWaError(null);
+      })
+      .catch((err: any) => {
+        if (!active) return;
+        setWaError(err?.message || "Gagal mengambil status WA");
+      })
+      .finally(() => {
+        if (!active) return;
+        setWaLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const name = user?.nama || "Admin";
   const photoUrl = resolveImageUrl(user?.profile_pic_url) || (defaultUser as unknown as string);
+
+  const [waEnabled, setWaEnabled] = useState<boolean | null>(null);
+  const [waLoading, setWaLoading] = useState(true);
+  const [waUpdating, setWaUpdating] = useState(false);
+  const [waError, setWaError] = useState<string | null>(null);
 
   // Dropdown state
   const [open, setOpen] = useState(false);
@@ -59,6 +87,21 @@ const AdminNavbar: React.FC = () => {
     }
   };
 
+  const handleToggleWa = async () => {
+    if (waEnabled === null || waUpdating) return;
+    const next = !waEnabled;
+    setWaUpdating(true);
+    try {
+      const updated = await updateWaAgentSettings({ enabled: next });
+      setWaEnabled(Boolean((updated as any)?.enabled));
+      setWaError(null);
+    } catch (err: any) {
+      setWaError(err?.message || "Gagal update WA");
+    } finally {
+      setWaUpdating(false);
+    }
+  };
+
   return (
     <nav className="sticky top-0 z-20 h-20 bg-white shadow flex justify-between items-center px-8">
       <div className="flex flex-col gap-1 px-4">
@@ -69,6 +112,40 @@ const AdminNavbar: React.FC = () => {
       </div>
 
       <div className="relative flex items-center gap-3 select-none">
+        <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2">
+          <div className="flex flex-col leading-tight">
+            <span className="text-[11px] uppercase tracking-wide text-neutral-500">WA Auto Reply</span>
+            {waLoading ? (
+              <span className="text-xs text-neutral-400">Loading...</span>
+            ) : (
+              <span
+                className={`text-xs font-semibold ${
+                  waEnabled ? "text-emerald-600" : "text-neutral-500"
+                }`}
+              >
+                {waEnabled ? "ON" : "OFF"}
+              </span>
+            )}
+            {waError ? <span className="text-[10px] text-red-500">{waError}</span> : null}
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleWa}
+            disabled={waLoading || waUpdating || waEnabled === null}
+            aria-pressed={waEnabled ? "true" : "false"}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              waEnabled ? "bg-emerald-500" : "bg-neutral-300"
+            } ${waLoading || waUpdating ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+            title="Toggle WA auto reply"
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                waEnabled ? "translate-x-5" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
+
         <img
           src={photoUrl}
           alt={user ? `Foto ${user.nama}` : "Profile"}
