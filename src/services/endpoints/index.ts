@@ -143,6 +143,14 @@ export const ENDPOINTS = {
     LIST: '/request-assist',
     UPDATE_STATUS: (id: number | string) => `/request-assist/${id}/status`,
   },
+  TEACHER_CHANGE: {
+    ADMIN_LIST: '/teacher-change/admin',
+    APPROVE: (id: number | string) => `/teacher-change/${id}/approve`,
+    REJECT: (id: number | string) => `/teacher-change/${id}/reject`,
+    CLOSE: (id: number | string) => `/teacher-change/${id}/close`,
+    FREEZE: (id: number | string) => `/teacher-change/${id}/freeze`,
+    FEE: (id: number | string) => `/teacher-change/${id}/fee`,
+  },
   PAYOUT_GURU: {
     LIST: () => `/payout-guru`,
     ITEM: (id: number | string) => `/payout-guru/${id}`,

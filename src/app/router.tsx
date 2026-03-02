@@ -40,6 +40,7 @@ import CertificateInstrumentPage from '@/features/dashboard/pages/certificate-in
 import EmployeePage from '@/features/dashboard/pages/employee/page';
 import TransactionListPage from '@/features/dashboard/pages/transaction-list/page';
 import RequestAssistPage from "@/features/dashboard/pages/request-assist/page";
+import TeacherChangePage from "@/features/dashboard/pages/teacher-change/page";
 
 export const router = createBrowserRouter([
   {
@@ -83,6 +84,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/student-list/detail-student", element: <DetailStudentPage /> },
       { path: "/dashboard-admin/student-list/detail-student/detail-class/:classId", element: <DetailStudentClassPage /> },
       { path: "/dashboard-admin/transaction-list", element: <TransactionListPage /> },
+      { path: "/dashboard-admin/teacher-change", element: <TeacherChangePage /> },
       { path: "/dashboard-admin/manage-promo", element: <AdminManagePromoPage /> },
       { path: "/dashboard-admin/manage-promo/detail-promo", element: <DetailPromoPage /> },
       { path: "/dashboard-admin/manage-promo/manage-flashsale", element: <ManageFlashsalePage /> },
