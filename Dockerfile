@@ -16,9 +16,8 @@ RUN pnpm config set fetch-retries 5 \
   && pnpm config set fetch-retry-maxtimeout 120000 \
   && pnpm config set network-concurrency 1
 
-# Install dependencies and allow native build scripts
-RUN pnpm install --frozen-lockfile \
-  && pnpm approve-builds --all
+# Install dependencies
+RUN pnpm install --frozen-lockfile
 
 # Copy project files (kecuali node_modules)
 COPY . .
