@@ -47,10 +47,10 @@ jobs:
         run: |
           docker rm -f vite-frontend || true
 
-      - name: Clean unused images (optional)
-        run: docker system prune -f
-
       - name: Build and run new container
+        env:
+          DOCKER_BUILDKIT: "1"
+          COMPOSE_DOCKER_CLI_BUILD: "1"
         run: docker compose up -d --build
 
       - name: Show running containers
