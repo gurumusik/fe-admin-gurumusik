@@ -47,6 +47,15 @@ jobs:
         run: |
           docker rm -f vite-frontend || true
 
+      - name: Free port 5173 if busy
+        shell: bash
+        run: |
+          if command -v lsof >/dev/null 2>&1; then
+            lsof -tiTCP:5173 -sTCP:LISTEN | xargs -r kill -9 || true
+          else
+            docker ps --format "{{.ID}} {{.Ports}}" | awk '/:5173->/ {print $1}' | xargs -r docker rm -f || true
+          fi
+
       - name: Build and run new container
         env:
           DOCKER_BUILDKIT: "1"
