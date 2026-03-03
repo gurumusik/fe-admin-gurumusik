@@ -18,6 +18,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # (macOS) Pastikan Docker Desktop jalan
+      - name: Start Docker Desktop (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          open -a "Docker Desktop" || true
+
+      # Tunggu sampai Docker daemon siap dipakai
+      - name: Wait for Docker daemon
+        shell: bash
+        run: |
+          # pakai context Docker Desktop
+          docker context use desktop-linux || true
+
+          for i in {1..60}; do
+            if docker info >/dev/null 2>&1; then
+              echo "✅ Docker is ready"
+              docker version
+              docker compose version
+              exit 0
+            fi
+            echo "Waiting for Docker..."
+            sleep 2
+          done
+
+          echo "❌ Docker not ready after waiting"
+          docker context ls || true
+          exit 1
+
       - name: Check Docker status
         run: |
           docker --version
@@ -40,10 +69,12 @@ jobs:
           cut -d= -f1 .env
 
       - name: Stop old container (compose)
+        shell: bash
         run: |
           docker compose down --remove-orphans || true
 
       - name: Force remove conflicting container if exists
+        shell: bash
         run: |
           docker rm -f vite-frontend || true
 
@@ -57,11 +88,13 @@ jobs:
           fi
 
       - name: Build and run new container
+        shell: bash
         env:
-          DOCKER_HOST: "unix:///Users/noviprima/Library/Containers/com.docker.docker/Data/docker-cli.sock"
           DOCKER_BUILDKIT: "1"
-          COMPOSE_DOCKER_CLI_BUILD: "1"
-        run: docker compose up -d --build
+        run: |
+          docker compose up -d --build
 
       - name: Show running containers
-        run: docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        shell: bash
+        run: |
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
