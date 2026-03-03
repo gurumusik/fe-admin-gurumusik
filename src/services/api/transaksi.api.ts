@@ -239,6 +239,23 @@ export type GetAllTransactionsRecapResp = {
   points: AllTransactionsRecapPoint[];
 };
 
+export type MonthlyTxStatsResp = {
+  range: {
+    year: number;
+    month: number;
+    start: string; // YYYY-MM-DD
+    end: string;   // YYYY-MM-DD
+  };
+  booking: {
+    students: number;
+    transactions: number;
+  };
+  payment: {
+    students: number;
+    transactions: number;
+  };
+};
+
 /* ========================= HELPERS ========================= */
 
 export function mapTxStatusLabel(raw: TxStatusRaw): TxStatusLabel {
@@ -292,6 +309,18 @@ export async function getAllTransactionsRecap(params: GetAllTransactionsRecapPar
 
   return baseUrl.request<GetAllTransactionsRecapResp>(
     `${ENDPOINTS.TRANSAKSI.RECAP()}${qstr}`,
+    { method: 'GET' }
+  );
+}
+
+export async function getMonthlyTxStats(params?: { year?: number; month?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.year) qs.set('year', String(params.year));
+  if (params?.month) qs.set('month', String(params.month));
+  const qstr = qs.toString() ? `?${qs.toString()}` : '';
+
+  return baseUrl.request<MonthlyTxStatsResp>(
+    `${ENDPOINTS.TRANSAKSI.MONTHLY_STATS()}${qstr}`,
     { method: 'GET' }
   );
 }

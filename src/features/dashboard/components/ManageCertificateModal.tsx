@@ -23,6 +23,15 @@ export type CertificateItem = {
   status: CertStatus;
   link?: string;
   instrumentIcon?: string;
+  certType?: string;
+  year?: number;
+  files?: Array<{
+    id?: number | string | null;
+    file_url?: string | null;
+    file_mime?: string | null;
+    created_at?: string | null;
+  }>;
+  details?: Array<{ label: string; value: string }>;
   video?: {
     title?: string;
     description?: string;
@@ -52,6 +61,8 @@ type Props = {
     item: CertificateItem,
     payload: { status: "approved" | "rejected"; reason?: string | null }
   ) => void;
+  initialItemId?: string | number;
+  initialPhase?: "list" | "detail" | "preview";
   
 };
 
@@ -134,6 +145,8 @@ const ManageCertificateModal: React.FC<Props> = ({
   canDecide = true,
   decisionMode = "immediate",
   onDraftChange,
+  initialItemId,
+  initialPhase = "detail",
 }) => {
   const items = useMemo(
     () => (certificates && certificates.length ? certificates : FALLBACK),
@@ -244,6 +257,16 @@ const ManageCertificateModal: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
+  // Open directly to detail/preview when requested
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialItemId == null) return;
+    const found = items.find((it) => String(it.id) === String(initialItemId)) || null;
+    if (!found) return;
+    setSelected(found);
+    setPhase(initialPhase === "preview" ? "preview" : "detail");
+  }, [isOpen, initialItemId, initialPhase, items]);
+
   // reset form ketika bukan fase reject
   useEffect(() => {
     if (phase !== "reject") {
@@ -294,7 +317,7 @@ const ManageCertificateModal: React.FC<Props> = ({
       onMouseDown={handleClose} // ⬅ langsung tutup
     >
       <div
-        className="w-full max-w-2xl rounded-2xl bg-white shadow-xl max-h-[calc(100vh-2rem)] overflow-hidden"
+        className="w-full max-w-2xl rounded-2xl bg-white shadow-xl max-h-[calc(100vh-4rem)] overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()} // cegah bubble
       >
         {/* ========== PHASE 1: LIST ========== */}
@@ -413,6 +436,21 @@ const ManageCertificateModal: React.FC<Props> = ({
                 <div className="text-[15px] font-semibold text-neutral-900 mb-2">Penyelenggara Sertifikasi</div>
                 <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 px-4 py-3 text-neutral-700">{selected.school || "-"}</div>
               </div>
+              {selected.details && selected.details.length > 0 && (
+                <div className="mb-6">
+                  <div className="text-[15px] font-semibold text-neutral-900 mb-2">Detail Tambahan</div>
+                  <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 px-4 py-3">
+                    <ul className="space-y-2">
+                      {selected.details.map((d, idx) => (
+                        <li key={`${d.label}-${idx}`} className="text-sm text-neutral-700">
+                          <span className="font-medium text-neutral-900">{d.label}:</span>{" "}
+                          <span className="break-all">{d.value || "-"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
@@ -478,15 +516,69 @@ const ManageCertificateModal: React.FC<Props> = ({
 
               <div>
                 <div className="text-[15px] font-semibold text-neutral-900 mb-2">File Sertifikasi</div>
-                <button
-                  className="inline-flex items-center rounded-full px-4 py-2 border text-[14px]
-                             border-[var(--secondary-color)] text-[var(--secondary-color)]
-                             hover:bg-[var(--secondary-color)]/5"
-                  onClick={() => openPreview(selected)}
-                >
-                  Lihat Sertifikat
-                </button>
+                {selected.files && selected.files.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selected.files.map((f, idx) => {
+                      const resolved = resolveCertUrl(f.file_url ?? undefined);
+                      const disabled = !resolved;
+                      return (
+                        <button
+                          key={String(f.id ?? idx)}
+                          disabled={disabled}
+                          className="inline-flex items-center rounded-full px-4 py-2 border text-[14px]
+                                     border-[var(--secondary-color)] text-[var(--secondary-color)]
+                                     hover:bg-[var(--secondary-color)]/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={() =>
+                            openPreview({
+                              ...selected,
+                              link: resolved || undefined,
+                            })
+                          }
+                        >
+                          Lihat File {idx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <button
+                    disabled={!selected.link}
+                    className="inline-flex items-center rounded-full px-4 py-2 border text-[14px]
+                               border-[var(--secondary-color)] text-[var(--secondary-color)]
+                               hover:bg-[var(--secondary-color)]/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => openPreview(selected)}
+                  >
+                    Lihat Sertifikat
+                  </button>
+                )}
               </div>
+              {showDecisionButtons && (
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => openReject()}
+                    className="rounded-full px-8 py-3 border-2 bg-white
+                             text-[var(--accent-red-color)] border-[var(--accent-red-color)]
+                             hover:bg-[var(--accent-pink-color)]/5"
+                  >
+                    Tolak
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (decisionMode === "draft") {
+                        onDraftChange?.(selected, { status: "approved", reason: null });
+                        setPhase("list");
+                        setSelected(null);
+                        return;
+                      }
+                      if (onApprove) onApprove(selected);
+                    }}
+                    className="rounded-full px-8 py-3 font-semibold shadow
+                             bg-[var(--primary-color)] text-neutral-900 hover:brightness-95"
+                  >
+                    Setujui
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -576,34 +668,6 @@ const ManageCertificateModal: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* only show when under_review */}
-            {showDecisionButtons && (
-              <div className="px-5 pb-4 grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => openReject()}
-                  className="rounded-full px-8 py-3 border-2 bg-white
-                           text-[var(--accent-red-color)] border-[var(--accent-red-color)]
-                           hover:bg-[var(--accent-pink-color)]/5"
-                >
-                  Tolak
-                </button>
-                <button
-                  onClick={() => {
-                    if (decisionMode === "draft") {
-                      onDraftChange?.(selected, { status: "approved", reason: null });
-                      setPhase("list");
-                      setSelected(null);
-                      return;
-                    }
-                    if (onApprove) onApprove(selected);
-                  }}
-                  className="rounded-full px-8 py-3 font-semibold shadow
-                           bg-[var(--primary-color)] text-neutral-900 hover:brightness-95"
-                >
-                  Setujui
-                </button>
-              </div>
-            )}
           </>
         )}
 

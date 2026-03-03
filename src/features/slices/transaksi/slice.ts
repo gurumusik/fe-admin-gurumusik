@@ -5,6 +5,7 @@ import {
   listTransactionsByPromo,
   getTransaksiDetail,
   listAllTransactions, // NEW
+  getMonthlyTxStats,
 } from '@/services/api/transaksi.api';
 
 import type {
@@ -19,6 +20,7 @@ import type {
   ListAllTxParams,
   ListPromoTransactionsResp,
   MonthlyRecapPoint,
+  MonthlyTxStats,
 } from './types';
 
 /* ========================= HELPERS ========================= */
@@ -67,6 +69,10 @@ const initialState: TransaksiByPromoState = {
   allRecap: null,          // rekap agregat
   allMonthlyRecap: null,   // rekap bulanan (chart)
   monthlyrecap: null,
+
+  monthlyStats: null,
+  monthlyStatsStatus: 'idle',
+  monthlyStatsError: null,
 };
 
 /* ========================= THUNKS ========================= */
@@ -178,6 +184,20 @@ export const fetchAllTxThunk = createAsyncThunk<
     return res;
   } catch (e: any) {
     return rejectWithValue(e?.message ?? 'Gagal memuat semua transaksi');
+  }
+});
+
+// === MONTHLY booking/payment stats
+export const fetchMonthlyTxStatsThunk = createAsyncThunk<
+  MonthlyTxStats,
+  { year?: number; month?: number } | void,
+  { rejectValue: string }
+>('transaksi/monthlyStats/fetch', async (params, { rejectWithValue }) => {
+  try {
+    const res = await getMonthlyTxStats(params || {});
+    return res as MonthlyTxStats;
+  } catch (e: any) {
+    return rejectWithValue(e?.message ?? 'Gagal memuat statistik transaksi');
   }
 });
 /* ========================= SLICE ========================= */
@@ -312,6 +332,21 @@ const slice = createSlice({
       s.allStatus = 'failed';
       s.allError = (a.payload as string) ?? 'Terjadi kesalahan';
       s.allItems = [];
+    });
+
+    // === monthly stats
+    b.addCase(fetchMonthlyTxStatsThunk.pending, (s) => {
+      s.monthlyStatsStatus = 'loading';
+      s.monthlyStatsError = null;
+    });
+    b.addCase(fetchMonthlyTxStatsThunk.fulfilled, (s, a) => {
+      s.monthlyStatsStatus = 'succeeded';
+      s.monthlyStats = a.payload ?? null;
+    });
+    b.addCase(fetchMonthlyTxStatsThunk.rejected, (s, a) => {
+      s.monthlyStatsStatus = 'failed';
+      s.monthlyStatsError = (a.payload as string) ?? 'Terjadi kesalahan';
+      s.monthlyStats = null;
     });
   },
 });

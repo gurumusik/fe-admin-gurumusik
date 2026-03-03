@@ -23,7 +23,7 @@ export type RecruitmentListResp = {
 /* ========================= API CALLS ========================= */
 
 /**
- * GET /recruitment/applications
+ * GET /guru-applications/applications
  * Query: ?status=proses|diterima|ditolak (opsional)
  */
 export async function listRecruitmentApplications(params?: { status?: 'proses' | 'diterima' | 'ditolak' }) {
@@ -45,7 +45,7 @@ export async function listRecruitmentApplications(params?: { status?: 'proses' |
 }
 
 /**
- * PATCH /recruitment/applications/:id/decision
+ * PATCH /guru-applications/applications/:id/decision
  * Body: { decision: 'approve'|'reject', note?: string }
  */
 export async function decideApplication(

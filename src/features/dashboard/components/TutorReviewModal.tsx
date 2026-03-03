@@ -35,7 +35,6 @@ type TutorReviewModalProps = {
   // kontrol toggle
   onSetShown?: (next: boolean) => Promise<void> | void;
   submitting?: boolean;
-  errorText?: string | null;
 
   // fallback PUT
   guruId?: number | string;
@@ -48,6 +47,7 @@ type TutorReviewModalProps = {
   selectedIndicators?: RatingSelectedIndicatorItem[];
   attachments?: RatingAttachmentItem[];
   feedbackText?: string | null;
+  errorText?: string | null;
 };
 
 const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
@@ -69,6 +69,7 @@ const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
   selectedIndicators = [],
   attachments = [],
   feedbackText = '',
+  errorText = null,
 }) => {
   // rating bintang (UI tetap)
   const ratingValue = useMemo(() => {
@@ -220,6 +221,12 @@ const TutorReviewModal: React.FC<TutorReviewModalProps> = ({
               <RiInformationLine size={25} className="text-[var(--accent-red-color)]" />
             </label>
           </div>
+
+          {errorText && (
+            <div className="mt-2 text-sm text-[var(--accent-red-color)]">
+              {errorText}
+            </div>
+          )}
 
           {/* ====== Alasan: dari selectedIndicators */}
           <div className="mt-5">

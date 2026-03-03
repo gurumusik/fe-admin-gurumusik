@@ -72,13 +72,17 @@ const AdminSidebar: React.FC = () => {
   ];
   const reportPrefixes = [
     "/dashboard-admin/reschedule",
+    "/dashboard-admin/request-assist",
+    "/dashboard-admin/wa-handoffs",
     "/dashboard-admin/tutor-report",
     "/dashboard-admin/student-report",
   ];
   const usersPrefixes = [
     "/dashboard-admin/tutor-list",
+    "/dashboard-admin/tutor-incomplete",
     "/dashboard-admin/student-list",
     "/dashboard-admin/employees",
+    "/dashboard-admin/transaction-list",
   ];
 
   // cek aktif per grup
@@ -283,6 +287,16 @@ const AdminSidebar: React.FC = () => {
                   active={isExact("/dashboard-admin/reschedule")}
                 />
                 <SubItem
+                  to="/dashboard-admin/request-assist"
+                  label="Request Assist"
+                  active={isExact("/dashboard-admin/request-assist")}
+                />
+                <SubItem
+                  to="/dashboard-admin/wa-handoffs"
+                  label="WA Admin Queue"
+                  active={isExact("/dashboard-admin/wa-handoffs")}
+                />
+                <SubItem
                   to="/dashboard-admin/tutor-report"
                   label="Tutor Report"
                   active={isExact("/dashboard-admin/tutor-report")}
@@ -316,7 +330,7 @@ const AdminSidebar: React.FC = () => {
                     groupActiveUsers ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
                   }`}
                 >
-                  List User
+                  Data Lists
                 </span>
               </div>
               <RiArrowDownSLine
@@ -335,6 +349,11 @@ const AdminSidebar: React.FC = () => {
                   active={isUnder("/dashboard-admin/tutor-list")}
                 />
                 <SubItem
+                  to="/dashboard-admin/tutor-incomplete"
+                  label="Guru Belum Lengkap"
+                  active={isUnder("/dashboard-admin/tutor-incomplete")}
+                />
+                <SubItem
                   to="/dashboard-admin/student-list"
                   label="Student List"
                   active={isUnder("/dashboard-admin/student-list")}
@@ -343,6 +362,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/employees"
                   label="Employee Access"
                   active={isUnder("/dashboard-admin/employees")}
+                />
+                <SubItem
+                  to="/dashboard-admin/transaction-list"
+                  label="Transaction List"
+                  active={isUnder("/dashboard-admin/transaction-list")}
                 />
               </div>
             </DropWrap>

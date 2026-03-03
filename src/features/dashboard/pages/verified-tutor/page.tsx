@@ -35,6 +35,12 @@ import ManageCertificateModal, {
   type CertificateItem,
   type CertStatus,
 } from '@/features/dashboard/components/ManageCertificateModal';
+import EducationCertificateModal, {
+  type EducationCertificateData,
+} from '@/features/dashboard/components/EducationCertificateModal';
+import AwardCertificateModal, {
+  type AwardCertificateData,
+} from '@/features/dashboard/components/AwardCertificateModal';
 
 const cls = (...xs: Array<string | false | null | undefined>) =>
   xs.filter(Boolean).join(' ');
@@ -175,8 +181,10 @@ const Pagination: React.FC<{
   page: number;
   onChange: (p: number) => void;
   pageSize?: number;
-}> = ({ total, page, onChange, pageSize = PAGE_SIZE }) => {
-  const pages = Math.ceil(Math.max(0, Number(total) || 0) / pageSize);
+  totalPages?: number;
+}> = ({ total, page, onChange, pageSize = PAGE_SIZE, totalPages }) => {
+  const pages = totalPages ?? Math.ceil(Math.max(0, Number(total) || 0) / pageSize);
+  const current = Math.min(Math.max(1, page), Math.max(1, pages));
 
   const btnCls =
     'min-w-9 h-9 px-3 rounded-lg border border-[#E3E8EF] text-md text-[#202020] hover:bg-[#F5F7FA]';
@@ -189,11 +197,11 @@ const Pagination: React.FC<{
       arr[arr.length - 1] === v ? undefined : arr.push(v);
 
     for (let i = 1; i <= pages; i++) {
-      if (i <= 3 || i > pages - 2 || Math.abs(i - page) <= 1) push(i);
+      if (i <= 3 || i > pages - 2 || Math.abs(i - current) <= 1) push(i);
       else if (arr[arr.length - 1] !== '...') push('...');
     }
     return arr;
-  }, [pages, page]);
+  }, [pages, current]);
 
   if (pages <= 1) return null;
 
@@ -201,8 +209,8 @@ const Pagination: React.FC<{
     <div className="flex items-center gap-2 mt-5">
       <button
         className={arrowBtnCls}
-        disabled={page === 1}
-        onClick={() => onChange(Math.max(1, page - 1))}
+        disabled={current === 1}
+        onClick={() => onChange(Math.max(1, current - 1))}
         aria-label="Sebelumnya"
         title="Sebelumnya"
       >
@@ -219,7 +227,7 @@ const Pagination: React.FC<{
             key={v}
             className={cls(
               btnCls,
-              v === page &&
+              v === current &&
                 'bg-[var(--secondary-light-color)] border-[var(--secondary-color)] font-medium'
             )}
             onClick={() => onChange(v)}
@@ -231,8 +239,8 @@ const Pagination: React.FC<{
 
       <button
         className={arrowBtnCls}
-        disabled={page === pages}
-        onClick={() => onChange(Math.min(pages, page + 1))}
+        disabled={current === pages}
+        onClick={() => onChange(Math.min(pages, current + 1))}
         aria-label="Berikutnya"
         title="Berikutnya"
       >
@@ -252,35 +260,87 @@ const mapCertStatus = (raw?: string | null): CertStatus => {
   return 'Menunggu Verifikasi'; // termasuk 'under_review' / default
 };
 
+const LANGUAGE_MAP: Record<string, { label: string; code: string }> = {
+  id: { label: 'Indonesia', code: 'ID' },
+  en: { label: 'English', code: 'EN' },
+  ja: { label: 'Jepang', code: 'JA' },
+  ko: { label: 'Korea', code: 'KR' },
+  cn: { label: 'China', code: 'CN' },
+  zh: { label: 'China', code: 'CN' },
+  fr: { label: 'Prancis', code: 'FR' },
+  de: { label: 'Jerman', code: 'DE' },
+  es: { label: 'Spanyol', code: 'ES' },
+  it: { label: 'Italia', code: 'IT' },
+  pt: { label: 'Portugal', code: 'PT' },
+  ru: { label: 'Rusia', code: 'RU' },
+  ar: { label: 'Arab', code: 'AR' },
+  nl: { label: 'Belanda', code: 'NL' },
+};
+
+const normalizeLanguages = (values: any[]) => {
+  const items = values
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .map((raw) => {
+      const key = raw.toLowerCase();
+      const known = LANGUAGE_MAP[key];
+      if (known) return known;
+      const code = raw.length <= 3 ? raw.toUpperCase() : raw.slice(0, 3).toUpperCase();
+      const label = raw.length <= 3 ? raw.toUpperCase() : raw;
+      return { code, label };
+    });
+  const seen = new Set<string>();
+  return items.filter((it) => {
+    if (seen.has(it.code)) return false;
+    seen.add(it.code);
+    return true;
+  });
+};
+
 const buildCertificatesFromApplication = (
   row: GuruApplicationDTO | null
 ): CertificateItem[] => {
-  if (!row || !row.user) return [];
+  if (!row) return [];
   const userAny: any = row.user as any;
   const detailGuru = userAny?.detailGuru;
-  const list: any[] = detailGuru?.sertifikat ?? [];
+  const list: any[] =
+    (Array.isArray((row as any).list_sertifikat) &&
+      (row as any).list_sertifikat) ||
+    detailGuru?.sertifikat ||
+    [];
   const clips: any[] = detailGuru?.cuplikan ?? [];
   if (!Array.isArray(list) || !list.length) return [];
 
   return list.map((s: any): CertificateItem => {
     // pastikan hasil akhirnya string | undefined (bukan null)
-    const fileUrl = s.certif_path
-      ? (resolveImageUrl(s.certif_path ?? null) ?? undefined)
-      : undefined;
+    const filesArr = Array.isArray(s.files) ? s.files : [];
+    const fileFromFiles =
+      filesArr.length > 0 ? filesArr[0]?.file_url : undefined;
+    const fileUrl =
+      fileFromFiles || s.certif_path
+        ? (resolveImageUrl((fileFromFiles || s.certif_path) ?? null) ?? undefined)
+        : undefined;
 
     const instrumentName =
-      (s.instrument && (s.instrument.nama_instrumen as string)) || "—";
+      (s.instrument && (s.instrument.nama_instrumen as string)) ||
+      (s.instrument && (s.instrument.nama as string)) ||
+      "-";
 
     const instrumentIcon =
       s.instrument && s.instrument.icon
         ? (resolveImageUrl(s.instrument.icon ?? null) ?? undefined)
         : undefined;
 
-    const gradeName = (s.grade && (s.grade.nama_grade as string)) || "—";
+    const gradeName =
+      (s.grade && (s.grade.nama_grade as string)) ||
+      (s.grade && (s.grade.nama as string)) ||
+      "-";
 
     const instrumentId = s.instrument_id ?? s.instrument?.id ?? null;
     const instrumentNameRaw =
-      (s.instrument && (s.instrument.nama_instrumen as string)) || "";
+      (s.instrument && (s.instrument.nama_instrumen as string)) ||
+      (s.instrument && (s.instrument.nama as string)) ||
+      "";
     const instrumentNameNormalized = instrumentNameRaw.trim();
 
     const clip =
@@ -300,13 +360,26 @@ const buildCertificatesFromApplication = (
         );
       }) ?? null;
 
+    const certTypeRaw = String(s.tipe_sertifikat || '').toLowerCase();
+    const certType =
+      certTypeRaw === 'international' || certTypeRaw === 'internasional'
+        ? 'Internasional'
+        : certTypeRaw === 'local' || certTypeRaw === 'lokal'
+        ? 'Lokal'
+        : certTypeRaw
+        ? certTypeRaw.charAt(0).toUpperCase() + certTypeRaw.slice(1)
+        : undefined;
+
     return {
       id: s.id,
       title: s.keterangan || "Sertifikat",
-      school: s.penyelenggara || "—",
+      school: s.penyelenggara || "-",
       instrument: instrumentName,
       instrumentIcon,        // sekarang: string | undefined
       grade: gradeName,
+      certType,
+      year: Number.isFinite(Number(s.tahun_berlaku)) ? Number(s.tahun_berlaku) : undefined,
+      files: filesArr,
       status: mapCertStatus(s.status),
       link: fileUrl,         // sekarang: string | undefined
       rejectReason: s.alasan_penolakan ?? null,
@@ -333,8 +406,9 @@ const VerifiedTutorPage: React.FC = () => {
   const total: number = typeof gaList?.total === 'number' ? gaList.total : 0;
   const loading: boolean = !!gaList?.loading;
   const errorMsg: string | null = gaList?.error ?? null;
-
-  const [page, setPage] = useState<number>(gaList?.page || 1);
+  const page = gaList?.page || 1;
+  const limit = gaList?.limit || PAGE_SIZE;
+  const totalPages = gaList?.totalPages || Math.ceil(Math.max(0, total) / limit);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ApproveMode>('approved');
@@ -354,6 +428,12 @@ const VerifiedTutorPage: React.FC = () => {
   const [certModalItems, setCertModalItems] = useState<CertificateItem[]>([]);
   const [certModalTitle, setCertModalTitle] =
     useState<string>('Kelola Sertifikat');
+  const [eduModalOpen, setEduModalOpen] = useState(false);
+  const [eduModalData, setEduModalData] =
+    useState<EducationCertificateData | null>(null);
+  const [awardModalOpen, setAwardModalOpen] = useState(false);
+  const [awardModalData, setAwardModalData] =
+    useState<AwardCertificateData | null>(null);
 
   const [certDrafts, setCertDrafts] = useState<
     Record<
@@ -361,20 +441,46 @@ const VerifiedTutorPage: React.FC = () => {
       { status: 'approved' | 'rejected'; reason?: string | null }
     >
   >({});
+  const [hiddenIds, setHiddenIds] = useState<Record<number, true>>({});
 
-  // Load awal: hanya status 'proses'
+  // Set default filter sekali (status proses + limit)
   useEffect(() => {
     dispatch(setGALimit(PAGE_SIZE));
-    dispatch(setGAPage(page));
     dispatch(setGAStatus('proses'));
+  }, [dispatch]);
+
+  // Fetch saat query berubah (page/limit/status/sort/search)
+  useEffect(() => {
     dispatch(fetchGuruApplicationsThunk());
-  }, [dispatch, page]);
+  }, [
+    dispatch,
+    gaList?.page,
+    gaList?.limit,
+    gaList?.status,
+    gaList?.q,
+    gaList?.created_from,
+    gaList?.created_to,
+    gaList?.sort?.by,
+    gaList?.sort?.dir,
+  ]);
 
   // Filter client-side juga (untuk berjaga)
   const items = useMemo(
-    () => itemsAll.filter((r) => r.status === 'proses'),
-    [itemsAll]
+    () =>
+      itemsAll.filter((r) => r.status === 'proses' && !hiddenIds[Number(r.id)]),
+    [itemsAll, hiddenIds]
   );
+
+  useEffect(() => {
+    setHiddenIds({});
+  }, [itemsAll]);
+
+  // Jika halaman kosong setelah keputusan, mundur 1 halaman
+  useEffect(() => {
+    if (!loading && items.length === 0 && page > 1) {
+      dispatch(setGAPage(page - 1));
+    }
+  }, [loading, items.length, page, dispatch]);
 
   const openModal = (mode: ApproveMode, row: GuruApplicationDTO) => {
     setSelected(row);
@@ -415,6 +521,43 @@ const VerifiedTutorPage: React.FC = () => {
     ).length;
   }, [certDrafts, selected]);
 
+  const selectedLanguages = useMemo(() => {
+    const a = Array.isArray(selected?.bahasa) ? selected?.bahasa : [];
+    const b = Array.isArray(selected?.user?.detailGuru?.bahasa)
+      ? (selected?.user?.detailGuru?.bahasa as any[])
+      : [];
+    const merged = [...a, ...b];
+    return normalizeLanguages(merged);
+  }, [selected]);
+
+  const selectedAwardList = useMemo<AwardCertificateData[]>(() => {
+    if (!Array.isArray(selected?.sertifikat_penghargaan)) return [];
+    return selected.sertifikat_penghargaan.map((a) => ({
+      id: a.id ?? null,
+      judul_penghargaan: a.judul_penghargaan ?? null,
+      penyelenggara: a.penyelenggara ?? null,
+      detail_penghargaan: a.detail_penghargaan ?? null,
+      instrument_id: a.instrument_id ?? null,
+      instrument: a.instrument ?? null,
+      files: Array.isArray((a as any).files) ? (a as any).files : null,
+      video_url: a.video_url ?? null,
+    }));
+  }, [selected]);
+
+  const selectedEducationList = useMemo<EducationCertificateData[]>(() => {
+    if (!Array.isArray(selected?.pendidikan_guru)) return [];
+    return selected.pendidikan_guru.map((e) => ({
+      id: e.id ?? null,
+      nama_kampus: e.nama_kampus ?? null,
+      major_instrument_id: e.major_instrument_id ?? null,
+      minor_instrument_id: e.minor_instrument_id ?? null,
+      majorInstrument: e.majorInstrument ?? null,
+      minorInstrument: e.minorInstrument ?? null,
+      url_sertifikat_kelulusan: e.url_sertifikat_kelulusan ?? null,
+      video_url: e.video_url ?? null,
+    }));
+  }, [selected]);
+
   // Panggil endpoint APPROVE/REJECT via thunk + tampilkan LoadingScreen
   const handleSubmitModal = async (payload: ApproveTeacherPayload) => {
     if (!selected) return;
@@ -448,6 +591,9 @@ const VerifiedTutorPage: React.FC = () => {
         ).unwrap();
       }
       setConfirmKind('success');
+      setHiddenIds((prev) =>
+        selected?.id ? { ...prev, [Number(selected.id)]: true } : prev
+      );
     } catch {
       setConfirmKind('error');
     } finally {
@@ -533,7 +679,13 @@ const VerifiedTutorPage: React.FC = () => {
       </div>
 
       <div className="flex justify-center">
-        <Pagination total={total} page={page} onChange={setPage} />
+        <Pagination
+          total={total}
+          totalPages={totalPages}
+          page={page}
+          pageSize={limit}
+          onChange={(p) => dispatch(setGAPage(p))}
+        />
       </div>
 
       {/* Modal Approve / Reject */}
@@ -550,21 +702,29 @@ const VerifiedTutorPage: React.FC = () => {
           short_name: selected?.user?.nama_panggilan ?? undefined,
           email: selected?.email ?? undefined,
           phone: selected?.no_telp ?? undefined,
-          city: selected?.domisili ?? '-',
+          province:
+            selected?.domisili_provinsi ??
+            selected?.user?.province ??
+            undefined,
+          city: selected?.domisili ?? selected?.user?.city ?? '-',
+          address: selected?.user?.alamat ?? undefined,
           videoUrl: selected?.user?.detailGuru?.intro_link ?? undefined,
           cvUrl: selected?.cv_url ?? undefined,
           certificateUrl: selected?.portfolio_url ?? undefined,
           awardCertificateUrl:
             selected?.sertifikat_penghargaan_url ?? undefined,
-          certificates: buildCertificatesFromApplication(selected),
-          education: {
-            campusName: selected?.user?.pendidikanGuru?.nama_kampus ?? undefined,
-            majorMinor:
-              selected?.user?.pendidikanGuru?.prodi_major_minor ?? undefined,
-            graduationCertUrl:
-              selected?.user?.pendidikanGuru?.url_sertifikat_kelulusan ??
-              undefined,
+          certificates: applyDrafts(buildCertificatesFromApplication(selected)),
+          languages: selectedLanguages,
+          classInfo: {
+            title: selected?.judul_kelas ?? undefined,
+            about: selected?.tentang_kelas ?? undefined,
+            values:
+              (Array.isArray(selected?.value_kelas)
+                ? selected?.value_kelas
+                : selected?.user?.detailGuru?.value_teacher) ?? undefined,
           },
+          awardList: selectedAwardList,
+          educationList: selectedEducationList,
         }}
         onOpenCertificates={(opts) => {
           const all = applyDrafts(buildCertificatesFromApplication(selected));
@@ -580,6 +740,19 @@ const VerifiedTutorPage: React.FC = () => {
           }
           setCertModalItems(filtered);
           setCertModalOpen(true);
+        }}
+        onOpenCertificateDetail={(item) => {
+          setCertModalTitle(item.title || 'Detail Sertifikat');
+          setCertModalItems([item]);
+          setCertModalOpen(true);
+        }}
+        onOpenEducationDetail={(edu) => {
+          setEduModalData(edu);
+          setEduModalOpen(true);
+        }}
+        onOpenAwardDetail={(award) => {
+          setAwardModalData(award);
+          setAwardModalOpen(true);
         }}
       />
 
@@ -605,6 +778,8 @@ const VerifiedTutorPage: React.FC = () => {
         onClose={() => setCertModalOpen(false)}
         certificates={certModalItems}
         title={certModalTitle}
+        initialItemId={certModalItems.length === 1 ? certModalItems[0].id : undefined}
+        initialPhase={certModalItems.length === 1 ? 'detail' : 'list'}
         canDecide
         decisionMode="draft"
         onDraftChange={(item, payload) => {
@@ -627,6 +802,17 @@ const VerifiedTutorPage: React.FC = () => {
             )
           );
         }}
+      />
+
+      <EducationCertificateModal
+        isOpen={eduModalOpen}
+        onClose={() => setEduModalOpen(false)}
+        data={eduModalData}
+      />
+      <AwardCertificateModal
+        isOpen={awardModalOpen}
+        onClose={() => setAwardModalOpen(false)}
+        data={awardModalData}
       />
     </div>
   );

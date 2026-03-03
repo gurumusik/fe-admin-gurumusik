@@ -15,6 +15,7 @@ import StudentReportPage from "@/features/dashboard/pages/student-report/page";
 import VerifiedTutorPage from "@/features/dashboard/pages/verified-tutor/page";
 import AdminEarningsPage from "@/features/dashboard/pages/earnings/page";
 import TutorListPage from "@/features/dashboard/pages/tutor-list/page";
+import TutorIncompletePage from "@/features/dashboard/pages/tutor-incomplete/page";
 import ClassListTutorPage from "@/features/dashboard/pages/tutor-list/class-list-tutor/page";
 import StudentListPage from "@/features/dashboard/pages/student-list/page";
 import DetailStudentPage from "@/features/dashboard/pages/student-list/detail-student/page";
@@ -38,6 +39,9 @@ import ManageProgramPage from '@/features/dashboard/pages/programs/page';
 import ManagePaketPage from '@/features/dashboard/pages/paket/page';
 import CertificateInstrumentPage from '@/features/dashboard/pages/certificate-instrument/page';
 import EmployeePage from '@/features/dashboard/pages/employee/page';
+import TransactionListPage from '@/features/dashboard/pages/transaction-list/page';
+import RequestAssistPage from "@/features/dashboard/pages/request-assist/page";
+import WaHandoffsPage from "@/features/dashboard/pages/wa-handoffs/page";
 
 export const router = createBrowserRouter([
   {
@@ -70,15 +74,19 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/tutor-report", element: <TutorReportPage /> },
       { path: "/dashboard-admin/student-report", element: <StudentReportPage /> },
       { path: "/dashboard-admin/reschedule", element: <ReschedulePage /> },
+      { path: "/dashboard-admin/request-assist", element: <RequestAssistPage /> },
+      { path: "/dashboard-admin/wa-handoffs", element: <WaHandoffsPage /> },
       { path: "/dashboard-admin/verified-tutor", element: <VerifiedTutorPage /> },
       { path: "/dashboard-admin/earnings", element: <AdminEarningsPage /> },
       { path: "/dashboard-admin/tutor-list", element: <TutorListPage /> },
+      { path: "/dashboard-admin/tutor-incomplete", element: <TutorIncompletePage /> },
       { path: "/dashboard-admin/tutor-list/class-list-tutor", element: <ClassListTutorPage /> },
       { path: "/dashboard-admin/tutor-list/class-list-tutor/detail-class", element: <DetailClassTutorPage /> },
       { path: "/dashboard-admin/tutor-list/class-list-tutor/profile-tutor", element: <ProfileTutorPage /> },
       { path: "/dashboard-admin/student-list", element: <StudentListPage /> },
       { path: "/dashboard-admin/student-list/detail-student", element: <DetailStudentPage /> },
       { path: "/dashboard-admin/student-list/detail-student/detail-class/:classId", element: <DetailStudentClassPage /> },
+      { path: "/dashboard-admin/transaction-list", element: <TransactionListPage /> },
       { path: "/dashboard-admin/manage-promo", element: <AdminManagePromoPage /> },
       { path: "/dashboard-admin/manage-promo/detail-promo", element: <DetailPromoPage /> },
       { path: "/dashboard-admin/manage-promo/manage-flashsale", element: <ManageFlashsalePage /> },

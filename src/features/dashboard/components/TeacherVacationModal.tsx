@@ -12,6 +12,8 @@ export type TeacherVacationModalProps = {
   defaultStartDate?: string;
   defaultEndDate?: string;
   widthClass?: string; // e.g. "max-w-lg"
+  title?: string;
+  description?: React.ReactNode;
 };
 
 const cls = (...xs: Array<string | false | null | undefined>) =>
@@ -24,6 +26,8 @@ const TeacherVacationModal: React.FC<TeacherVacationModalProps> = ({
   defaultStartDate = '',
   defaultEndDate = '',
   widthClass = 'max-w-lg',
+  title,
+  description,
 }) => {
   const confirmRef = useRef<HTMLButtonElement | null>(null);
 
@@ -58,6 +62,14 @@ const TeacherVacationModal: React.FC<TeacherVacationModalProps> = ({
 
   if (!isOpen) return null;
 
+  const finalTitle = title ?? 'Yakin…Mau Mencutikan Guru?';
+  const finalDescription = description ?? (
+    <>
+      Selama periode cuti, guru tidak akan muncul di landing page dan tidak bisa dipesan murid.
+      Setelah periode cuti berakhir, guru otomatis aktif kembali.
+    </>
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
@@ -79,13 +91,12 @@ const TeacherVacationModal: React.FC<TeacherVacationModalProps> = ({
 
           {/* Title */}
           <h3 className="text-center text-lg font-semibold text-neutral-900 mt-6">
-            Yakin…Mau Mencutikan Guru?
+            {finalTitle}
           </h3>
 
           {/* Description */}
           <p className="text-center text-md text-neutral-700 mt-2">
-            Selama periode cuti, guru tidak akan muncul di landing page dan tidak bisa dipesan murid.
-            Setelah periode cuti berakhir, guru otomatis aktif kembali.
+            {finalDescription}
           </p>
 
           <div className="my-4 h-px bg-neutral-200" />

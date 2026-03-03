@@ -10,6 +10,7 @@ export const ENDPOINTS = {
   },
   GURU: {
     LIST: '/guru',
+    INCOMPLETE: '/guru/incomplete',
     DETAIL: (id: number | string) => `/guru/${id}`,
     SCHEDULES: (id: number | string) => `/guru/${id}/schedules`,
     CLASSES: (id: number | string) => `/guru/${id}/classes`,
@@ -64,12 +65,14 @@ export const ENDPOINTS = {
 
   GURU_APPLICATION: {
     LIST: '/guru-applications',
-    DETAIL: (id: number|string) => `/guru-applications/${id}`
+    DETAIL: (id: number|string) => `/guru-applications/${id}`,
+    APPLICATIONS: '/guru-applications/applications',
+    DECIDE: (id: number | string) => `/guru-applications/applications/${id}/decision`,
   },
   
   RECRUITMENT: {
-      LIST: '/recruitment/applications',
-      DECIDE: (id: number | string) => `/recruitment/applications/${id}/decision`,
+      LIST: '/guru-applications/applications',
+      DECIDE: (id: number | string) => `/guru-applications/applications/${id}/decision`,
     },
 
   SILABUS: {
@@ -116,6 +119,7 @@ export const ENDPOINTS = {
 
   MURID: {
     ADMIN_LIST: '/murid', 
+    STATUS: '/murid/status',
     DETAIL_BY_UUID: (uuid: string) => `/murid/by-uuid/${uuid}`, 
     CLASSES_BY_UUID: (uuid: string) => `/murid/by-uuid/${uuid}/classes`,
     CLASS_HISTORY: (uuid: string, classId: string | number) => `/murid/by-uuid/${uuid}/classes/${classId}/history`, 
@@ -129,12 +133,21 @@ export const ENDPOINTS = {
     BY_PROMO: (promoId: number | string) => `/transaksi/promo/${promoId}/transactions`,
     ALL: () => `/transaksi/all`,
     RECAP: () => `/transaksi/recap`,
+    MONTHLY_STATS: () => `/transaksi/monthly-stats`,
   },
   INVOICE: {
     DETAIL: (id: number | string) => `/invoice/${id}`,
   },
   RESCHEDULE: {
     ADMIN_LIST: '/reschedule/admin',
+  },
+  REQUEST_ASSIST: {
+    LIST: '/request-assist',
+    UPDATE_STATUS: (id: number | string) => `/request-assist/${id}/status`,
+  },
+  WA_HANDOFFS: {
+    LIST: '/wa/admin/handoffs',
+    RESOLVE: (id: number | string) => `/wa/admin/handoffs/${id}/resolve`,
   },
   PAYOUT_GURU: {
     LIST: () => `/payout-guru`,

@@ -214,6 +214,23 @@ export type MonthlyRecapPoint = {
   promo_tx_count?: number;// jumlah transaksi pakai promo per bulan
 };
 
+export type MonthlyTxStats = {
+  range: {
+    year: number;
+    month: number;
+    start: string;
+    end: string;
+  };
+  booking: {
+    students: number;
+    transactions: number;
+  };
+  payment: {
+    students: number;
+    transactions: number;
+  };
+};
+
 export type AllTxRecap = {
   total_sum: number;
   course_sum: number;
@@ -257,4 +274,8 @@ export type TransaksiByPromoState = {
   allRecap?: AllTxRecap | null;
   allMonthlyRecap?: MonthlyRecapPoint[] | null; // <-- sumber data chart (tak ikut tab)
   monthlyrecap?: any | null; 
+
+  monthlyStats?: MonthlyTxStats | null;
+  monthlyStatsStatus: SliceStatus;
+  monthlyStatsError?: string | null;
 };

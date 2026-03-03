@@ -8,9 +8,11 @@ export type StudentListItem = {
   uuid: string;
   image: string | null;
   name: string;
+  email?: string | null;
   phone: string | null;
   city: string | null;
   status: 'Aktif' | 'Non-Aktif' | 'Cuti';
+  created_at?: string | null;
 };
 
 export type StudentRecap = {
@@ -48,6 +50,10 @@ export type StudentHeader = {
   image: string | null;
   name: string;
   status: 'Aktif' | 'Non-Aktif' | 'Cuti';
+  email?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  created_at?: string | null;
 };
 
 export type StudentHeaderResp = {
@@ -95,6 +101,10 @@ export type StudentHeaderDTO = {
     image: string | null;
     name: string;
     status: 'Aktif' | 'Non-Aktif' | 'Cuti' | string;
+    email?: string | null;
+    phone?: string | null;
+    city?: string | null;
+    created_at?: string | null;
   };
 };
 
@@ -158,6 +168,27 @@ export async function getStudentByUuid(uuid: string) {
     ENDPOINTS.MURID.DETAIL_BY_UUID(uuid),
     { method: 'GET' }
   );
+}
+
+export type UpdateMuridStatusPayload = {
+  status_akun: 'aktif' | 'non_aktif' | 'cuti';
+  cuti_start_date?: string;
+  cuti_end_date?: string;
+  uuid?: string;
+  id?: number | string;
+};
+
+export async function updateMuridStatus(payload: UpdateMuridStatusPayload) {
+  const qs = new URLSearchParams();
+  if (payload.id != null) qs.set('id', String(payload.id));
+  if (payload.uuid) qs.set('uuid', String(payload.uuid));
+  const qstr = qs.toString() ? `?${qs.toString()}` : '';
+
+  return baseUrl.request<any>(`${ENDPOINTS.MURID.STATUS}${qstr}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
 }
 
 /** Legacy (by UUID, list classes aggregated by transaksi – endpoint lama) */
