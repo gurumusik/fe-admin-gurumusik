@@ -9,8 +9,16 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY pnpm-lock.yaml ./
 COPY package.json ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Improve registry reliability in CI
+RUN pnpm config set fetch-retries 5 \
+  && pnpm config set fetch-retry-factor 2 \
+  && pnpm config set fetch-retry-mintimeout 10000 \
+  && pnpm config set fetch-retry-maxtimeout 120000 \
+  && pnpm config set network-concurrency 1
+
+# Install dependencies and allow native build scripts
+RUN pnpm install --frozen-lockfile \
+  && pnpm approve-builds --all
 
 # Copy project files (kecuali node_modules)
 COPY . .
