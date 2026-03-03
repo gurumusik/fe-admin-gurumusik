@@ -2,7 +2,6 @@ version: '3.9'
 services:
   vite-frontend:
     build: .
-    container_name: vite-frontend
     restart: always
     ports:
       - "5173:5173"
