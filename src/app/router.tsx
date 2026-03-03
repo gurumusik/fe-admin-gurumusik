@@ -15,6 +15,7 @@ import StudentReportPage from "@/features/dashboard/pages/student-report/page";
 import VerifiedTutorPage from "@/features/dashboard/pages/verified-tutor/page";
 import AdminEarningsPage from "@/features/dashboard/pages/earnings/page";
 import TutorListPage from "@/features/dashboard/pages/tutor-list/page";
+import TutorIncompletePage from "@/features/dashboard/pages/tutor-incomplete/page";
 import ClassListTutorPage from "@/features/dashboard/pages/tutor-list/class-list-tutor/page";
 import StudentListPage from "@/features/dashboard/pages/student-list/page";
 import DetailStudentPage from "@/features/dashboard/pages/student-list/detail-student/page";
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/verified-tutor", element: <VerifiedTutorPage /> },
       { path: "/dashboard-admin/earnings", element: <AdminEarningsPage /> },
       { path: "/dashboard-admin/tutor-list", element: <TutorListPage /> },
+      { path: "/dashboard-admin/tutor-incomplete", element: <TutorIncompletePage /> },
       { path: "/dashboard-admin/tutor-list/class-list-tutor", element: <ClassListTutorPage /> },
       { path: "/dashboard-admin/tutor-list/class-list-tutor/detail-class", element: <DetailClassTutorPage /> },
       { path: "/dashboard-admin/tutor-list/class-list-tutor/profile-tutor", element: <ProfileTutorPage /> },

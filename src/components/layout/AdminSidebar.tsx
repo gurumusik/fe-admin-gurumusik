@@ -79,6 +79,7 @@ const AdminSidebar: React.FC = () => {
   ];
   const usersPrefixes = [
     "/dashboard-admin/tutor-list",
+    "/dashboard-admin/tutor-incomplete",
     "/dashboard-admin/student-list",
     "/dashboard-admin/employees",
     "/dashboard-admin/transaction-list",
@@ -346,6 +347,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/tutor-list"
                   label="Tutor List"
                   active={isUnder("/dashboard-admin/tutor-list")}
+                />
+                <SubItem
+                  to="/dashboard-admin/tutor-incomplete"
+                  label="Guru Belum Lengkap"
+                  active={isUnder("/dashboard-admin/tutor-incomplete")}
                 />
                 <SubItem
                   to="/dashboard-admin/student-list"

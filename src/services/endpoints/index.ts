@@ -10,6 +10,7 @@ export const ENDPOINTS = {
   },
   GURU: {
     LIST: '/guru',
+    INCOMPLETE: '/guru/incomplete',
     DETAIL: (id: number | string) => `/guru/${id}`,
     SCHEDULES: (id: number | string) => `/guru/${id}/schedules`,
     CLASSES: (id: number | string) => `/guru/${id}/classes`,
