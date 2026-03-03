@@ -25,16 +25,18 @@ jobs:
 
       - name: Ensure Docker Desktop is running
         shell: bash
+        env:
+          DOCKER_HOST: "unix:///Users/noviprima/Library/Containers/com.docker.docker/Data/docker-cli.sock"
         run: |
           open -a Docker || true
-          for i in {1..60}; do
+          for i in {1..150}; do
             if docker info >/dev/null 2>&1; then
               echo "Docker daemon is ready"
               exit 0
             fi
             sleep 2
           done
-          echo "Docker daemon is not ready after 120s"
+          echo "Docker daemon is not ready after 300s"
           exit 1
 
       - name: Check Docker daemon access
