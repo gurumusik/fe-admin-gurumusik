@@ -125,10 +125,24 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   widthClass = "max-w-md",
 }) => {
   const primaryRef = useRef<HTMLButtonElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    const t = setTimeout(() => primaryRef.current?.focus(), 0);
+    const t = setTimeout(() => {
+      const root = modalRef.current;
+      if (!root) return;
+      const active = document.activeElement;
+      if (active && root.contains(active)) return;
+      const firstField = root.querySelector(
+        "input:not([type=hidden]):not([disabled]), textarea:not([disabled]), select:not([disabled])"
+      ) as HTMLElement | null;
+      if (firstField) {
+        firstField.focus();
+        return;
+      }
+      primaryRef.current?.focus();
+    }, 0);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -165,6 +179,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       aria-modal="true"
     >
       <div
+        ref={modalRef}
         className={cls("w-full rounded-2xl bg-white shadow-2xl", widthClass)}
         onClick={(e) => e.stopPropagation()}
       >
