@@ -23,6 +23,9 @@ jobs:
           docker --version
           docker compose version
 
+      - name: Use Docker Desktop context
+        run: docker context use desktop-linux
+
       - name: Create .env
         shell: bash
         run: |
@@ -58,6 +61,7 @@ jobs:
 
       - name: Build and run new container
         env:
+          DOCKER_HOST: "unix:///Users/noviprima/.docker/run/docker.sock"
           DOCKER_BUILDKIT: "1"
           COMPOSE_DOCKER_CLI_BUILD: "1"
         run: docker compose up -d --build
