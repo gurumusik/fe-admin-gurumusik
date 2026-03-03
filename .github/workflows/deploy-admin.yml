@@ -24,6 +24,8 @@ jobs:
           docker compose version
 
       - name: Check Docker daemon access
+        env:
+          DOCKER_HOST: "unix:///Users/noviprima/Library/Containers/com.docker.docker/Data/docker-cli.sock"
         run: |
           whoami
           echo "DOCKER_HOST=$DOCKER_HOST"
@@ -64,6 +66,10 @@ jobs:
           fi
 
       - name: Build and run new container
+        env:
+          DOCKER_HOST: "unix:///Users/noviprima/Library/Containers/com.docker.docker/Data/docker-cli.sock"
+          DOCKER_BUILDKIT: "1"
+          COMPOSE_DOCKER_CLI_BUILD: "1"
         run: docker compose up -d --build
 
       - name: Show running containers
