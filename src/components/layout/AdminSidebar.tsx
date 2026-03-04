@@ -84,6 +84,7 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/student-list",
     "/dashboard-admin/employees",
     "/dashboard-admin/transaction-list",
+    "/dashboard-admin/transaction-ticket",
   ];
 
   // cek aktif per grup
@@ -373,6 +374,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/transaction-list"
                   label="Transaction List"
                   active={isUnder("/dashboard-admin/transaction-list")}
+                />
+                <SubItem
+                  to="/dashboard-admin/transaction-ticket"
+                  label="Transaction Ticket"
+                  active={isUnder("/dashboard-admin/transaction-ticket")}
                 />
               </div>
             </DropWrap>

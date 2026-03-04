@@ -1,6 +1,7 @@
 /* ========================= TYPES for Murid List ========================= */
 
 export type StudentListItem = {
+  id?: number;
   uuid: string;
   image: string | null;
   name: string;

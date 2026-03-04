@@ -150,6 +150,126 @@ export type TransaksiDetailResp = {
   };
 };
 
+/* ========================= ADMIN CHECKOUT (Ticket) ========================= */
+
+export type TeacherScheduleItem = {
+  id: number;
+  day: number | string;
+  start: string | null;
+  end: string | null;
+  timezone?: string | null;
+};
+
+export type TeacherScheduleResp = {
+  total: number;
+  data: TeacherScheduleItem[];
+};
+
+export type TransaksiPackagePricing = {
+  sessions: number;
+  unit_price: number;
+  subtotal: number;
+  discount_percent: number;
+  paket_discount_percent: number;
+  total: number;
+  admin_fee: number;
+  guru_fee: number;
+  currency: 'IDR';
+  program?: { id: number; nama_program?: string | null };
+  instrument_id?: number | null;
+  grade_id?: number | null;
+};
+
+export type TransaksiPackageItem = {
+  id: number;
+  nama_paket: string;
+  jumlah_sesi?: number | null;
+  diskon_promo?: number | null;
+  is_trial?: boolean | null;
+  pricing?: TransaksiPackagePricing;
+};
+
+export type ListTransaksiPackagesResp = {
+  total: number;
+  data: TransaksiPackageItem[];
+  trial_meta?: {
+    quota?: number | null;
+    used?: boolean;
+    used_experienced?: boolean | null;
+  };
+};
+
+export type ListTransaksiPackagesParams = {
+  program_id?: number;
+  instrument_id?: number;
+  grade_id?: number;
+};
+
+export type AdminCheckoutPayload = {
+  murid_id: number;
+  guru_id: number;
+  schedule_id: number;
+  program_id: number;
+  instrument_id: number;
+  grade_id?: number | null;
+  paket_key: string;
+  custom_sessions?: number | null;
+  metode_pembayaran?: string;
+  bahasa?: string | { code?: string } | null;
+  tanggal_mulai_sesi?: string | null;
+  experienced?: boolean | string | number | null;
+  force_auto_approve?: boolean;
+};
+
+export type AdminCheckoutResp = {
+  message?: string;
+  transaksi?: {
+    id?: number;
+    transaction_code?: string | null;
+    status?: string;
+  };
+  pricing?: {
+    sessions?: number;
+    total?: number;
+  };
+  invoice?: {
+    number?: string;
+    status?: string;
+    total?: number;
+    issued_at?: string | null;
+    due_at?: string | null;
+  };
+};
+
+export async function getTeacherSchedule(guruId: number | string, onlyAvailable = true) {
+  const qs = new URLSearchParams();
+  if (onlyAvailable) qs.set('onlyAvailable', '1');
+  const qstr = qs.toString() ? `?${qs.toString()}` : '';
+  return baseUrl.request<TeacherScheduleResp>(
+    `${ENDPOINTS.TRANSAKSI.TEACHER_SCHEDULE(guruId)}${qstr}`,
+    { method: 'GET' }
+  );
+}
+
+export async function listTransaksiPackages(params: ListTransaksiPackagesParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.program_id) qs.set('program_id', String(params.program_id));
+  if (params.instrument_id) qs.set('instrument_id', String(params.instrument_id));
+  if (params.grade_id) qs.set('grade_id', String(params.grade_id));
+  const qstr = qs.toString() ? `?${qs.toString()}` : '';
+  return baseUrl.request<ListTransaksiPackagesResp>(
+    `${ENDPOINTS.TRANSAKSI.PACKAGES()}${qstr}`,
+    { method: 'GET' }
+  );
+}
+
+export async function adminCheckoutTransaksi(payload: AdminCheckoutPayload) {
+  return baseUrl.request<AdminCheckoutResp>(
+    ENDPOINTS.TRANSAKSI.CHECKOUT(),
+    { method: 'POST', json: payload }
+  );
+}
+
 /* ========================= QUERY PARAM TYPES ========================= */
 
 export type TxRange = '30D' | '90D' | 'ALL';

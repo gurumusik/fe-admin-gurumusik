@@ -5,6 +5,7 @@ import { ENDPOINTS } from '@/services/endpoints';
 /* ========================= TYPES (API) ========================= */
 
 export type StudentListItem = {
+  id?: number;
   uuid: string;
   image: string | null;
   name: string;

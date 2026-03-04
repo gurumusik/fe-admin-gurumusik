@@ -134,6 +134,10 @@ export const ENDPOINTS = {
     ALL: () => `/transaksi/all`,
     RECAP: () => `/transaksi/recap`,
     MONTHLY_STATS: () => `/transaksi/monthly-stats`,
+    PACKAGES: () => `/transaksi/packages`,
+    QUOTE: () => `/transaksi/quote`,
+    CHECKOUT: () => `/transaksi/checkout`,
+    TEACHER_SCHEDULE: (guruId: number | string) => `/transaksi/teacher/${guruId}/schedule`,
   },
   INVOICE: {
     DETAIL: (id: number | string) => `/invoice/${id}`,
