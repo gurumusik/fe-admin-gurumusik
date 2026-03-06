@@ -441,6 +441,8 @@ const VerifiedTutorPage: React.FC = () => {
       { status: 'approved' | 'rejected'; reason?: string | null }
     >
   >({});
+  const [eduDrafts, setEduDrafts] = useState<Record<string, 'approved' | 'rejected'>>({});
+  const [awardDrafts, setAwardDrafts] = useState<Record<string, 'approved' | 'rejected'>>({});
   const [hiddenIds, setHiddenIds] = useState<Record<number, true>>({});
 
   // Set default filter sekali (status proses + limit)
@@ -488,6 +490,8 @@ const VerifiedTutorPage: React.FC = () => {
     setModalOpen(true);
     if (mode === 'approved') {
       setCertDrafts({});
+      setEduDrafts({});
+      setAwardDrafts({});
     }
   };
 
@@ -514,12 +518,21 @@ const VerifiedTutorPage: React.FC = () => {
       };
     });
 
-  const approvedDraftCount = useMemo(() => {
-    const items = buildCertificatesFromApplication(selected);
-    return items.filter(
-      (item) => certDrafts[String(item.id)]?.status === 'approved'
-    ).length;
-  }, [certDrafts, selected]);
+  const certItems = useMemo(
+    () => buildCertificatesFromApplication(selected),
+    [selected]
+  );
+
+  const hasInstrumentCerts = certItems.length > 0;
+  const totalInstrumentCerts = certItems.length;
+
+  const approvedDraftCount = useMemo(
+    () =>
+      certItems.filter(
+        (item) => certDrafts[String(item.id)]?.status === 'approved'
+      ).length,
+    [certItems, certDrafts]
+  );
 
   const selectedLanguages = useMemo(() => {
     const a = Array.isArray(selected?.bahasa) ? selected?.bahasa : [];
@@ -558,6 +571,33 @@ const VerifiedTutorPage: React.FC = () => {
     }));
   }, [selected]);
 
+  const awardListWithDrafts = useMemo(
+    () =>
+      selectedAwardList.map((a) => ({
+        ...a,
+        draftStatus: a.id != null ? awardDrafts[String(a.id)] ?? null : null,
+      })),
+    [selectedAwardList, awardDrafts]
+  );
+
+  const educationListWithDrafts = useMemo(
+    () =>
+      selectedEducationList.map((e) => ({
+        ...e,
+        draftStatus: e.id != null ? eduDrafts[String(e.id)] ?? null : null,
+      })),
+    [selectedEducationList, eduDrafts]
+  );
+
+  const totalAwards = awardListWithDrafts.length;
+  const approvedAwardCount = awardListWithDrafts.filter(
+    (a) => a.draftStatus === 'approved'
+  ).length;
+  const totalEducation = educationListWithDrafts.length;
+  const approvedEducationCount = educationListWithDrafts.filter(
+    (e) => e.draftStatus === 'approved'
+  ).length;
+
   // Panggil endpoint APPROVE/REJECT via thunk + tampilkan LoadingScreen
   const handleSubmitModal = async (payload: ApproveTeacherPayload) => {
     if (!selected) return;
@@ -566,19 +606,47 @@ const VerifiedTutorPage: React.FC = () => {
 
     try {
       if (payload.mode === 'approved') {
-        const certItems = buildCertificatesFromApplication(selected);
         const cert_decisions = buildCertDecisions(certItems);
         const approvedCount = cert_decisions.filter(
           (c) => c.status === 'approved'
         ).length;
-        if (approvedCount < 1) {
-          throw new Error('Minimal 1 sertifikat harus disetujui');
+        const hasAltCerts =
+          (Array.isArray(selected?.pendidikan_guru) &&
+            selected.pendidikan_guru.length > 0) ||
+          (Array.isArray(selected?.sertifikat_penghargaan) &&
+            selected.sertifikat_penghargaan.length > 0);
+        const education_decisions = educationListWithDrafts
+          .filter((e) => e.id != null)
+          .map((e) => ({
+            id: e.id as number | string,
+            status: e.draftStatus === 'approved' ? 'approved' : 'rejected',
+          }));
+        const award_decisions = awardListWithDrafts
+          .filter((a) => a.id != null)
+          .map((a) => ({
+            id: a.id as number | string,
+            status: a.draftStatus === 'approved' ? 'approved' : 'rejected',
+          }));
+
+        if (hasInstrumentCerts && approvedCount !== totalInstrumentCerts) {
+          throw new Error('Semua sertifikat instrumen harus disetujui');
+        }
+        if (totalEducation > 0 && approvedEducationCount !== totalEducation) {
+          throw new Error('Semua sertifikat pendidikan harus disetujui');
+        }
+        if (totalAwards > 0 && approvedAwardCount !== totalAwards) {
+          throw new Error('Semua sertifikat penghargaan harus disetujui');
+        }
+        if (!hasInstrumentCerts && !hasAltCerts) {
+          throw new Error('Minimal 1 sertifikat harus tersedia');
         }
         await dispatch(
           approveApplicationThunk({
             id: selected.id,
             note: (payload as any)?.notes,
-            cert_decisions,
+            cert_decisions: hasInstrumentCerts ? cert_decisions : [],
+            education_decisions,
+            award_decisions,
           })
         ).unwrap();
       } else {
@@ -694,8 +762,13 @@ const VerifiedTutorPage: React.FC = () => {
         mode={modalMode}
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmitModal}
-        approveDisabled={modalMode === 'approved' && approvedDraftCount < 1}
-        approveDisabledHint="Pilih minimal 1 sertifikat untuk disetujui."
+        approveDisabled={
+          modalMode === 'approved' &&
+          ((hasInstrumentCerts && approvedDraftCount !== totalInstrumentCerts) ||
+            (totalEducation > 0 && approvedEducationCount !== totalEducation) ||
+            (totalAwards > 0 && approvedAwardCount !== totalAwards))
+        }
+        approveDisabledHint="Semua sertifikat instrumen, pendidikan, dan penghargaan harus disetujui."
         data={{
           image: resolveImageUrl(selected?.user?.profile_pic_url ?? null) || defaultUser,
           name: selected?.nama ?? undefined,
@@ -713,7 +786,7 @@ const VerifiedTutorPage: React.FC = () => {
           certificateUrl: selected?.portfolio_url ?? undefined,
           awardCertificateUrl:
             selected?.sertifikat_penghargaan_url ?? undefined,
-          certificates: applyDrafts(buildCertificatesFromApplication(selected)),
+          certificates: applyDrafts(certItems),
           languages: selectedLanguages,
           classInfo: {
             title: selected?.judul_kelas ?? undefined,
@@ -723,11 +796,11 @@ const VerifiedTutorPage: React.FC = () => {
                 ? selected?.value_kelas
                 : selected?.user?.detailGuru?.value_teacher) ?? undefined,
           },
-          awardList: selectedAwardList,
-          educationList: selectedEducationList,
+          awardList: awardListWithDrafts,
+          educationList: educationListWithDrafts,
         }}
         onOpenCertificates={(opts) => {
-          const all = applyDrafts(buildCertificatesFromApplication(selected));
+          const all = applyDrafts(certItems);
           let filtered = all;
           if (opts?.instrumentName) {
             const key = opts.instrumentName.toLowerCase();
@@ -808,11 +881,35 @@ const VerifiedTutorPage: React.FC = () => {
         isOpen={eduModalOpen}
         onClose={() => setEduModalOpen(false)}
         data={eduModalData}
+        decisionStatus={
+          eduModalData?.id != null
+            ? eduDrafts[String(eduModalData.id)] ?? null
+            : null
+        }
+        onDecisionChange={(status) => {
+          if (eduModalData?.id == null) return;
+          setEduDrafts((prev) => ({
+            ...prev,
+            [String(eduModalData.id)]: status,
+          }));
+        }}
       />
       <AwardCertificateModal
         isOpen={awardModalOpen}
         onClose={() => setAwardModalOpen(false)}
         data={awardModalData}
+        decisionStatus={
+          awardModalData?.id != null
+            ? awardDrafts[String(awardModalData.id)] ?? null
+            : null
+        }
+        onDecisionChange={(status) => {
+          if (awardModalData?.id == null) return;
+          setAwardDrafts((prev) => ({
+            ...prev,
+            [String(awardModalData.id)]: status,
+          }));
+        }}
       />
     </div>
   );

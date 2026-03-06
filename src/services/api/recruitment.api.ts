@@ -13,6 +13,16 @@ export type DecideApplicationPayload = {
     status: 'approved' | 'rejected';
     alasan_penolakan?: string | null;
   }>;
+  education_decisions?: Array<{
+    id: number | string;
+    status: 'approved' | 'rejected';
+    alasan_penolakan?: string | null;
+  }>;
+  award_decisions?: Array<{
+    id: number | string;
+    status: 'approved' | 'rejected';
+    alasan_penolakan?: string | null;
+  }>;
 };
 
 export type RecruitmentListResp = {

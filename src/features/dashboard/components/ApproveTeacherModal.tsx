@@ -305,6 +305,22 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                                 <span className="text-sm text-neutral-700">
                                   {a.instrument?.nama_instrumen || '-'}
                                 </span>
+                                <span
+                                  className={[
+                                    'ml-auto text-xs font-medium',
+                                    a.draftStatus === 'approved'
+                                      ? 'text-[#18A957]'
+                                      : a.draftStatus === 'rejected'
+                                      ? 'text-[#F14A7E]'
+                                      : 'text-neutral-500',
+                                  ].join(' ')}
+                                >
+                                  {a.draftStatus === 'approved'
+                                    ? 'Disetujui'
+                                    : a.draftStatus === 'rejected'
+                                    ? 'Tidak Disetujui'
+                                    : 'Menunggu Verifikasi'}
+                                </span>
                               </div>
                             </div>
                           ))}
@@ -335,6 +351,22 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                                 )}
                                 <span className="text-sm text-neutral-700">
                                   {e.majorInstrument?.nama_instrumen || '-'}
+                                </span>
+                                <span
+                                  className={[
+                                    'ml-auto text-xs font-medium',
+                                    e.draftStatus === 'approved'
+                                      ? 'text-[#18A957]'
+                                      : e.draftStatus === 'rejected'
+                                      ? 'text-[#F14A7E]'
+                                      : 'text-neutral-500',
+                                  ].join(' ')}
+                                >
+                                  {e.draftStatus === 'approved'
+                                    ? 'Disetujui'
+                                    : e.draftStatus === 'rejected'
+                                    ? 'Tidak Disetujui'
+                                    : 'Menunggu Verifikasi'}
                                 </span>
                               </div>
                             </div>

@@ -13,12 +13,15 @@ export type AwardCertificateData = {
   instrument?: { id?: number | null; nama_instrumen?: string | null; icon?: string | null } | null;
   files?: Array<{ id?: number | null; file_url?: string | null; file_mime?: string | null; created_at?: string | null }> | null;
   video_url?: string | null;
+  draftStatus?: 'approved' | 'rejected' | null;
 };
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   data?: AwardCertificateData | null;
+  decisionStatus?: 'approved' | 'rejected' | null;
+  onDecisionChange?: (status: 'approved' | 'rejected') => void;
 };
 
 const pillBase =
@@ -41,8 +44,16 @@ const resolveHttpsUrl = (raw?: string | null): string => {
   return '';
 };
 
-const AwardCertificateModal: React.FC<Props> = ({ isOpen, onClose, data }) => {
+const AwardCertificateModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  data,
+  decisionStatus,
+  onDecisionChange,
+}) => {
   if (!isOpen) return null;
+
+  const currentDecision = decisionStatus ?? data?.draftStatus ?? null;
 
   const instrumentName = data?.instrument?.nama_instrumen || '-';
   const instrumentIcon = data?.instrument?.icon ? resolveImageUrl(data?.instrument?.icon ?? null) : null;
@@ -50,6 +61,31 @@ const AwardCertificateModal: React.FC<Props> = ({ isOpen, onClose, data }) => {
 
   const videoResolved = resolveHttpsUrl(data?.video_url ?? null);
   const videoDisabled = !videoResolved;
+
+  const decisionLabel =
+    currentDecision === 'approved'
+      ? 'Disetujui'
+      : currentDecision === 'rejected'
+      ? 'Tidak Disetujui'
+      : 'Menunggu Verifikasi';
+
+  const decisionPillClass =
+    currentDecision === 'approved'
+      ? 'bg-[var(--accent-green-light-color)] text-[#18A957] border-[var(--accent-green-color)]'
+      : currentDecision === 'rejected'
+      ? 'bg-[var(--accent-red-light-color)] text-[#F14A7E] border-[var(--accent-red-color)]'
+      : 'bg-neutral-100 text-neutral-600 border-neutral-300';
+
+  const decisionBtnBase =
+    'h-9 px-4 rounded-full text-sm font-semibold border transition';
+  const approveBtnClass =
+    currentDecision === 'approved'
+      ? 'bg-[var(--accent-green-light-color)] border-[var(--accent-green-color)] text-[#18A957]'
+      : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50';
+  const rejectBtnClass =
+    currentDecision === 'rejected'
+      ? 'bg-[var(--accent-red-light-color)] border-[var(--accent-red-color)] text-[#F14A7E]'
+      : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50';
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center px-4" aria-modal="true" role="dialog">
@@ -134,6 +170,36 @@ const AwardCertificateModal: React.FC<Props> = ({ isOpen, onClose, data }) => {
               ) : (
                 <span className="text-sm text-neutral-500">Tidak ada file.</span>
               )}
+            </div>
+
+            <div>
+              <label className="text-md text-neutral-900 mb-1 block">Keputusan Admin</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={[
+                    'inline-flex items-center px-3 py-1 rounded-full text-xs border',
+                    decisionPillClass,
+                  ].join(' ')}
+                >
+                  {decisionLabel}
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onDecisionChange?.('approved')}
+                    className={`${decisionBtnBase} ${approveBtnClass}`}
+                  >
+                    Setujui
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDecisionChange?.('rejected')}
+                    className={`${decisionBtnBase} ${rejectBtnClass}`}
+                  >
+                    Tolak
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

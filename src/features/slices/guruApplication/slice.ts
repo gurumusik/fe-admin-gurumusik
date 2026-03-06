@@ -123,14 +123,26 @@ export const approveApplicationThunk = createAsyncThunk<
       status: 'approved' | 'rejected';
       alasan_penolakan?: string | null;
     }>;
+    education_decisions?: Array<{
+      id: number | string;
+      status: 'approved' | 'rejected';
+      alasan_penolakan?: string | null;
+    }>;
+    award_decisions?: Array<{
+      id: number | string;
+      status: 'approved' | 'rejected';
+      alasan_penolakan?: string | null;
+    }>;
   },
   { rejectValue: string }
->('guruApplication/approve', async ({ id, note, cert_decisions }, thunkApi) => {
+>('guruApplication/approve', async ({ id, note, cert_decisions, education_decisions, award_decisions }, thunkApi) => {
   try {
     const resp = await decideApplication(id, {
       decision: 'approve',
       note,
       cert_decisions,
+      education_decisions,
+      award_decisions,
     });
     return resp;
   } catch (err: any) {
