@@ -619,13 +619,19 @@ const VerifiedTutorPage: React.FC = () => {
           .filter((e) => e.id != null)
           .map((e) => ({
             id: e.id as number | string,
-            status: e.draftStatus === 'approved' ? 'approved' : 'rejected',
+            status:
+              e.draftStatus === 'approved'
+                ? ('approved' as const)
+                : ('rejected' as const),
           }));
         const award_decisions = awardListWithDrafts
           .filter((a) => a.id != null)
           .map((a) => ({
             id: a.id as number | string,
-            status: a.draftStatus === 'approved' ? 'approved' : 'rejected',
+            status:
+              a.draftStatus === 'approved'
+                ? ('approved' as const)
+                : ('rejected' as const),
           }));
 
         if (hasInstrumentCerts && approvedCount !== totalInstrumentCerts) {
