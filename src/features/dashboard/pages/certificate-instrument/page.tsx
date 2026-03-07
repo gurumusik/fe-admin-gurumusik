@@ -79,6 +79,17 @@ const pickCertSchool = (obj: any) =>
 const pickCertLink = (obj: any) =>
   obj?.certif_path ?? obj?.certificate_path ?? obj?.link ?? null;
 
+const pickCertYear = (obj: any) =>
+  obj?.tahun_berlaku ?? obj?.tahun ?? obj?.year ?? null;
+
+const pickCertType = (obj: any) =>
+  obj?.tipe_sertifikat ?? obj?.tipe ?? obj?.cert_type ?? obj?.certificate_type ?? null;
+
+const pickFiles = (obj: any) => obj?.files ?? obj?.file ?? obj?.lampiran ?? null;
+
+const pickVideoClips = (obj: any) =>
+  obj?.cuplikan_kelas_guru ?? obj?.cuplikan_kelas ?? obj?.video_instrumen ?? obj?.video_clips ?? null;
+
 const pickRejectReason = (obj: any) =>
   obj?.alasan_penolakan ?? obj?.reject_reason ?? null;
 
@@ -114,8 +125,37 @@ const toCertificateItem = (obj: any, fallback?: any): CertificateItem => {
 
   const gradeName = pickGradeName(src) ?? pickGradeName(base) ?? '-';
   const statusRaw = pickStatus(src) ?? pickStatus(base);
-  const certLinkRaw = pickCertLink(src) ?? pickCertLink(base);
+
+  const rawFiles = pickFiles(src) ?? pickFiles(base);
+  const filesArr = Array.isArray(rawFiles) ? rawFiles : [];
+  const files: CertificateItem['files'] = filesArr.map((f: any) => ({
+    id: f?.id ?? null,
+    file_url: f?.file_url ?? f?.url ?? f?.path ?? null,
+    file_mime: f?.file_mime ?? f?.mime ?? f?.mimetype ?? null,
+    created_at: f?.created_at ?? null,
+  }));
+
+  const certLinkRaw =
+    files?.[0]?.file_url ?? (pickCertLink(src) ?? pickCertLink(base));
   const certLink = resolveImageUrl(certLinkRaw) ?? (certLinkRaw || undefined);
+
+  const rawClips = pickVideoClips(src) ?? pickVideoClips(base);
+  const clipsArr = Array.isArray(rawClips) ? rawClips : [];
+  const videoClips: CertificateItem['videoClips'] = clipsArr.map((v: any) => ({
+    id: v?.id ?? null,
+    title: v?.title ?? null,
+    description: v?.deskripsi ?? v?.description ?? null,
+    link: v?.link ?? v?.url ?? v?.video_url ?? null,
+  }));
+
+  const yearRaw = pickCertYear(src) ?? pickCertYear(base);
+  const year =
+    typeof yearRaw === 'number'
+      ? yearRaw
+      : yearRaw
+        ? Number(yearRaw)
+        : undefined;
+  const certType = pickCertType(src) ?? pickCertType(base) ?? undefined;
 
   return {
     id: src?.id ?? src?.sertifikat_id ?? base?.id ?? base?.sertifikat_id ?? '-',
@@ -126,6 +166,10 @@ const toCertificateItem = (obj: any, fallback?: any): CertificateItem => {
     grade: String(gradeName ?? '-'),
     status: mapCertStatus(statusRaw),
     link: certLink,
+    year: Number.isFinite(year as number) ? (year as number) : undefined,
+    certType: certType ? String(certType) : undefined,
+    files: files.length ? files : undefined,
+    videoClips: videoClips.length ? videoClips : undefined,
     rejectReason: pickRejectReason(src),
   };
 };

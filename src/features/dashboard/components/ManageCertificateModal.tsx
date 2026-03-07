@@ -32,11 +32,14 @@ export type CertificateItem = {
     created_at?: string | null;
   }>;
   details?: Array<{ label: string; value: string }>;
-  video?: {
-    title?: string;
-    description?: string;
-    link?: string;
-  } | null;
+  videoClips?: Array<{
+    id?: number | string | null;
+    title?: string | null;
+    description?: string | null;
+    link?: string | null;
+  }>;
+  /** legacy (single video) */
+  video?: { title?: string; description?: string; link?: string } | null;
   draftStatus?: "approved" | "rejected" | null;
   draftReason?: string | null;
   /** alasan penolakan dari backend (nullable) */
@@ -436,6 +439,22 @@ const ManageCertificateModal: React.FC<Props> = ({
                 <div className="text-[15px] font-semibold text-neutral-900 mb-2">Penyelenggara Sertifikasi</div>
                 <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 px-4 py-3 text-neutral-700">{selected.school || "-"}</div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <div className="text-[15px] font-semibold text-neutral-900 mb-2">Tahun</div>
+                  <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 px-4 py-3 text-neutral-700">
+                    {selected.year ? String(selected.year) : "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[15px] font-semibold text-neutral-900 mb-2">Tipe Sertifikat</div>
+                  <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 px-4 py-3 text-neutral-700">
+                    {selected.certType || "-"}
+                  </div>
+                </div>
+              </div>
+
               {selected.details && selected.details.length > 0 && (
                 <div className="mb-6">
                   <div className="text-[15px] font-semibold text-neutral-900 mb-2">Detail Tambahan</div>
@@ -476,16 +495,51 @@ const ManageCertificateModal: React.FC<Props> = ({
 
               <div className="mb-6">
                 <div className="text-[15px] font-semibold text-neutral-900 mb-2">Video Instrumen</div>
-                {selected.video?.link ? (
+                {Array.isArray(selected.videoClips) && selected.videoClips.length > 0 ? (
+                  <div className="space-y-3">
+                    {selected.videoClips.map((v, idx) => {
+                      const titleTxt = (v.title ?? "").trim() || `Cuplikan Video ${idx + 1}`;
+                      const descTxt = (v.description ?? "").trim();
+                      const linkTxt = (v.link ?? "").trim();
+                      const embed = resolveVideoEmbedUrl(linkTxt);
+                      return (
+                        <div key={String(v.id ?? idx)} className="rounded-xl border border-neutral-300 bg-neutral-100/50 p-3">
+                          <div className="text-sm font-medium text-neutral-900 mb-1">{titleTxt}</div>
+                          {descTxt ? <div className="text-sm text-neutral-600 mb-3">{descTxt}</div> : null}
+                          {linkTxt ? (
+                            embed ? (
+                              <div className="aspect-video rounded-lg overflow-hidden bg-black/5">
+                                <iframe
+                                  src={embed || undefined}
+                                  title={titleTxt}
+                                  className="w-full h-full"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                  allowFullScreen
+                                />
+                              </div>
+                            ) : (
+                              <a
+                                href={resolveHttpsUrl(linkTxt)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-sm text-[var(--secondary-color)] underline"
+                              >
+                                Buka video
+                              </a>
+                            )
+                          ) : (
+                            <div className="text-sm text-neutral-600">Link video tidak tersedia.</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : selected.video?.link ? (
                   <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 p-3">
-                    <div className="text-sm font-medium text-neutral-900 mb-1">
-                      {selected.video?.title || "Cuplikan Video"}
-                    </div>
-                    {selected.video?.description && (
-                      <div className="text-sm text-neutral-600 mb-3">
-                        {selected.video.description}
-                      </div>
-                    )}
+                    <div className="text-sm font-medium text-neutral-900 mb-1">{selected.video?.title || "Cuplikan Video"}</div>
+                    {selected.video?.description ? (
+                      <div className="text-sm text-neutral-600 mb-3">{selected.video.description}</div>
+                    ) : null}
                     {resolveVideoEmbedUrl(selected.video.link) ? (
                       <div className="aspect-video rounded-lg overflow-hidden bg-black/5">
                         <iframe
