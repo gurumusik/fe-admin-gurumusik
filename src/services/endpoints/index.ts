@@ -191,4 +191,14 @@ export const ENDPOINTS = {
     CREATE: '/admin/employees',
     UPDATE: (id: number | string) => `/admin/employees/${id}`,
   },
+
+  PROFILE_TEMPLATES: {
+    LIST: '/profile-templates', // GET (admin: all+filter, guru: active only)
+    DETAIL: (id: number | string) => `/profile-templates/${id}`,
+    CREATE: '/profile-templates',
+    UPDATE: (id: number | string) => `/profile-templates/${id}`,
+    ENABLE: (id: number | string) => `/profile-templates/${id}/enable`,
+    DISABLE: (id: number | string) => `/profile-templates/${id}/disable`,
+    DELETE: (id: number | string) => `/profile-templates/${id}`,
+  },
 };

@@ -44,6 +44,9 @@ import TransactionTicketPage from '@/features/dashboard/pages/transaction-ticket
 import RequestAssistPage from "@/features/dashboard/pages/request-assist/page";
 import WaHandoffsPage from "@/features/dashboard/pages/wa-handoffs/page";
 import TeacherChangePage from "@/features/dashboard/pages/teacher-change/page";
+import AdminProfileTemplatesPage from '@/features/dashboard/pages/profile-templates/page';
+import AdminProfileTemplateCreatePage from '@/features/dashboard/pages/profile-templates/new/page';
+import AdminProfileTemplateDetailPage from '@/features/dashboard/pages/profile-templates/detail/page';
 
 export const router = createBrowserRouter([
   {
@@ -108,6 +111,9 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/paket", element: <ManagePaketPage /> },
       { path: "/dashboard-admin/certificate-instrument", element: <CertificateInstrumentPage /> },
       { path: "/dashboard-admin/employees", element: <EmployeePage /> },
+      { path: "/dashboard-admin/profile-templates", element: <AdminProfileTemplatesPage /> },
+      { path: "/dashboard-admin/profile-templates/new", element: <AdminProfileTemplateCreatePage /> },
+      { path: "/dashboard-admin/profile-templates/:id", element: <AdminProfileTemplateDetailPage /> },
     ],
   },
 ]);
