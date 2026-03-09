@@ -35,6 +35,9 @@ type PaketForm = {
   benefits: string[];
   details: PaketDetail[];
   diskon_promo: string;
+  promo_start_date: string;
+  promo_end_date: string;
+  promo_quota: string;
   is_trial: boolean;
 };
 
@@ -45,6 +48,9 @@ const initialForm: PaketForm = {
   benefits: [],
   details: [],
   diskon_promo: "",
+  promo_start_date: "",
+  promo_end_date: "",
+  promo_quota: "",
   is_trial: false,
 };
 
@@ -304,6 +310,12 @@ const ManagePaketPage: React.FC = () => {
         paket?.diskon_promo !== undefined && paket.diskon_promo !== null
           ? String(paket.diskon_promo)
           : "",
+      promo_start_date: paket?.promo_start_date ?? "",
+      promo_end_date: paket?.promo_end_date ?? "",
+      promo_quota:
+        paket?.promo_quota !== undefined && paket.promo_quota !== null
+          ? String(paket.promo_quota)
+          : "",
       is_trial: Boolean(paket?.is_trial),
     });
     setBenefitInput("");
@@ -315,6 +327,23 @@ const ManagePaketPage: React.FC = () => {
   };
 
   const closeModal = () => setIsModalOpen(false);
+
+  useEffect(() => {
+    const diskon_promo = form.diskon_promo.trim();
+    const hasAnyPromo =
+      form.promo_start_date.trim() ||
+      form.promo_end_date.trim() ||
+      form.promo_quota.trim();
+
+    if (!diskon_promo && hasAnyPromo) {
+      setForm((prev) => ({
+        ...prev,
+        promo_start_date: "",
+        promo_end_date: "",
+        promo_quota: "",
+      }));
+    }
+  }, [form.diskon_promo, form.promo_start_date, form.promo_end_date, form.promo_quota]);
 
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -395,6 +424,68 @@ const ManagePaketPage: React.FC = () => {
       return;
     }
 
+    const diskon_promo = form.diskon_promo.trim();
+    const promo_start_date = form.promo_start_date.trim();
+    const promo_end_date = form.promo_end_date.trim();
+    const promo_quota = form.promo_quota.trim();
+
+    const diskon_promo_filled = diskon_promo !== "";
+    const promo_any_filled =
+      promo_start_date !== "" || promo_end_date !== "" || promo_quota !== "";
+
+    if (!diskon_promo_filled && promo_any_filled) {
+      openResultModal(
+        "error",
+        "Form belum valid",
+        "promo_start_date, promo_end_date, dan promo_quota tidak boleh diisi jika diskon_promo kosong."
+      );
+      return;
+    }
+
+    if (diskon_promo_filled) {
+      const diskon_promo_number = Number(diskon_promo);
+      if (!Number.isFinite(diskon_promo_number)) {
+        openResultModal(
+          "error",
+          "Form belum valid",
+          "diskon_promo harus numerik (persentase)."
+        );
+        return;
+      }
+
+      if (!promo_start_date || !promo_end_date || !promo_quota) {
+        openResultModal(
+          "error",
+          "Form belum valid",
+          "promo_start_date, promo_end_date, dan promo_quota wajib diisi jika diskon_promo diisi."
+        );
+        return;
+      }
+
+      const promo_quota_number = Number(promo_quota);
+      if (
+        !Number.isFinite(promo_quota_number) ||
+        !Number.isInteger(promo_quota_number) ||
+        promo_quota_number < 0
+      ) {
+        openResultModal(
+          "error",
+          "Form belum valid",
+          "promo_quota harus numerik integer dan tidak boleh negatif."
+        );
+        return;
+      }
+
+      if (promo_start_date > promo_end_date) {
+        openResultModal(
+          "error",
+          "Form belum valid",
+          "promo_start_date tidak boleh lebih besar dari promo_end_date."
+        );
+        return;
+      }
+    }
+
     const isInternasional = packageType === "internasional";
     const isHobby = packageType === "hobby";
 
@@ -404,9 +495,10 @@ const ManagePaketPage: React.FC = () => {
       deskripsi: form.deskripsi.trim() || undefined,
       benefits: form.benefits.length ? form.benefits : undefined,
       details: form.details.length ? form.details : undefined,
-      diskon_promo: form.diskon_promo
-        ? Number(form.diskon_promo)
-        : undefined,
+      diskon_promo: diskon_promo_filled ? Number(diskon_promo) : null,
+      promo_start_date: diskon_promo_filled ? promo_start_date : null,
+      promo_end_date: diskon_promo_filled ? promo_end_date : null,
+      promo_quota: diskon_promo_filled ? Number(promo_quota) : null,
       package_by: packageType,
       is_hobby: isHobby,
       is_internasional: isInternasional,
@@ -489,7 +581,7 @@ const ManagePaketPage: React.FC = () => {
       return (
         <tr>
           <td
-            colSpan={6}
+            colSpan={7}
             className="px-4 py-6 text-center text-sm text-neutral-400"
           >
             Memuat data paket...
@@ -502,7 +594,7 @@ const ManagePaketPage: React.FC = () => {
       return (
         <tr>
           <td
-            colSpan={6}
+            colSpan={7}
             className="px-4 py-6 text-center text-sm text-neutral-400"
           >
             Belum ada paket di kategori ini atau tidak cocok dengan kata kunci.
@@ -541,9 +633,29 @@ const ManagePaketPage: React.FC = () => {
             {paket?.jumlah_sesi ?? "-"}
           </td>
           <td className="px-4 py-3 align-top">
-            {paket?.diskon_promo != null && paket.diskon_promo !== 0
-              ? `${paket.diskon_promo}%`
-              : "-"}
+            {paket?.diskon_promo != null ? `${paket.diskon_promo}%` : "-"}
+          </td>
+          <td className="px-4 py-3 align-top">
+            {paket?.promo_start_date ||
+            paket?.promo_end_date ||
+            paket?.promo_quota != null ? (
+              <div className="text-xs text-neutral-600 space-y-1">
+                <div>
+                  <span className="font-medium">Start:</span>{" "}
+                  {paket?.promo_start_date ?? "-"}
+                </div>
+                <div>
+                  <span className="font-medium">End:</span>{" "}
+                  {paket?.promo_end_date ?? "-"}
+                </div>
+                <div>
+                  <span className="font-medium">Quota:</span>{" "}
+                  {paket?.promo_quota ?? "-"}
+                </div>
+              </div>
+            ) : (
+              "-"
+            )}
           </td>
           <td className="px-4 py-3 align-top">
             {benefits.length > 0 ? (
@@ -735,6 +847,9 @@ const ManagePaketPage: React.FC = () => {
                         </th>
                         <th className="px-4 py-3 text-left font-semibold text-sm text-neutral-800 uppercase tracking-wide">
                           Diskon Promo
+                        </th>
+                        <th className="px-4 py-3 text-left font-semibold text-sm text-neutral-800 uppercase tracking-wide">
+                          Jadwal Promo
                         </th>
                         <th className="px-4 py-3 text-left font-semibold text-sm text-neutral-800 uppercase tracking-wide">
                           Benefit
@@ -1035,6 +1150,67 @@ const ManagePaketPage: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Promo Start Date
+                    {form.diskon_promo.trim() ? (
+                      <span className="text-red-500">*</span>
+                    ) : null}
+                  </label>
+                  <input
+                    type="date"
+                    name="promo_start_date"
+                    value={form.promo_start_date}
+                    onChange={handleInputChange}
+                    disabled={!form.diskon_promo.trim()}
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary-color,#111827)] focus:border-[var(--primary-color,#111827)] disabled:bg-neutral-50 disabled:text-neutral-400"
+                    required={Boolean(form.diskon_promo.trim())}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Promo End Date
+                    {form.diskon_promo.trim() ? (
+                      <span className="text-red-500">*</span>
+                    ) : null}
+                  </label>
+                  <input
+                    type="date"
+                    name="promo_end_date"
+                    value={form.promo_end_date}
+                    onChange={handleInputChange}
+                    disabled={!form.diskon_promo.trim()}
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary-color,#111827)] focus:border-[var(--primary-color,#111827)] disabled:bg-neutral-50 disabled:text-neutral-400"
+                    required={Boolean(form.diskon_promo.trim())}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Promo Quota
+                    {form.diskon_promo.trim() ? (
+                      <span className="text-red-500">*</span>
+                    ) : null}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    name="promo_quota"
+                    value={form.promo_quota}
+                    onChange={handleInputChange}
+                    disabled={!form.diskon_promo.trim()}
+                    placeholder="Contoh: 20"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary-color,#111827)] focus:border-[var(--primary-color,#111827)] disabled:bg-neutral-50 disabled:text-neutral-400"
+                    required={Boolean(form.diskon_promo.trim())}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-neutral-500 -mt-2">
+                Field promo_start_date, promo_end_date, dan promo_quota wajib
+                diisi jika diskon_promo diisi.
+              </p>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button

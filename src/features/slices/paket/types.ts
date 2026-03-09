@@ -16,6 +16,9 @@ export type Paket = {
   benefits?: string | string[] | null;
   details?: PaketDetail[] | string | null;
   diskon_promo?: number | null;
+  promo_start_date?: string | null;
+  promo_end_date?: string | null;
+  promo_quota?: number | null;
   is_hobby?: boolean | null;
   is_internasional?: boolean | null;
   is_trial?: boolean | null;
@@ -58,6 +61,9 @@ export type CreatePaketPayload = {
   benefits?: string[] | string | null;
   details?: PaketDetail[] | string | null;
   diskon_promo?: number | null;
+  promo_start_date?: string | null;
+  promo_end_date?: string | null;
+  promo_quota?: number | null;
   package_by?: PaketGroupKey;
   is_hobby?: boolean | null;
   is_internasional?: boolean | null;
