@@ -117,11 +117,11 @@ export default function ProfileTemplateForm({
                 <textarea
                   value={values.headline}
                   onChange={(e) => onChange({ ...values, headline: e.target.value })}
-                  placeholder="Contoh: Halo, saya {{name}}. Saya guru {{instrument_name}} grade {{instrument_grade}}."
+                  placeholder="Contoh: Instruktur Musik Berpengalaman dengan Pembelajaran Personalized"
                   rows={3}
                   className="w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-neutral-900 outline-none placeholder:text-black/40 focus:border-(--secondary-color)"
                 />
-                {placeholderDoc}
+                
               </div>
 
               <div>
@@ -129,10 +129,11 @@ export default function ProfileTemplateForm({
                 <textarea
                   value={values.about}
                   onChange={(e) => onChange({ ...values, about: e.target.value })}
-                  placeholder="Tulis deskripsi panjang. Placeholder juga bisa dipakai."
+                  placeholder="Halo, saya {{name}}. Saya guru {{instrument_name}} grade {{instrument_grade}}."
                   rows={6}
                   className="w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-neutral-900 outline-none placeholder:text-black/40 focus:border-(--secondary-color)"
                 />
+                {placeholderDoc}
               </div>
 
               <StringItemsInput
