@@ -234,7 +234,7 @@ const ManageProgramPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Manage Program</h1>
+          <h1 className="text-2xl font-semibold">Manage Programs</h1>
           <p className="text-sm text-neutral-500 mt-1">
             Kelola daftar program, headline, deskripsi, benefit, dan durasi.
           </p>
