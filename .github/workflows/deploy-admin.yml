@@ -77,6 +77,11 @@ jobs:
           echo "DOCKER_CONFIG=$CI_DOCKER_CONFIG" >> "$GITHUB_ENV"
           echo "DOCKER_HOST=unix:///Users/noviprima/.docker/run/docker.sock" >> "$GITHUB_ENV"
 
+      - name: Set Compose project name
+        shell: bash
+        run: |
+          echo "COMPOSE_PROJECT_NAME=fe-admin-gurumusik" >> "$GITHUB_ENV"
+
       - name: Verify Docker access
         shell: bash
         run: |
@@ -100,6 +105,28 @@ jobs:
         shell: bash
         run: |
           docker compose down --remove-orphans || true
+
+      - name: Remove Docker container that occupies port 5173
+        shell: bash
+        run: |
+          PORT_CONTAINERS="$(docker ps -q --filter publish=5173)"
+
+          if [ -n "$PORT_CONTAINERS" ]; then
+            echo "Removing Docker containers using port 5173:"
+            docker ps --filter publish=5173 --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
+            docker rm -f $PORT_CONTAINERS
+          else
+            echo "No Docker container is using port 5173"
+          fi
+
+      - name: Check port 5173 after cleanup
+        shell: bash
+        run: |
+          if lsof -nP -iTCP:5173 -sTCP:LISTEN >/dev/null 2>&1; then
+            echo "Port 5173 is still busy after Docker cleanup:"
+            lsof -nP -iTCP:5173 -sTCP:LISTEN || true
+            exit 1
+          fi
 
       - name: Build and run
         shell: bash
