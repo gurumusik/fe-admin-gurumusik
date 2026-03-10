@@ -36,6 +36,7 @@ jobs:
               docker compose version
               exit 0
             fi
+
             echo "Waiting for Docker..."
             sleep 2
           done
@@ -58,30 +59,36 @@ jobs:
           }
           EOF
 
-          # bawa plugin yang dibutuhkan ke config CI
-          [ -x "$HOME/.docker/cli-plugins/docker-compose" ] && \
+          if [ -x "$HOME/.docker/cli-plugins/docker-compose" ]; then
             ln -sf "$HOME/.docker/cli-plugins/docker-compose" "$CI_DOCKER_CONFIG/cli-plugins/docker-compose"
+          else
+            echo "docker-compose plugin not found at $HOME/.docker/cli-plugins/docker-compose"
+            exit 1
+          fi
 
-          [ -x "$HOME/.docker/cli-plugins/docker-buildx" ] && \
+          if [ -x "$HOME/.docker/cli-plugins/docker-buildx" ]; then
             ln -sf "$HOME/.docker/cli-plugins/docker-buildx" "$CI_DOCKER_CONFIG/cli-plugins/docker-buildx"
+          fi
 
-          [ -x "$HOME/.docker/cli-plugins/docker-desktop" ] && \
+          if [ -x "$HOME/.docker/cli-plugins/docker-desktop" ]; then
             ln -sf "$HOME/.docker/cli-plugins/docker-desktop" "$CI_DOCKER_CONFIG/cli-plugins/docker-desktop"
+          fi
 
           echo "DOCKER_CONFIG=$CI_DOCKER_CONFIG" >> "$GITHUB_ENV"
-          echo "DOCKER_CONTEXT=desktop-linux" >> "$GITHUB_ENV"
+          echo "DOCKER_HOST=unix:///Users/noviprima/.docker/run/docker.sock" >> "$GITHUB_ENV"
 
-      - name: Verify Docker plugins
+      - name: Verify Docker access
         shell: bash
         run: |
+          docker version
           docker compose version
-          docker buildx version || true    
+          docker info
 
       - name: Create .env
         shell: bash
         run: |
           rm -f .env
-          cat > .env << 'EOF'
+          cat > .env <<'EOF'
           VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
           VITE_IMG_BASE_URL=${{ secrets.VITE_IMG_BASE_URL }}
           VITE_NODE_ENV=${{ secrets.VITE_NODE_ENV }}
