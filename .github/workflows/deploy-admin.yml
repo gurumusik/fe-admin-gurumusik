@@ -50,7 +50,7 @@ jobs:
         run: |
           CI_DOCKER_CONFIG="$RUNNER_TEMP/docker-config"
           rm -rf "$CI_DOCKER_CONFIG"
-          mkdir -p "$CI_DOCKER_CONFIG"
+          mkdir -p "$CI_DOCKER_CONFIG/cli-plugins"
 
           cat > "$CI_DOCKER_CONFIG/config.json" <<'EOF'
           {
@@ -58,8 +58,24 @@ jobs:
           }
           EOF
 
+          # bawa plugin yang dibutuhkan ke config CI
+          [ -x "$HOME/.docker/cli-plugins/docker-compose" ] && \
+            ln -sf "$HOME/.docker/cli-plugins/docker-compose" "$CI_DOCKER_CONFIG/cli-plugins/docker-compose"
+
+          [ -x "$HOME/.docker/cli-plugins/docker-buildx" ] && \
+            ln -sf "$HOME/.docker/cli-plugins/docker-buildx" "$CI_DOCKER_CONFIG/cli-plugins/docker-buildx"
+
+          [ -x "$HOME/.docker/cli-plugins/docker-desktop" ] && \
+            ln -sf "$HOME/.docker/cli-plugins/docker-desktop" "$CI_DOCKER_CONFIG/cli-plugins/docker-desktop"
+
           echo "DOCKER_CONFIG=$CI_DOCKER_CONFIG" >> "$GITHUB_ENV"
           echo "DOCKER_CONTEXT=desktop-linux" >> "$GITHUB_ENV"
+
+      - name: Verify Docker plugins
+        shell: bash
+        run: |
+          docker compose version
+          docker buildx version || true    
 
       - name: Create .env
         shell: bash
