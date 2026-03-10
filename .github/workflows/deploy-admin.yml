@@ -45,6 +45,22 @@ jobs:
           docker desktop status || true
           exit 1
 
+      - name: Prepare clean Docker config for CI
+        shell: bash
+        run: |
+          CI_DOCKER_CONFIG="$RUNNER_TEMP/docker-config"
+          rm -rf "$CI_DOCKER_CONFIG"
+          mkdir -p "$CI_DOCKER_CONFIG"
+
+          cat > "$CI_DOCKER_CONFIG/config.json" <<'EOF'
+          {
+            "auths": {}
+          }
+          EOF
+
+          echo "DOCKER_CONFIG=$CI_DOCKER_CONFIG" >> "$GITHUB_ENV"
+          echo "DOCKER_CONTEXT=desktop-linux" >> "$GITHUB_ENV"
+
       - name: Create .env
         shell: bash
         run: |
