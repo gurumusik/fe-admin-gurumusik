@@ -18,6 +18,7 @@ import gradesReducer from '@/features/slices/grades/slice'
 import sertifikatReducer from '@/features/slices/sertifikat/slice';
 import guruApplicationReducer from '@/features/slices/guruApplication/slice';
 import paketReducer from '@/features/slices/paket/slice';
+import referralsReducer from '@/features/slices/referrals/slice';
 
 export const store = configureStore({
   reducer: {
@@ -40,6 +41,7 @@ export const store = configureStore({
     sertifikat: sertifikatReducer,
     guruApplication: guruApplicationReducer,
     paket: paketReducer,
+    referrals: referralsReducer,
     // tambahkan slice lain
   },
   // middleware default sudah cukup (immer, serializableCheck, thunk)

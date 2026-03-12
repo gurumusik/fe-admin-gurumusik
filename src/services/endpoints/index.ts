@@ -201,4 +201,9 @@ export const ENDPOINTS = {
     DISABLE: (id: number | string) => `/profile-templates/${id}/disable`,
     DELETE: (id: number | string) => `/profile-templates/${id}`,
   },
+
+  REFERRALS: {
+    REFERRERS: '/admin/referrals/referrers',
+    COMMISSIONS: '/admin/referrals/commissions',
+  },
 };
