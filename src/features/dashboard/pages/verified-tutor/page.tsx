@@ -10,18 +10,9 @@ import {
   RiCheckboxCircleFill,
   RiCloseLine,
 } from 'react-icons/ri';
-import { useDispatch, useSelector } from 'react-redux';
-import type { RootState, AppDispatch } from '@/app/store';
 
-import {
-  fetchGuruApplicationsThunk,
-  setGAPage,
-  setGALimit,
-  setGAStatus,
-  approveApplicationThunk,
-  rejectApplicationThunk,
-} from '@/features/slices/guruApplication/slice';
 import type { GuruApplicationDTO } from '@/features/slices/guruApplication/types';
+import { decideApplication, listRecruitmentApplications } from '@/services/api/recruitment.api';
 
 import ConfirmationModal from '@/components/ui/common/ConfirmationModal';
 import ApproveTeacherModal, {
@@ -31,6 +22,9 @@ import ApproveTeacherModal, {
 import LoadingScreen from '@/components/ui/common/LoadingScreen';
 import defaultUser from '@/assets/images/default-user.png';
 import { resolveImageUrl } from '@/utils/resolveImageUrl';
+import { getRevisionFieldLabel } from './revisionFieldMap';
+import GuruRevisionComposerModal from '@/features/dashboard/components/GuruRevisionComposerModal';
+import GuruRevisionDetailModal from '@/features/dashboard/components/GuruRevisionDetailModal';
 import ManageCertificateModal, {
   type CertificateItem,
   type CertStatus,
@@ -46,7 +40,6 @@ const cls = (...xs: Array<string | false | null | undefined>) =>
   xs.filter(Boolean).join(' ');
 
 const PAGE_SIZE = 5;
-const EMPTY_ARR: any[] = [];
 
 /* ======================== Subcomponents (UI sama persis) ======================== */
 
@@ -74,6 +67,10 @@ const TableHeader: React.FC = () => {
         <th className={headCls}>Asal Kota</th>
         <th className={headCls}>Tanggal</th>
         <th className={headCls}>Mengajar ABK</th>
+        <th className={headCls}>State</th>
+        <th className={headCls}>Revisi</th>
+        <th className={headCls}>Kesalahan</th>
+        <th className={headCls}>Pending</th>
         <th className={headCls}>Aksi</th>
       </tr>
     </thead>
@@ -111,7 +108,8 @@ const RowItem: React.FC<{
   row: GuruApplicationDTO;
   onApprove: () => void;
   onReject: () => void;
-}> = ({ row, onApprove, onReject }) => {
+  onOpenRevisionDetail?: () => void;
+}> = ({ row, onApprove, onReject, onOpenRevisionDetail }) => {
   const profileUrl = resolveImageUrl(row.user?.profile_pic_url ?? null) || defaultUser;
 
   const createdAt = row.created_at
@@ -127,6 +125,22 @@ const RowItem: React.FC<{
   const abkColorVar = abk
     ? 'var(--accent-green-color)'
     : 'var(--accent-red-color)';
+
+  const submission = row.submission_state === 'REVISION' ? 'Data Revisi' : 'Pengajuan Data Baru';
+  const submissionCls =
+    row.submission_state === 'REVISION'
+      ? 'bg-[var(--secondary-light-color)] text-[var(--secondary-color)]'
+      : 'bg-neutral-100 text-neutral-700';
+
+  const revCount = Number(row.revision_count || 0);
+  const revDanger = row.revision_danger_flag === true || revCount >= 3;
+  const revCls = revDanger
+    ? 'bg-[var(--accent-red-light-color)] text-[var(--accent-red-color)]'
+    : 'bg-neutral-100 text-neutral-700';
+
+  const errCount = Number(row.error_count || 0);
+  const errBtnDisabled = !(onOpenRevisionDetail && (errCount > 0 || row.has_pending_revision));
+  const pending = row.has_pending_revision === true;
 
   return (
     <tr>
@@ -166,6 +180,59 @@ const RowItem: React.FC<{
         <span className="text-md" style={{ color: abkColorVar }}>
           {abkLabel}
         </span>
+      </td>
+
+      {/* State */}
+      <td className="py-3 px-4">
+        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${submissionCls}`}>
+          {submission}
+        </span>
+      </td>
+
+      {/* Revisi */}
+      <td className="py-3 px-4">
+        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${revCls}`}>
+          {revCount}x
+        </span>
+      </td>
+
+      {/* Kesalahan */}
+      <td className="py-3 px-4">
+        {errCount > 0 ? (
+          <button
+            type="button"
+            onClick={onOpenRevisionDetail}
+            className="text-sm font-semibold text-[var(--secondary-color)] hover:underline cursor-pointer"
+            title="Lihat detail kesalahan"
+          >
+            {errCount} kesalahan
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenRevisionDetail}
+            disabled={errBtnDisabled}
+            className={cls(
+              'text-sm font-semibold',
+              errBtnDisabled ? 'text-neutral-400 cursor-not-allowed' : 'text-[var(--secondary-color)] hover:underline cursor-pointer'
+            )}
+            title={errBtnDisabled ? 'Belum ada laporan' : 'Lihat laporan terakhir'}
+          >
+            -
+          </button>
+        )}
+      </td>
+
+      {/* Pending */}
+      <td className="py-3 px-4">
+        {pending ? (
+          <span className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--accent-orange-color)]">
+            <span className="w-2 h-2 rounded-full bg-[var(--accent-orange-color)]" />
+            Perlu revisi
+          </span>
+        ) : (
+          <span className="text-xs text-neutral-500">-</span>
+        )}
       </td>
 
       {/* Aksi */}
@@ -397,18 +464,10 @@ const buildCertificatesFromApplication = (
 /* ======================== Main Page ======================== */
 
 const VerifiedTutorPage: React.FC = () => {
-  const dispatch = useDispatch<AppDispatch>();
-
-  const gaList = useSelector((s: RootState) => s.guruApplication.list);
-  const itemsAll: GuruApplicationDTO[] = Array.isArray(gaList?.rows)
-    ? gaList.rows
-    : EMPTY_ARR;
-  const total: number = typeof gaList?.total === 'number' ? gaList.total : 0;
-  const loading: boolean = !!gaList?.loading;
-  const errorMsg: string | null = gaList?.error ?? null;
-  const page = gaList?.page || 1;
-  const limit = gaList?.limit || PAGE_SIZE;
-  const totalPages = gaList?.totalPages || Math.ceil(Math.max(0, total) / limit);
+  const [itemsAll, setItemsAll] = useState<GuruApplicationDTO[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ApproveMode>('approved');
@@ -419,6 +478,7 @@ const VerifiedTutorPage: React.FC = () => {
   const [confirmCtx, setConfirmCtx] = useState<'approved' | 'rejected'>(
     'approved'
   );
+  const [confirmErrorText, setConfirmErrorText] = useState<string | null>(null);
 
   // state untuk overlay loading submit decide
   const [deciding, setDeciding] = useState(false);
@@ -445,26 +505,44 @@ const VerifiedTutorPage: React.FC = () => {
   const [awardDrafts, setAwardDrafts] = useState<Record<string, 'approved' | 'rejected'>>({});
   const [hiddenIds, setHiddenIds] = useState<Record<number, true>>({});
 
-  // Set default filter sekali (status proses + limit)
-  useEffect(() => {
-    dispatch(setGALimit(PAGE_SIZE));
-    dispatch(setGAStatus('proses'));
-  }, [dispatch]);
+  // revision report (compose)
+  const [revisionSelected, setRevisionSelected] = useState<Record<string, true>>({});
+  const [revisionComposerOpen, setRevisionComposerOpen] = useState(false);
+  const [revisionDetailOpen, setRevisionDetailOpen] = useState(false);
+  const [revisionDetailApp, setRevisionDetailApp] = useState<{ id: number; name?: string } | null>(null);
 
-  // Fetch saat query berubah (page/limit/status/sort/search)
+  const reload = async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const resp = await listRecruitmentApplications({ status: 'proses' });
+      setItemsAll(Array.isArray(resp?.data) ? resp.data : []);
+    } catch (err: any) {
+      setErrorMsg(String(err?.message || 'Gagal memuat data'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    dispatch(fetchGuruApplicationsThunk());
-  }, [
-    dispatch,
-    gaList?.page,
-    gaList?.limit,
-    gaList?.status,
-    gaList?.q,
-    gaList?.created_from,
-    gaList?.created_to,
-    gaList?.sort?.by,
-    gaList?.sort?.dir,
-  ]);
+    let mounted = true;
+    setLoading(true);
+    setErrorMsg(null);
+    listRecruitmentApplications({ status: 'proses' })
+      .then((resp) => {
+        if (!mounted) return;
+        setItemsAll(Array.isArray(resp?.data) ? resp.data : []);
+      })
+      .catch((err: any) => {
+        if (!mounted) return;
+        setErrorMsg(String(err?.message || 'Gagal memuat data'));
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => { mounted = false; };
+  }, []);
 
   // Filter client-side juga (untuk berjaga)
   const items = useMemo(
@@ -477,23 +555,47 @@ const VerifiedTutorPage: React.FC = () => {
     setHiddenIds({});
   }, [itemsAll]);
 
-  // Jika halaman kosong setelah keputusan, mundur 1 halaman
-  useEffect(() => {
-    if (!loading && items.length === 0 && page > 1) {
-      dispatch(setGAPage(page - 1));
-    }
-  }, [loading, items.length, page, dispatch]);
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+
+  const pageRows = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return items.slice(start, start + PAGE_SIZE);
+  }, [items, currentPage]);
 
   const openModal = (mode: ApproveMode, row: GuruApplicationDTO) => {
     setSelected(row);
     setModalMode(mode);
     setModalOpen(true);
+    setRevisionSelected({});
     if (mode === 'approved') {
       setCertDrafts({});
       setEduDrafts({});
       setAwardDrafts({});
     }
   };
+
+  const toggleRevisionField = (field_key: string, label: string, next: boolean) => {
+    void label;
+    const k = String(field_key || '').trim();
+    if (!k) return;
+    setRevisionSelected((prev) => {
+      const copy = { ...prev };
+      if (next) copy[k] = true;
+      else delete copy[k];
+      return copy;
+    });
+  };
+
+  const pickedRevisionFields = useMemo(
+    () =>
+      Object.keys(revisionSelected).map((k) => ({
+        field_key: k,
+        label: getRevisionFieldLabel(k),
+      })),
+    [revisionSelected],
+  );
 
   const applyDrafts = (items: CertificateItem[]) =>
     items.map((item) => {
@@ -603,6 +705,7 @@ const VerifiedTutorPage: React.FC = () => {
     if (!selected) return;
     setModalOpen(false);
     setDeciding(true);
+    setConfirmErrorText(null);
 
     try {
       if (payload.mode === 'approved') {
@@ -646,35 +749,30 @@ const VerifiedTutorPage: React.FC = () => {
         if (!hasInstrumentCerts && !hasAltCerts) {
           throw new Error('Minimal 1 sertifikat harus tersedia');
         }
-        await dispatch(
-          approveApplicationThunk({
-            id: selected.id,
-            note: (payload as any)?.notes,
-            cert_decisions: hasInstrumentCerts ? cert_decisions : [],
-            education_decisions,
-            award_decisions,
-          })
-        ).unwrap();
+        await decideApplication(selected.id, {
+          decision: 'approve',
+          cert_decisions: hasInstrumentCerts ? cert_decisions : [],
+          education_decisions,
+          award_decisions,
+        });
       } else {
         const reason =
           (payload as any)?.reason ||
           (payload as any)?.notes ||
           'Ditolak oleh admin';
-        await dispatch(
-          rejectApplicationThunk({ id: selected.id, note: reason })
-        ).unwrap();
+        await decideApplication(selected.id, { decision: 'reject', note: reason });
       }
       setConfirmKind('success');
       setHiddenIds((prev) =>
         selected?.id ? { ...prev, [Number(selected.id)]: true } : prev
       );
-    } catch {
+      await reload();
+    } catch (err: any) {
       setConfirmKind('error');
+      setConfirmErrorText(String(err?.message || 'Request failed'));
     } finally {
       setConfirmCtx(payload.mode);
       setSelected(null);
-      // refresh list agar item yang sudah diputuskan hilang dari status 'proses'
-      await dispatch(fetchGuruApplicationsThunk());
       setDeciding(false);
       setConfirmOpen(true);
     }
@@ -696,14 +794,16 @@ const VerifiedTutorPage: React.FC = () => {
             'Tutor ini kini resmi terdaftar di platform dan sudah dapat menerima murid.',
           ]
         : [
-            'Terjadi kendala saat menyetujui tutor ini. Silakan coba lagi beberapa saat lagi.',
+            confirmErrorText ||
+              'Terjadi kendala saat menyetujui tutor ini. Silakan coba lagi beberapa saat lagi.',
           ]
       : confirmKind === 'success'
       ? [
           'Tutor ini tidak akan muncul di daftar calon tutor dan tidak dapat mengajar di platform.',
         ]
       : [
-          'Terjadi kendala saat menolak tutor ini. Silakan coba lagi beberapa saat lagi.',
+          confirmErrorText ||
+            'Terjadi kendala saat menolak tutor ini. Silakan coba lagi beberapa saat lagi.',
         ];
 
   return (
@@ -725,7 +825,7 @@ const VerifiedTutorPage: React.FC = () => {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={7} className="p-6 text-sm text-neutral-600">
+                <td colSpan={11} className="p-6 text-sm text-neutral-600">
                   Memuat data...
                 </td>
               </tr>
@@ -733,19 +833,23 @@ const VerifiedTutorPage: React.FC = () => {
 
             {!loading && items.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-neutral-600">
+                <td colSpan={11} className="p-8 text-center text-neutral-600">
                   Belum ada pendaftar.
                 </td>
               </tr>
             )}
 
             {!loading &&
-              items.map((row) => (
+              pageRows.map((row) => (
                 <RowItem
                   key={row.id}
                   row={row}
                   onApprove={() => openModal('approved', row)}
                   onReject={() => openModal('rejected', row)}
+                  onOpenRevisionDetail={() => {
+                    setRevisionDetailApp({ id: Number(row.id), name: row.nama ?? undefined });
+                    setRevisionDetailOpen(true);
+                  }}
                 />
               ))}
           </tbody>
@@ -756,9 +860,9 @@ const VerifiedTutorPage: React.FC = () => {
         <Pagination
           total={total}
           totalPages={totalPages}
-          page={page}
-          pageSize={limit}
-          onChange={(p) => dispatch(setGAPage(p))}
+          page={currentPage}
+          pageSize={PAGE_SIZE}
+          onChange={(p) => setPage(p)}
         />
       </div>
 
@@ -770,11 +874,19 @@ const VerifiedTutorPage: React.FC = () => {
         onSubmit={handleSubmitModal}
         approveDisabled={
           modalMode === 'approved' &&
-          ((hasInstrumentCerts && approvedDraftCount !== totalInstrumentCerts) ||
+          ((selected?.has_pending_revision === true) ||
+            (revisionSelected && Object.keys(revisionSelected).length > 0) ||
+            (hasInstrumentCerts && approvedDraftCount !== totalInstrumentCerts) ||
             (totalEducation > 0 && approvedEducationCount !== totalEducation) ||
             (totalAwards > 0 && approvedAwardCount !== totalAwards))
         }
-        approveDisabledHint="Semua sertifikat instrumen, pendidikan, dan penghargaan harus disetujui."
+        approveDisabledHint={
+          selected?.has_pending_revision === true
+            ? 'Masih menunggu perbaikan data dari tutor (pending revisi).'
+            : revisionSelected && Object.keys(revisionSelected).length > 0
+            ? 'Tidak bisa menyetujui jika masih ada field yang ditandai perlu revisi. Kirim Laporan Kesalahan dulu atau hilangkan tanda revisi.'
+            : 'Semua sertifikat instrumen, pendidikan, dan penghargaan harus disetujui.'
+        }
         data={{
           image: resolveImageUrl(selected?.user?.profile_pic_url ?? null) || defaultUser,
           name: selected?.nama ?? undefined,
@@ -787,6 +899,8 @@ const VerifiedTutorPage: React.FC = () => {
             undefined,
           city: selected?.domisili ?? selected?.user?.city ?? '-',
           address: selected?.user?.alamat ?? undefined,
+          home_lat: selected?.user?.home_lat ?? undefined,
+          home_lng: selected?.user?.home_lng ?? undefined,
           videoUrl: selected?.user?.detailGuru?.intro_link ?? undefined,
           cvUrl: selected?.cv_url ?? undefined,
           certificateUrl: selected?.portfolio_url ?? undefined,
@@ -833,6 +947,31 @@ const VerifiedTutorPage: React.FC = () => {
           setAwardModalData(award);
           setAwardModalOpen(true);
         }}
+        revisionSelected={revisionSelected}
+        onToggleRevisionField={toggleRevisionField}
+        onOpenRevisionComposer={() => setRevisionComposerOpen(true)}
+      />
+
+      <GuruRevisionComposerModal
+        open={revisionComposerOpen && !!selected?.id}
+        onClose={() => setRevisionComposerOpen(false)}
+        applicationId={selected?.id ?? 0}
+        applicationName={selected?.nama ?? undefined}
+        pickedFields={pickedRevisionFields}
+        onSent={async () => {
+          setRevisionSelected({});
+          await reload();
+        }}
+      />
+
+      <GuruRevisionDetailModal
+        open={revisionDetailOpen && !!revisionDetailApp?.id}
+        onClose={() => {
+          setRevisionDetailOpen(false);
+          setRevisionDetailApp(null);
+        }}
+        applicationId={revisionDetailApp?.id ?? 0}
+        applicationName={revisionDetailApp?.name}
       />
 
       {/* Modal konfirmasi approve/reject aplikasi */}

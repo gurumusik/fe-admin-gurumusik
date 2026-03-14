@@ -87,6 +87,8 @@ export type GAUserLite = {
   province?: string | null;
   city?: string | null;
   alamat?: string | null;
+  home_lat?: string | number | null;
+  home_lng?: string | number | null;
   detailGuru?: GADetailGuruLite | null;
   pendidikanGuru?: GAPendidikanGuruLite | null;
 };
@@ -121,6 +123,13 @@ export type GuruApplicationDTO = {
   is_abk: boolean;           // <-- perbaikan di sini
   created_at: string;
   updated_at: string;
+
+  // verify tutor revision meta (may only exist on some endpoints)
+  revision_count?: number;
+  revision_danger_flag?: boolean;
+  error_count?: number;
+  submission_state?: 'NEW' | 'REVISION';
+  has_pending_revision?: boolean;
 
   user?: GAUserLite | null;
   decider?: GADeciderLite | null;
