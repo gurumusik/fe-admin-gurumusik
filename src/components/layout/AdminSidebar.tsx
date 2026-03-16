@@ -70,6 +70,7 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/tutor-commision",
     "/dashboard-admin/refund",
     "/dashboard-admin/data-rekrutmen",
+    "/dashboard-admin/referrals",
   ];
   const reportPrefixes = [
     "/dashboard-admin/reschedule",
@@ -251,6 +252,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/refund"
                   label="Refund"
                   active={isExact("/dashboard-admin/refund")}
+                />
+                <SubItem
+                  to="/dashboard-admin/referrals"
+                  label="Teacher Referrals"
+                  active={isUnder("/dashboard-admin/referrals")}
                 />
               </div>
             </DropWrap>

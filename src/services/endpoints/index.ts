@@ -73,6 +73,10 @@ export const ENDPOINTS = {
   RECRUITMENT: {
       LIST: '/guru-applications/applications',
       DECIDE: (id: number | string) => `/guru-applications/applications/${id}/decision`,
+
+      REVISION_REPORTS: (appId: number | string) => `/recruitment/applications/${appId}/revision-reports`,
+      REVISION_REPORTS_LATEST: (appId: number | string) => `/recruitment/applications/${appId}/revision-reports/latest`,
+      REVISION_TOKEN_DEACTIVATE: (tokenId: number | string) => `/recruitment/revision-tokens/${tokenId}/deactivate`,
     },
 
   SILABUS: {
@@ -200,5 +204,10 @@ export const ENDPOINTS = {
     ENABLE: (id: number | string) => `/profile-templates/${id}/enable`,
     DISABLE: (id: number | string) => `/profile-templates/${id}/disable`,
     DELETE: (id: number | string) => `/profile-templates/${id}`,
+  },
+
+  REFERRALS: {
+    REFERRERS: '/admin/referrals/referrers',
+    COMMISSIONS: '/admin/referrals/commissions',
   },
 };

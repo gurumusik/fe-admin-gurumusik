@@ -27,6 +27,8 @@ type BaseData = {
   province?: string;
   city?: string;
   address?: string;
+  home_lat?: string | number | null;
+  home_lng?: string | number | null;
   videoUrl?: string;
   cvUrl?: string;
   certificateUrl?: string;
@@ -63,11 +65,43 @@ type ApproveTeacherModalProps = {
   onOpenAwardDetail?: (item: AwardCertificateData) => void;
   approveDisabled?: boolean;
   approveDisabledHint?: string;
+
+  // optional: revision reporting (admin verify tutor)
+  revisionSelected?: Record<string, true>;
+  onToggleRevisionField?: (field_key: string, label: string, next: boolean) => void;
+  onOpenRevisionComposer?: () => void;
 };
 
 const inputCls =
   'w-full h-11 rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 text-sm text-neutral-800 outline-none';
+const textareaCls =
+  'w-full min-h-[84px] rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 py-2 text-sm text-neutral-800 outline-none resize-none';
 const labelCls = 'text-md text-neutral-900 mb-1 block';
+
+const RevisionToggle: React.FC<{
+  field_key: string;
+  label: string;
+  checked?: boolean;
+  onToggle?: (field_key: string, label: string, next: boolean) => void;
+}> = ({ field_key, label, checked, onToggle }) => {
+  if (!onToggle) return null;
+  const active = !!checked;
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(field_key, label, !active)}
+      className={[
+        'ml-auto h-7 px-3 rounded-full text-xs font-semibold border transition cursor-pointer',
+        active
+          ? 'bg-[var(--accent-red-light-color)] text-[var(--accent-red-color)] border-[var(--accent-red-light-color)]'
+          : 'bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50',
+      ].join(' ')}
+      title={active ? 'Ditandai untuk revisi' : 'Tandai untuk revisi'}
+    >
+      {active ? 'Perlu revisi' : 'Tandai revisi'}
+    </button>
+  );
+};
 
 const getDisplayCertStatus = (c: CertificateItem) => {
   if (c.draftStatus === 'approved') return 'Disetujui';
@@ -87,6 +121,9 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   onOpenAwardDetail,
   approveDisabled = false,
   approveDisabledHint,
+  revisionSelected,
+  onToggleRevisionField,
+  onOpenRevisionComposer,
 }) => {
   const [file] = useState<File | null>(null);
   const [reason, setReason] = useState('');
@@ -96,7 +133,6 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
     if (open && mode === 'approved') setStep(1);
   }, [open, mode]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const certs = data?.certificates ?? [];
 
   const [, setActiveInstrument] = useState<string | null>(null);
@@ -112,6 +148,22 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   const hasAwards = Array.isArray(data?.awardList) && data!.awardList!.length > 0;
   const hasLanguages =
     Array.isArray(data?.languages) && data!.languages!.length > 0;
+
+  const latNum =
+    data?.home_lat === null || data?.home_lat === undefined || data?.home_lat === ''
+      ? null
+      : Number(data.home_lat);
+  const lngNum =
+    data?.home_lng === null || data?.home_lng === undefined || data?.home_lng === ''
+      ? null
+      : Number(data.home_lng);
+  const hasCoords = Number.isFinite(latNum) && Number.isFinite(lngNum);
+  const coordText = hasCoords ? `${latNum}, ${lngNum}` : '';
+  const gmapsQuery = hasCoords ? `${latNum},${lngNum}` : '';
+  const gmapsUrl = hasCoords ? `https://www.google.com/maps?q=${encodeURIComponent(gmapsQuery)}` : '';
+  const gmapsEmbedUrl = hasCoords
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(gmapsQuery)}&z=15&output=embed`
+    : '';
 
   return (
     <div className="fixed inset-0 z-[80]">
@@ -131,15 +183,29 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                 ? 'Formulir Calon Tutor'
                 : 'Formulir Penolakan Calon Tutor'}
             </h3>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-9 h-9 grid place-items-center rounded-full hover:bg-neutral-100 cursor-pointer"
-              aria-label="Tutup"
-              title="Tutup"
-            >
-              <RiCloseLine className="text-2xl text-neutral-900" />
-            </button>
+            <div className="flex items-center gap-2">
+              {mode === 'approved' && onOpenRevisionComposer && (
+                <button
+                  type="button"
+                  onClick={onOpenRevisionComposer}
+                  className="h-9 px-4 rounded-full font-semibold border border-neutral-300 text-neutral-900 hover:bg-neutral-50 cursor-pointer"
+                >
+                  Laporan Kesalahan
+                  {revisionSelected && Object.keys(revisionSelected).length > 0
+                    ? ` (${Object.keys(revisionSelected).length})`
+                    : ''}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-9 h-9 grid place-items-center rounded-full hover:bg-neutral-100 cursor-pointer"
+                aria-label="Tutup"
+                title="Tutup"
+              >
+                <RiCloseLine className="text-2xl text-neutral-900" />
+              </button>
+            </div>
           </div>
 
           {/* body */}
@@ -167,28 +233,140 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                   <div className="grid grid-cols-1 gap-3">
                     <div className="flex gap-2">
                       <div className="w-1/2">
-                        <label className={labelCls}>Nama Lengkap</label>
+                        <div className="flex items-center gap-2">
+                          <label className={labelCls}>Nama Lengkap</label>
+                          <RevisionToggle
+                            field_key="profile.nama"
+                            label="Nama lengkap"
+                            checked={!!revisionSelected?.['profile.nama']}
+                            onToggle={onToggleRevisionField}
+                          />
+                        </div>
                         <input className={inputCls} value={data?.name ?? ''} readOnly />
                       </div>
                       <div className="w-1/2">
-                        <label className={labelCls}>Nama Panggilan</label>
+                        <div className="flex items-center gap-2">
+                          <label className={labelCls}>Nama Panggilan</label>
+                          <RevisionToggle
+                            field_key="profile.nama_panggilan"
+                            label="Nama panggilan"
+                            checked={!!revisionSelected?.['profile.nama_panggilan']}
+                            onToggle={onToggleRevisionField}
+                          />
+                        </div>
                         <input className={inputCls} value={data?.short_name ?? ''} readOnly />
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <div className="w-1/2">
-                        <label className={labelCls}>Email</label>
+                        <div className="flex items-center gap-2">
+                          <label className={labelCls}>Email</label>
+                          <RevisionToggle
+                            field_key="profile.email"
+                            label="Email"
+                            checked={!!revisionSelected?.['profile.email']}
+                            onToggle={onToggleRevisionField}
+                          />
+                        </div>
                         <input className={inputCls} value={data?.email ?? ''} readOnly />
                       </div>
                       <div className="w-1/2">
-                        <label className={labelCls}>No Telepon</label>
+                        <div className="flex items-center gap-2">
+                          <label className={labelCls}>No Telepon</label>
+                          <RevisionToggle
+                            field_key="profile.phone"
+                            label="Nomor telepon"
+                            checked={!!revisionSelected?.['profile.phone']}
+                            onToggle={onToggleRevisionField}
+                          />
+                        </div>
                         <input className={inputCls} value={data?.phone ?? ''} readOnly />
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <div className="w-1/2">
-                        <label className={labelCls}>Kota</label>
+                        <div className="flex items-center gap-2">
+                          <label className={labelCls}>Provinsi</label>
+                          <RevisionToggle
+                            field_key="location.province"
+                            label="Provinsi"
+                            checked={!!revisionSelected?.['location.province']}
+                            onToggle={onToggleRevisionField}
+                          />
+                        </div>
+                        <input className={inputCls} value={data?.province ?? ''} readOnly />
+                      </div>
+                      <div className="w-1/2">
+                        <div className="flex items-center gap-2">
+                          <label className={labelCls}>Kota</label>
+                          <RevisionToggle
+                            field_key="location.city"
+                            label="Kota"
+                            checked={!!revisionSelected?.['location.city']}
+                            onToggle={onToggleRevisionField}
+                          />
+                        </div>
                         <input className={inputCls} value={data?.city ?? ''} readOnly />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <label className={labelCls}>Alamat</label>
+                        <RevisionToggle
+                          field_key="location.address"
+                          label="Alamat"
+                          checked={!!revisionSelected?.['location.address']}
+                          onToggle={onToggleRevisionField}
+                        />
+                      </div>
+                      <textarea className={textareaCls} value={data?.address ?? ''} readOnly />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <label className={labelCls}>Titik Koordinat</label>
+                        <RevisionToggle
+                          field_key="location.coordinates"
+                          label="Titik koordinat"
+                          checked={!!revisionSelected?.['location.coordinates']}
+                          onToggle={onToggleRevisionField}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            className={inputCls}
+                            value={coordText || '-'}
+                            readOnly
+                          />
+                          {hasCoords ? (
+                            <a
+                              href={gmapsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="h-11 px-4 inline-flex items-center rounded-lg border border-neutral-300 bg-white text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+                            >
+                              Buka Maps
+                            </a>
+                          ) : null}
+                        </div>
+
+                        {hasCoords ? (
+                          <div className="overflow-hidden rounded-xl border border-neutral-200">
+                            <iframe
+                              title="Lokasi tutor"
+                              src={gmapsEmbedUrl}
+                              className="w-full h-[220px]"
+                              loading="lazy"
+                              referrerPolicy="no-referrer-when-downgrade"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-xs text-neutral-500">
+                            Koordinat belum diisi oleh tutor.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -209,7 +387,15 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     {/* Bahasa */}
                     {hasLanguages && (
                       <div>
-                        <label className={labelCls}>Bahasa</label>
+                        <div className="flex items-center gap-2">
+                          <label className={labelCls}>Bahasa</label>
+                          <RevisionToggle
+                            field_key="languages"
+                            label="Bahasa"
+                            checked={!!revisionSelected?.languages}
+                            onToggle={onToggleRevisionField}
+                          />
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           {data!.languages!.map((lang) => (
                             <span
@@ -228,9 +414,17 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
 
                     {/* Sertifikat instrumen (lokal/internasional) */}
                     <div>
-                      <label className={labelCls}>
-                        Sertifikat Instrumen (Lokal/Internasional)
-                      </label>
+                      <div className="flex items-center gap-2">
+                        <label className={labelCls}>
+                          Sertifikat Instrumen (Lokal/Internasional)
+                        </label>
+                        <RevisionToggle
+                          field_key="certificates.instrument"
+                          label="Sertifikat instrumen"
+                          checked={!!revisionSelected?.['certificates.instrument']}
+                          onToggle={onToggleRevisionField}
+                        />
+                      </div>
                       <div className="rounded-xl border border-neutral-300 p-2">
                         {certs.length ? (
                           <ul className="space-y-2">
@@ -284,7 +478,15 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     {/* Sertifikat Penghargaan */}
                     {hasAwards && (
                       <div className="mt-3">
-                        <label className={labelCls}>Sertifikat Penghargaan</label>
+                        <div className="flex items-center gap-2">
+                          <label className={labelCls}>Sertifikat Penghargaan</label>
+                          <RevisionToggle
+                            field_key="certificates.award"
+                            label="Sertifikat penghargaan"
+                            checked={!!revisionSelected?.['certificates.award']}
+                            onToggle={onToggleRevisionField}
+                          />
+                        </div>
                         <div className="grid grid-cols-1 gap-3">
                           {data!.awardList!.map((a, idx) => (
                             <div
@@ -331,7 +533,15 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     {/* Sertifikat Pendidikan */}
                     {hasEducation && (
                       <div className="mt-3">
-                        <label className={labelCls}>Sertifikat Pendidikan</label>
+                        <div className="flex items-center gap-2">
+                          <label className={labelCls}>Sertifikat Pendidikan</label>
+                          <RevisionToggle
+                            field_key="certificates.education"
+                            label="Sertifikat pendidikan"
+                            checked={!!revisionSelected?.['certificates.education']}
+                            onToggle={onToggleRevisionField}
+                          />
+                        </div>
                         <div className="grid grid-cols-1 gap-3">
                           {data!.educationList!.map((e, idx) => (
                             <div
@@ -397,7 +607,15 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                 <>
                   <div className="grid grid-cols-1 gap-3">
                     <div>
-                      <label className={labelCls}>Judul Kelas</label>
+                      <div className="flex items-center gap-2">
+                        <label className={labelCls}>Judul Kelas</label>
+                        <RevisionToggle
+                          field_key="class.title"
+                          label="Judul kelas"
+                          checked={!!revisionSelected?.['class.title']}
+                          onToggle={onToggleRevisionField}
+                        />
+                      </div>
                       <input
                         className={inputCls}
                         value={data?.classInfo?.title ?? ''}
@@ -405,7 +623,15 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Tentang Kelas</label>
+                      <div className="flex items-center gap-2">
+                        <label className={labelCls}>Tentang Kelas</label>
+                        <RevisionToggle
+                          field_key="class.about"
+                          label="Tentang kelas"
+                          checked={!!revisionSelected?.['class.about']}
+                          onToggle={onToggleRevisionField}
+                        />
+                      </div>
                       <textarea
                         className="w-full min-h-[90px] rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 py-2 text-sm text-neutral-800 outline-none"
                         value={data?.classInfo?.about ?? ''}
@@ -413,7 +639,15 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Value Kelas</label>
+                      <div className="flex items-center gap-2">
+                        <label className={labelCls}>Value Kelas</label>
+                        <RevisionToggle
+                          field_key="class.values"
+                          label="Value kelas"
+                          checked={!!revisionSelected?.['class.values']}
+                          onToggle={onToggleRevisionField}
+                        />
+                      </div>
                       <input
                         className={inputCls}
                         value={
