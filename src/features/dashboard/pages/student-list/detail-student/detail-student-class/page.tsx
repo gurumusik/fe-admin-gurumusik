@@ -94,11 +94,15 @@ const DetailStudentClassPage: React.FC = () => {
   const [classReportStatus, setClassReportStatus] = useState<'idle' | 'loading' | 'succeeded' | 'failed'>('idle');
   const [classReportError, setClassReportError] = useState<string | null>(null);
   const [classReportSesiLabel, setClassReportSesiLabel] = useState<string>('—');
+  const [classReportSesiId, setClassReportSesiId] = useState<number | null>(null);
+  const [classReportGuruId, setClassReportGuruId] = useState<number | null>(null);
 
   const openClassReport = useCallback(
     async (opts: { guruId: number; sesiId: number; sesiLabel: string }) => {
       try {
         if (!opts.guruId || !opts.sesiId) return;
+        setClassReportGuruId(opts.guruId);
+        setClassReportSesiId(opts.sesiId);
         setClassReportSesiLabel(opts.sesiLabel);
         setClassReportError(null);
         setClassReportStatus('loading');
@@ -110,6 +114,7 @@ const DetailStudentClassPage: React.FC = () => {
           no: idx + 1,
           timestamp: String(e?.timestamp || ''),
           progress: String(e?.label || ''),
+          type: e?.type,
         }));
         setClassReportRows(rows);
         setClassReportStatus('succeeded');
@@ -510,6 +515,8 @@ const DetailStudentClassPage: React.FC = () => {
       <TutorClassReportModal
         open={classReportOpen}
         onClose={() => setClassReportOpen(false)}
+        guruId={classReportGuruId ?? undefined}
+        sesiId={classReportSesiId ?? undefined}
         tutorImage={hdr?.teacherAvatar || defaultUser}
         tutorName={hdr?.teacherName || 'Guru'}
         programLabel={hdr?.programName || '—'}

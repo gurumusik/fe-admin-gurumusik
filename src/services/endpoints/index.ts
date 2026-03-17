@@ -16,6 +16,8 @@ export const ENDPOINTS = {
     CLASSES: (id: number | string) => `/guru/${id}/classes`,
     CLASSES_SESSIONS: (guruId: number | string) => `/guru/${guruId}/classes/sessions`,
     CLASSES_SESSION_PROGRESS: (guruId: number | string) => `/guru/${guruId}/classes/sessions/progress`,
+    CLASSES_SESSION_ABSEN_MEDIA: (guruId: number | string) => `/guru/${guruId}/classes/sessions/absen-media`,
+    CLASSES_SESSION_REVIEW: (guruId: number | string) => `/guru/${guruId}/classes/sessions/review`,
     CLASSES_RATINGS: (guruId: number | string) => `/guru/${guruId}/classes/ratings`,
     PROFILE: () => `/guru/profile`,
     STATUS: (id?: number | string) => (id ? `/guru/status?id=${id}` : `/guru/status`),

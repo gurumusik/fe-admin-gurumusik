@@ -145,6 +145,7 @@ const DetailClassTutorPage: React.FC = () => {
   const [classReportStatus, setClassReportStatus] = useState<'idle'|'loading'|'succeeded'|'failed'>('idle');
   const [classReportError, setClassReportError] = useState<string|null>(null);
   const [classReportSesiLabel, setClassReportSesiLabel] = useState<string>('—');
+  const [classReportSesiId, setClassReportSesiId] = useState<number | null>(null);
   const [guruInfo, setGuruInfo] = useState<{ id: number; nama: string | null; status_akun: string | null; profile_pic_url: string | null; } | null>(null);
 
   const fetchRatings = useCallback(async () => {
@@ -242,6 +243,7 @@ const DetailClassTutorPage: React.FC = () => {
     async (opts: { sesiId: number; sesiLabel: string }) => {
       try {
         if (!guruId) return;
+        setClassReportSesiId(opts.sesiId);
         setClassReportSesiLabel(opts.sesiLabel);
         setClassReportError(null);
         setClassReportStatus('loading');
@@ -253,6 +255,7 @@ const DetailClassTutorPage: React.FC = () => {
           no: idx + 1,
           timestamp: String(e?.timestamp || ''),
           progress: String(e?.label || ''),
+          type: e?.type,
         }));
         setClassReportRows(rows);
         setClassReportStatus('succeeded');
@@ -623,6 +626,8 @@ const DetailClassTutorPage: React.FC = () => {
       <TutorClassReportModal
         open={classReportOpen}
         onClose={() => setClassReportOpen(false)}
+        guruId={Number(guruId)}
+        sesiId={classReportSesiId ?? undefined}
         tutorImage={modalTutorImage}
         tutorName={modalTutorName}
         statusLabel={modalStatusLabel}

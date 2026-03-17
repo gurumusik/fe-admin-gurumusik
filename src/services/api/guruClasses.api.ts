@@ -125,6 +125,48 @@ export async function getSessionProgress(params: { guruId: number; sesiId: numbe
   return baseUrl.request<SessionProgressResponse>(url, { method: 'GET' });
 }
 
+export type SessionAbsenMediaRow = {
+  id: number;
+  status: 'mulai' | 'selesai';
+  created_at: string;
+  absen_url: string;
+};
+
+export type SessionAbsenMediaResponse = {
+  sesi_id: number;
+  kind: 'awal' | 'akhir';
+  data: SessionAbsenMediaRow[];
+};
+
+export async function getSessionAbsenMedia(params: {
+  guruId: number;
+  sesiId: number;
+  kind: 'awal' | 'akhir';
+}) {
+  const { guruId, sesiId, kind } = params;
+  if (!guruId || !sesiId) throw new Error('guruId & sesiId wajib diisi');
+
+  const qs = new URLSearchParams({ sesi_id: String(sesiId), kind }).toString();
+  const url = `${ENDPOINTS.GURU.CLASSES_SESSION_ABSEN_MEDIA(guruId)}?${qs}`;
+  return baseUrl.request<SessionAbsenMediaResponse>(url, { method: 'GET' });
+}
+
+export type SessionGuruReviewResponse = {
+  sesi_id: number;
+  penilaian_id: number;
+  keterangan: string;
+  attachments: string[];
+};
+
+export async function getSessionGuruReview(params: { guruId: number; sesiId: number }) {
+  const { guruId, sesiId } = params;
+  if (!guruId || !sesiId) throw new Error('guruId & sesiId wajib diisi');
+
+  const qs = new URLSearchParams({ sesi_id: String(sesiId) }).toString();
+  const url = `${ENDPOINTS.GURU.CLASSES_SESSION_REVIEW(guruId)}?${qs}`;
+  return baseUrl.request<SessionGuruReviewResponse>(url, { method: 'GET' });
+}
+
 export async function updateRatingIsShow(
   guruId: number | string,
   ratingId: number | string,

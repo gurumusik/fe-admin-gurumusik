@@ -1,20 +1,25 @@
 'use client';
 
-import React from 'react';
-import { RiCloseLine, RiCalendar2Line } from 'react-icons/ri';
+import React, { useCallback, useMemo, useState } from 'react';
+import { RiCalendar2Line, RiCloseLine, RiExternalLinkLine, RiEyeLine } from 'react-icons/ri';
 import { getInstrumentIcon } from '@/utils/getInstrumentIcon';
-import { getPackageColor } from '@/utils/getPackageColor';
+import { getProgramColor } from '@/utils/getProgramColor';
 import { getStatusColor } from '@/utils/getStatusColor';
+import { getSessionAbsenMedia, getSessionGuruReview, resolveAvatarUrl } from '@/services/api/guruClasses.api';
 
 export type TutorClassReportRow = {
   no: number | string;
   timestamp: string;
   progress: string;
+  type?: 'scheduled' | 'absen_awal' | 'absen_akhir' | 'review' | 'ended' | 'status';
 };
 
 type TutorClassReportModalProps = {
   open: boolean;
   onClose: () => void;
+
+  guruId?: number;
+  sesiId?: number;
 
   tutorImage: string;
   tutorName: string;
@@ -44,6 +49,8 @@ function toDDMMYYYYHHmm(input?: string | Date | null) {
 const TutorClassReportModal: React.FC<TutorClassReportModalProps> = ({
   open,
   onClose,
+  guruId,
+  sesiId,
   tutorImage,
   tutorName,
   statusLabel = 'Aktif',
@@ -56,6 +63,70 @@ const TutorClassReportModal: React.FC<TutorClassReportModalProps> = ({
   rows = [],
 }) => {
   if (!open) return null;
+
+  const canFetchDetails = Number(guruId) > 0 && Number(sesiId) > 0;
+
+  // ===== Absen media modal =====
+  const [absenOpen, setAbsenOpen] = useState(false);
+  const [absenKind, setAbsenKind] = useState<'awal' | 'akhir'>('awal');
+  const [absenStatus, setAbsenStatus] = useState<'idle' | 'loading' | 'succeeded' | 'failed'>('idle');
+  const [absenError, setAbsenError] = useState<string | null>(null);
+  const [absenUrls, setAbsenUrls] = useState<string[]>([]);
+
+  const openAbsen = useCallback(
+    async (kind: 'awal' | 'akhir') => {
+      if (!canFetchDetails) return;
+      try {
+        setAbsenKind(kind);
+        setAbsenError(null);
+        setAbsenStatus('loading');
+        setAbsenOpen(true);
+
+        const raw = await getSessionAbsenMedia({ guruId: Number(guruId), sesiId: Number(sesiId), kind });
+        const urls = (raw?.data ?? [])
+          .map((r) => resolveAvatarUrl(r?.absen_url ?? null))
+          .filter((u): u is string => typeof u === 'string' && u.length > 0);
+        setAbsenUrls(urls);
+        setAbsenStatus('succeeded');
+      } catch (e: any) {
+        setAbsenUrls([]);
+        setAbsenStatus('failed');
+        setAbsenError(e?.message || 'Gagal memuat foto absen');
+      }
+    },
+    [canFetchDetails, guruId, sesiId]
+  );
+
+  // ===== Guru review modal =====
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<'idle' | 'loading' | 'succeeded' | 'failed'>('idle');
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewText, setReviewText] = useState<string>('');
+  const [reviewAttachments, setReviewAttachments] = useState<string[]>([]);
+
+  const openReview = useCallback(async () => {
+    if (!canFetchDetails) return;
+    try {
+      setReviewError(null);
+      setReviewStatus('loading');
+      setReviewOpen(true);
+
+      const raw = await getSessionGuruReview({ guruId: Number(guruId), sesiId: Number(sesiId) });
+      setReviewText(String(raw?.keterangan ?? ''));
+      const urls = (raw?.attachments ?? [])
+        .map((u) => resolveAvatarUrl(u ?? null))
+        .filter((u): u is string => typeof u === 'string' && u.length > 0);
+      setReviewAttachments(urls);
+      setReviewStatus('succeeded');
+    } catch (e: any) {
+      setReviewText('');
+      setReviewAttachments([]);
+      setReviewStatus('failed');
+      setReviewError(e?.message || 'Gagal memuat review guru');
+    }
+  }, [canFetchDetails, guruId, sesiId]);
+
+  const showAbsenEye = useMemo(() => new Set(['absen_awal', 'absen_akhir']), []);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
@@ -102,10 +173,7 @@ const TutorClassReportModal: React.FC<TutorClassReportModalProps> = ({
                   <span className="text-md text-neutral-500">Program</span>
                   <div className="mt-2 text-center">
                     <span
-                      className={`inline-flex items-center rounded-lg text-xs font-semibold px-2.5 py-1 ${getPackageColor(
-                        programLabel,
-                        'solid'
-                      )}`}
+                      className={`inline-flex items-center rounded-lg text-xs font-semibold px-2.5 py-1 ${getProgramColor(programLabel)}`}
                     >
                       {programLabel}
                     </span>
@@ -167,7 +235,33 @@ const TutorClassReportModal: React.FC<TutorClassReportModalProps> = ({
                       <tr key={`row-${r.no}`} className="border-t border-black/5 text-md">
                         <td className="px-4 py-4">{r.no}</td>
                         <td className="px-4 py-4">{toDDMMYYYYHHmm(r.timestamp)}</td>
-                        <td className="px-4 py-4">{r.progress}</td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <span>{r.progress}</span>
+
+                            {canFetchDetails && showAbsenEye.has(String(r.type)) ? (
+                              <button
+                                type="button"
+                                onClick={() => openAbsen(String(r.type) === 'absen_awal' ? 'awal' : 'akhir')}
+                                className="inline-flex items-center justify-center rounded-lg p-2 hover:bg-black/5 text-neutral-700"
+                                aria-label="Lihat foto absen"
+                                title="Lihat foto absen"
+                              >
+                                <RiEyeLine size={18} />
+                              </button>
+                            ) : canFetchDetails && String(r.type) === 'review' ? (
+                              <button
+                                type="button"
+                                onClick={openReview}
+                                className="inline-flex items-center justify-center rounded-lg p-2 hover:bg-black/5 text-neutral-700"
+                                aria-label="Lihat review guru"
+                                title="Lihat review guru"
+                              >
+                                <RiExternalLinkLine size={18} />
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -177,9 +271,101 @@ const TutorClassReportModal: React.FC<TutorClassReportModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ===== Sub-modal: Foto Absen ===== */}
+      {absenOpen ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setAbsenOpen(false)} />
+          <div className="relative z-[111] w-[min(760px,95vw)] rounded-3xl bg-white shadow-2xl border border-black/10">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-black/10">
+              <h3 className="text-xl font-semibold text-neutral-900">
+                Foto Absen {absenKind === 'awal' ? 'Awal' : 'Akhir'}
+              </h3>
+              <button
+                onClick={() => setAbsenOpen(false)}
+                className="inline-flex items-center justify-center rounded-full p-2 hover:bg-black/5"
+                aria-label="Close"
+              >
+                <RiCloseLine size={22} />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              {absenStatus === 'loading' ? (
+                <div className="py-10 text-center text-neutral-500">Memuatâ€¦</div>
+              ) : absenStatus === 'failed' ? (
+                <div className="py-10 text-center text-red-600">{absenError || 'Gagal memuat.'}</div>
+              ) : absenUrls.length === 0 ? (
+                <div className="py-10 text-center text-neutral-500">Tidak ada foto.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {absenUrls.map((u, idx) => (
+                    <a key={`absen-${idx}`} href={u} target="_blank" rel="noreferrer" className="block">
+                      <img
+                        src={u}
+                        alt={`absen-${idx}`}
+                        className="w-full rounded-2xl border border-black/10 object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ===== Sub-modal: Review Guru ===== */}
+      {reviewOpen ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setReviewOpen(false)} />
+          <div className="relative z-[111] w-[min(760px,95vw)] rounded-3xl bg-white shadow-2xl border border-black/10">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-black/10">
+              <h3 className="text-xl font-semibold text-neutral-900">Guru Review</h3>
+              <button
+                onClick={() => setReviewOpen(false)}
+                className="inline-flex items-center justify-center rounded-full p-2 hover:bg-black/5"
+                aria-label="Close"
+              >
+                <RiCloseLine size={22} />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              {reviewStatus === 'loading' ? (
+                <div className="py-10 text-center text-neutral-500">Memuatâ€¦</div>
+              ) : reviewStatus === 'failed' ? (
+                <div className="py-10 text-center text-red-600">{reviewError || 'Gagal memuat.'}</div>
+              ) : (
+                <>
+                  <div className="rounded-2xl border border-black/10 bg-neutral-50 p-4 text-neutral-900 whitespace-pre-wrap">
+                    {reviewText || 'â€”'}
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="text-sm font-semibold text-neutral-900 mb-2">Lampiran</div>
+                    {reviewAttachments.length === 0 ? (
+                      <div className="text-neutral-500 text-sm">Tidak ada lampiran.</div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {reviewAttachments.map((u, idx) => (
+                          <a key={`lamp-${idx}`} href={u} target="_blank" rel="noreferrer" className="block">
+                            <img
+                              src={u}
+                              alt={`lampiran-${idx}`}
+                              className="w-full rounded-2xl border border-black/10 object-cover"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
 
 export default TutorClassReportModal;
-
