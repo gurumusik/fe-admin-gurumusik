@@ -113,6 +113,7 @@ export type StudentHeaderDTO = {
 
 export type MuridClassSessionRow = {
   transaksi_id: number;
+  guru_id?: number;
   sesi_id: number;
   sesi_ke: number;
   date: string;        // YYYY-MM-DD

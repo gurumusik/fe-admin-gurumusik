@@ -15,12 +15,14 @@ import { getStatusColor } from '@/utils/getStatusColor';
 
 import { fetchStudentHeaderThunk, selectStudentDetail } from '@/features/slices/murid/slice';
 import StudentReportModal, { type StudentReportRow } from '@/features/dashboard/components/StudentReportModal';
+import TutorClassReportModal, { type TutorClassReportRow } from '@/features/dashboard/components/TutorClassReportModal';
 
 import {
   listMuridClassesById,
   listMuridTransaksiRatings, // ⬅️ NEW: ambil data rating per transaksi
   type MuridClassSessionRow,
 } from '@/services/api/murid.api';
+import { getSessionProgress } from '@/services/api/guruClasses.api';
 
 /* ===================== Helpers ===================== */
 // rata-rata rating (abaikan null)
@@ -85,6 +87,40 @@ const DetailStudentClassPage: React.FC = () => {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportRows, setReportRows] = useState<StudentReportRow[]>([]);
   const [reportLoading, setReportLoading] = useState<boolean>(false);
+
+  // ====== modal laporan kelas (progress sesi) ======
+  const [classReportOpen, setClassReportOpen] = useState(false);
+  const [classReportRows, setClassReportRows] = useState<TutorClassReportRow[]>([]);
+  const [classReportStatus, setClassReportStatus] = useState<'idle' | 'loading' | 'succeeded' | 'failed'>('idle');
+  const [classReportError, setClassReportError] = useState<string | null>(null);
+  const [classReportSesiLabel, setClassReportSesiLabel] = useState<string>('—');
+
+  const openClassReport = useCallback(
+    async (opts: { guruId: number; sesiId: number; sesiLabel: string }) => {
+      try {
+        if (!opts.guruId || !opts.sesiId) return;
+        setClassReportSesiLabel(opts.sesiLabel);
+        setClassReportError(null);
+        setClassReportStatus('loading');
+        setClassReportOpen(true);
+
+        const raw = await getSessionProgress({ guruId: opts.guruId, sesiId: opts.sesiId });
+        const events = Array.isArray((raw as any)?.events) ? (raw as any).events : [];
+        const rows: TutorClassReportRow[] = events.map((e: any, idx: number) => ({
+          no: idx + 1,
+          timestamp: String(e?.timestamp || ''),
+          progress: String(e?.label || ''),
+        }));
+        setClassReportRows(rows);
+        setClassReportStatus('succeeded');
+      } catch (e: any) {
+        setClassReportRows([]);
+        setClassReportStatus('failed');
+        setClassReportError(e?.message || 'Gagal memuat laporan kelas');
+      }
+    },
+    []
+  );
 
   // header murid
   useEffect(() => {
@@ -329,7 +365,7 @@ const DetailStudentClassPage: React.FC = () => {
                 <th className="p-5 font-medium">Jam Mulai</th>
                 <th className="p-5 font-medium">Jam Akhir</th>
                 <th className="p-5 font-medium">Status</th>
-                <th className="w-[160px] p-5 font-medium">Aksi</th>
+                <th className="w-[260px] p-5 font-medium">Aksi</th>
               </tr>
             </thead>
 
@@ -358,23 +394,53 @@ const DetailStudentClassPage: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-4 py-4">
-                    {isBelumSelesai(r.status) ? (
+                    <div className="inline-flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => console.log('Aktifkan kelas untuk sesi', r.sesi_id, '(sesi_ke:', r.sesi_ke, ')')}
-                        className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
+                        onClick={() =>
+                          openClassReport({
+                            guruId: Number(r.guru_id ?? 0),
+                            sesiId: Number(r.sesi_id),
+                            sesiLabel: `${r.sesi_ke}/${hdr?.totalSession ?? r.total_session ?? 0}`,
+                          })
+                        }
+                        disabled={classReportStatus === 'loading' || !Number(r.guru_id)}
+                        className={`rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium ${
+                          classReportStatus === 'loading' || !Number(r.guru_id)
+                            ? 'text-(--secondary-color) opacity-50 cursor-not-allowed'
+                            : 'text-(--secondary-color) hover:bg-(--secondary-light-color)'
+                        }`}
+                        title={
+                          !Number(r.guru_id)
+                            ? 'GuruId tidak tersedia'
+                            : classReportStatus === 'loading'
+                              ? 'Memuat laporan…'
+                              : 'Laporan Kelas'
+                        }
                       >
-                        Aktifkan Kelas
+                        Laporan Kelas
                       </button>
-                    ) : isBelumMulai(r.status) ? null : (
-                      <button
-                        type="button"
-                        onClick={() => setReportOpen(true)}
-                        className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
-                      >
-                        Laporan
-                      </button>
-                    )}
+
+                      {typeof r.rating === 'number' && Number.isFinite(r.rating) && !isBelumMulai(r.status) ? (
+                        <button
+                          type="button"
+                          onClick={() => setReportOpen(true)}
+                          className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
+                        >
+                          Laporan Penilaian
+                        </button>
+                      ) : null}
+
+                      {isBelumSelesai(r.status) ? (
+                        <button
+                          type="button"
+                          onClick={() => console.log('Aktifkan kelas untuk sesi', r.sesi_id, '(sesi_ke:', r.sesi_ke, ')')}
+                          className="rounded-full border border-(--secondary-color) px-4 py-1.5 text-sm font-medium text-(--secondary-color) hover:bg-(--secondary-light-color)"
+                        >
+                          Aktifkan Kelas
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -439,6 +505,20 @@ const DetailStudentClassPage: React.FC = () => {
         nilaiAsli={hdr?.avgRating != null ? `${hdr.avgRating.toFixed(1)}/5` : '−'}
         rows={reportRows}
         loading={reportLoading} // ⬅️ NEW
+      />
+
+      <TutorClassReportModal
+        open={classReportOpen}
+        onClose={() => setClassReportOpen(false)}
+        tutorImage={hdr?.teacherAvatar || defaultUser}
+        tutorName={hdr?.teacherName || 'Guru'}
+        programLabel={hdr?.programName || '—'}
+        instrumentLabel={hdr?.instrumentName || '—'}
+        schedule={hdr?.schedule || '—'}
+        sesiLabel={classReportSesiLabel}
+        loading={classReportStatus === 'loading'}
+        error={classReportStatus === 'failed' ? classReportError : null}
+        rows={classReportRows}
       />
     </div>
   );
