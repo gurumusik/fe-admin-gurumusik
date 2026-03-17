@@ -291,23 +291,40 @@ const TutorClassReportModal: React.FC<TutorClassReportModalProps> = ({
             </div>
             <div className="px-6 py-5">
               {absenStatus === 'loading' ? (
-                <div className="py-10 text-center text-neutral-500">Memuatâ€¦</div>
+                <div className="py-10 text-center text-neutral-500">Memuat</div>
               ) : absenStatus === 'failed' ? (
                 <div className="py-10 text-center text-red-600">{absenError || 'Gagal memuat.'}</div>
               ) : absenUrls.length === 0 ? (
                 <div className="py-10 text-center text-neutral-500">Tidak ada foto.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {absenUrls.map((u, idx) => (
-                    <a key={`absen-${idx}`} href={u} target="_blank" rel="noreferrer" className="block">
+                absenUrls.length === 1 ? (
+                  <div className="flex justify-center">
+                    <a
+                      href={absenUrls[0]}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block w-full max-w-[520px]"
+                    >
                       <img
-                        src={u}
-                        alt={`absen-${idx}`}
-                        className="w-full rounded-2xl border border-black/10 object-cover"
+                        src={absenUrls[0]}
+                        alt="absen"
+                        className="w-full max-h-[65vh] rounded-2xl border border-black/10 object-contain bg-neutral-50"
                       />
                     </a>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {absenUrls.map((u, idx) => (
+                      <a key={`absen-${idx}`} href={u} target="_blank" rel="noreferrer" className="block">
+                        <img
+                          src={u}
+                          alt={`absen-${idx}`}
+                          className="w-full max-h-[45vh] rounded-2xl border border-black/10 object-contain bg-neutral-50"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -331,7 +348,7 @@ const TutorClassReportModal: React.FC<TutorClassReportModalProps> = ({
             </div>
             <div className="px-6 py-5">
               {reviewStatus === 'loading' ? (
-                <div className="py-10 text-center text-neutral-500">Memuatâ€¦</div>
+                <div className="py-10 text-center text-neutral-500">Memuat</div>
               ) : reviewStatus === 'failed' ? (
                 <div className="py-10 text-center text-red-600">{reviewError || 'Gagal memuat.'}</div>
               ) : (
