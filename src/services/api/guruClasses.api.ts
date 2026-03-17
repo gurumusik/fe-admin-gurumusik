@@ -101,6 +101,30 @@ export async function listTransaksiRatings(params: {
   } as ListTransaksiRatingsResponse;
 }
 
+export type SessionProgressEvent = {
+  id?: number;
+  type: 'scheduled' | 'absen_awal' | 'absen_akhir' | 'status';
+  timestamp: string;
+  label: string;
+};
+
+export type SessionProgressResponse = {
+  sesi_id: number;
+  transaksi_id: number;
+  status: string | null;
+  schedule: { tanggal_sesi: string | null; waktu_mulai: string | null; waktu_selesai: string | null };
+  events: SessionProgressEvent[];
+};
+
+export async function getSessionProgress(params: { guruId: number; sesiId: number }) {
+  const { guruId, sesiId } = params;
+  if (!guruId || !sesiId) throw new Error('guruId & sesiId wajib diisi');
+
+  const qs = new URLSearchParams({ sesi_id: String(sesiId) }).toString();
+  const url = `${ENDPOINTS.GURU.CLASSES_SESSION_PROGRESS(guruId)}?${qs}`;
+  return baseUrl.request<SessionProgressResponse>(url, { method: 'GET' });
+}
+
 export async function updateRatingIsShow(
   guruId: number | string,
   ratingId: number | string,
