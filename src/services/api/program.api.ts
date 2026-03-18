@@ -8,6 +8,13 @@ import type {
   CreateProgramPayload,
 } from '@/features/slices/program/types';
 
+const unwrapProgram = (payload: Program | { data?: Program } | null | undefined): Program => {
+  if (payload && typeof payload === 'object' && 'data' in payload && payload.data) {
+    return payload.data;
+  }
+  return payload as Program;
+};
+
 export async function listPrograms(params?: FetchProgramsParams) {
   const q = new URLSearchParams();
   if (params?.q) q.set('q', params.q);
@@ -22,30 +29,33 @@ export async function listPrograms(params?: FetchProgramsParams) {
 }
 
 export async function createProgram(payload: CreateProgramPayload) {
-  return baseUrl.request<{ message?: string; data: Program }>(
+  const res = await baseUrl.request<Program | { message?: string; data: Program }>(
     ENDPOINTS.PROGRAMS.CREATE,
     {
       method: 'POST',
       json: payload,
     }
   );
+  return unwrapProgram(res);
 }
 
 // (opsional) detail by id
 export async function getProgramDetail(id: number | string) {
-  return baseUrl.request<Program>(ENDPOINTS.PROGRAMS.DETAIL(id), {
+  const res = await baseUrl.request<Program | { data?: Program }>(ENDPOINTS.PROGRAMS.DETAIL(id), {
     method: 'GET',
   });
+  return unwrapProgram(res);
 }
 
 export async function updateProgram(
   id: number | string,
   payload: Partial<CreateProgramPayload>
 ) {
-  return baseUrl.request<Program>(ENDPOINTS.PROGRAMS.UPDATE(id), {
+  const res = await baseUrl.request<Program | { data?: Program }>(ENDPOINTS.PROGRAMS.UPDATE(id), {
     method: 'PUT',
     json: payload,
   });
+  return unwrapProgram(res);
 }
 
 export async function deleteProgram(id: number | string) {

@@ -71,6 +71,7 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/refund",
     "/dashboard-admin/data-rekrutmen",
     "/dashboard-admin/referrals",
+    "/dashboard-admin/billing-config",
   ];
   const reportPrefixes = [
     "/dashboard-admin/reschedule",
@@ -257,6 +258,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/referrals"
                   label="Teacher Referrals"
                   active={isUnder("/dashboard-admin/referrals")}
+                />
+                <SubItem
+                  to="/dashboard-admin/billing-config"
+                  label="Billing Config"
+                  active={isUnder("/dashboard-admin/billing-config")}
                 />
               </div>
             </DropWrap>

@@ -41,6 +41,7 @@ import CertificateInstrumentPage from '@/features/dashboard/pages/certificate-in
 import EmployeePage from '@/features/dashboard/pages/employee/page';
 import TransactionListPage from '@/features/dashboard/pages/transaction-list/page';
 import TransactionTicketPage from '@/features/dashboard/pages/transaction-ticket/page';
+import BillingConfigPage from '@/features/dashboard/pages/billing-config/page';
 import RequestAssistPage from "@/features/dashboard/pages/request-assist/page";
 import WaHandoffsPage from "@/features/dashboard/pages/wa-handoffs/page";
 import TeacherChangePage from "@/features/dashboard/pages/teacher-change/page";
@@ -112,6 +113,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/paket", element: <ManagePaketPage /> },
       { path: "/dashboard-admin/certificate-instrument", element: <CertificateInstrumentPage /> },
       { path: "/dashboard-admin/employees", element: <EmployeePage /> },
+      { path: "/dashboard-admin/billing-config", element: <BillingConfigPage /> },
       { path: "/dashboard-admin/profile-templates", element: <AdminProfileTemplatesPage /> },
       { path: "/dashboard-admin/profile-templates/new", element: <AdminProfileTemplateCreatePage /> },
       { path: "/dashboard-admin/profile-templates/:id", element: <AdminProfileTemplateDetailPage /> },

@@ -44,7 +44,7 @@ export const createProgramThunk = createAsyncThunk<
 >('program/create', async (payload, { rejectWithValue }) => {
   try {
     const res = await ProgramAPI.createProgram(payload);
-    return res.data as Program; // Program baru
+    return res as Program;
   } catch (e: any) {
     return rejectWithValue(e?.message ?? 'Gagal membuat program');
   }

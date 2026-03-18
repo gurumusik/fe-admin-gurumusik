@@ -199,6 +199,11 @@ export const ENDPOINTS = {
     UPDATE: (id: number | string) => `/admin/employees/${id}`,
   },
 
+  BILLING_CONFIG: {
+    DETAIL: '/admin/billing-config',
+    UPDATE: '/admin/billing-config',
+  },
+
   PROFILE_TEMPLATES: {
     LIST: '/profile-templates', // GET (admin: all+filter, guru: active only)
     DETAIL: (id: number | string) => `/profile-templates/${id}`,

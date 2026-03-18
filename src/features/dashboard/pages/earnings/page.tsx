@@ -285,19 +285,21 @@ const InfoOverlay: React.FC<{
         <div className="space-y-3 text-[15px] leading-relaxed text-[#0B1220]">
           {isKotor ? (
             <>
-              <p>Pendapatan Kotor adalah jumlah pendapatan yang <b>sudah dipotong promo</b>, tetapi <b>belum dipotong komisi guru</b>.</p>
+              <p>Pendapatan Kotor adalah total nilai yang dibayarkan murid <b>setelah diskon/promo</b>, tetapi <b>belum dipotong komisi guru</b>.</p>
               <div>
                 <b>Rumus:</b>
-                <p>Total Pendapatan Kotor = Pendapatan Kotor Kursus + Pendapatan Kotor Modul – Promo</p>
+                <p>Total Pendapatan Kotor = Pendapatan Kotor Kursus + Pendapatan Kotor Modul</p>
               </div>
+              <p>Nilai promo ditampilkan terpisah pada kartu Promo.</p>
             </>
           ) : (
             <>
-              <p>Pendapatan Bersih adalah jumlah pendapatan akhir <b>setelah dipotong promo/diskon dan komisi guru</b>.</p>
+              <p>Pendapatan Bersih adalah jumlah pendapatan akhir <b>setelah komisi guru dipotong</b>. Promo/diskon tetap dicatat terpisah.</p>
               <div>
                 <b>Rumus:</b>
-                <p>Total Pendapatan Bersih = Pendapatan Bersih Kursus + Pendapatan Bersih Modul – Promo</p>
+                <p>Total Pendapatan Bersih = Pendapatan Bersih Kursus + Pendapatan Bersih Modul</p>
               </div>
+              <p>Nilai promo ditampilkan terpisah pada kartu Promo.</p>
             </>
           )}
         </div>
@@ -896,7 +898,7 @@ const AdminEarningsPage: React.FC = () => {
               </div>
 
               <div className={cls("relative rounded-2xl p-4 sm:p-5", toneClasses.purple.bg)}>
-                <p className="text-md text-[#0B1220]">Fee Layanan</p>
+                <p className="text-md text-[#0B1220]">Fee Admin</p>
                 <div className="mt-2">
                   <div className="text-[20px] font-bold leading-tight text-[#0B122A] sm:text-[22px]">
                     {fmt((recap as any).fee_sum ?? 0)}

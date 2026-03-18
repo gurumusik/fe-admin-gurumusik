@@ -36,6 +36,7 @@ type ProgramForm = {
   deskripsi: string;
   bnefits: string[];
   durasi_menit: string;
+  komisi_guru_per_sesi: string;
 };
 
 const initialForm: ProgramForm = {
@@ -44,7 +45,17 @@ const initialForm: ProgramForm = {
   deskripsi: "",
   bnefits: [],
   durasi_menit: "",
+  komisi_guru_per_sesi: "",
 };
+
+const formatIDR = (value?: number | null) =>
+  value == null
+    ? "-"
+    : value.toLocaleString("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        minimumFractionDigits: 0,
+      });
 
 const ManageProgramPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -148,6 +159,10 @@ const ManageProgramPage: React.FC = () => {
       bnefits: Array.isArray(program?.bnefits) ? program.bnefits : [],
       durasi_menit:
         program?.durasi_menit != null ? String(program.durasi_menit) : "",
+      komisi_guru_per_sesi:
+        program?.komisi_guru_per_sesi != null
+          ? String(program.komisi_guru_per_sesi)
+          : "",
     });
     setBenefitInput("");
     setIsModalOpen(true);
@@ -185,6 +200,9 @@ const ManageProgramPage: React.FC = () => {
       deskripsi: form.deskripsi.trim() || undefined,
       bnefits: form.bnefits.length ? form.bnefits : undefined,
       durasi_menit: form.durasi_menit ? Number(form.durasi_menit) : undefined,
+      komisi_guru_per_sesi: form.komisi_guru_per_sesi
+        ? Number(form.komisi_guru_per_sesi)
+        : null,
     };
 
     try {
@@ -236,7 +254,7 @@ const ManageProgramPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-semibold">Manage Programs</h1>
           <p className="text-sm text-neutral-500 mt-1">
-            Kelola daftar program, headline, deskripsi, benefit, dan durasi.
+            Kelola daftar program, headline, deskripsi, benefit, durasi, dan komisi guru per sesi.
           </p>
           {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
         </div>
@@ -277,6 +295,9 @@ const ManageProgramPage: React.FC = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm text-neutral-800 uppercase tracking-wide">
                   Durasi (menit)
                 </th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-neutral-800 uppercase tracking-wide">
+                  Komisi Guru / Sesi
+                </th>
                 <th className="px-4 py-3 text-center font-semibold text-sm text-neutral-800 uppercase tracking-wide">
                   Aksi
                 </th>
@@ -286,7 +307,7 @@ const ManageProgramPage: React.FC = () => {
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-4 py-6 text-center text-sm text-neutral-400"
                   >
                     Memuat data program...
@@ -295,7 +316,7 @@ const ManageProgramPage: React.FC = () => {
               ) : safePrograms.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-4 py-6 text-center text-sm text-neutral-400"
                   >
                     Belum ada program atau tidak cocok dengan kata kunci.
@@ -343,6 +364,11 @@ const ManageProgramPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 align-top">
                       {program?.durasi_menit ?? "-"}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <span className="text-md text-neutral-700">
+                        {formatIDR(program?.komisi_guru_per_sesi ?? null)}
+                      </span>
                     </td>
                     <td className="px-4 py-3 align-top text-center whitespace-nowrap">
                       <button
@@ -474,8 +500,8 @@ const ManageProgramPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Durasi */}
-              <div className="grid grid-cols-1 gap-4">
+              {/* Durasi + Komisi */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-neutral-700">
                     Durasi (menit)
@@ -491,6 +517,27 @@ const ManageProgramPage: React.FC = () => {
                       className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary-color,#111827)] focus:border-[var(--primary-color,#111827)]"
                     />
                   </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Komisi Guru / Sesi<span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      name="komisi_guru_per_sesi"
+                      value={form.komisi_guru_per_sesi}
+                      onChange={handleInputChange}
+                      placeholder="Contoh: 150000"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary-color,#111827)] focus:border-[var(--primary-color,#111827)]"
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-neutral-500">
+                    Nominal flat komisi per sesi. Promo tidak akan mengurangi nilai ini.
+                  </p>
                 </div>
               </div>
 

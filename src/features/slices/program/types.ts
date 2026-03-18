@@ -8,6 +8,7 @@ export type Program = {
   deskripsi?: string | null;
   bnefits?: string[] | null;
   durasi_menit?: number | null;
+  komisi_guru_per_sesi?: number | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -49,6 +50,7 @@ export type CreateProgramPayload = {
   deskripsi?: string;
   bnefits?: string[];
   durasi_menit?: number | null;
+  komisi_guru_per_sesi?: number | null;
 };
 
 export type UpdateProgramPayload = {
