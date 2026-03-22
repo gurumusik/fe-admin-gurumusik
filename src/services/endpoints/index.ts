@@ -218,4 +218,8 @@ export const ENDPOINTS = {
     REFERRERS: '/admin/referrals/referrers',
     COMMISSIONS: '/admin/referrals/commissions',
   },
+
+  NOTIFICATIONS: {
+    ADMIN_BROADCAST: '/notifications/admin/broadcast',
+  },
 };

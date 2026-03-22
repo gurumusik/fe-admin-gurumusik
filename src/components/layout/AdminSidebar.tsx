@@ -10,6 +10,7 @@ import {
   RiSoundModuleLine,
   RiStarLine,
   RiFileAddLine,
+  RiNotification4Line,
 } from "react-icons/ri";
 import logo from "@/assets/images/gurumusik.png";
 
@@ -101,6 +102,7 @@ const AdminSidebar: React.FC = () => {
   const isVerifiedTutorActive = isUnder("/dashboard-admin/verified-tutor");
   const isRatingActive = isUnder("/dashboard-admin/manage-rating");
   const isEntryTutorActive = isUnder("/dashboard-admin/entry-tutor");
+  const isNotificationBroadcastActive = isUnder("/dashboard-admin/notifications");
 
   // state dropdown
   const [openManage, setOpenManage] = React.useState(groupActiveManage);
@@ -125,7 +127,7 @@ const AdminSidebar: React.FC = () => {
   };
 
   return (
-    <aside className="bg-white w-[260px] h-screen fixed left-0 top-0 p-4 shadow-md z-[11]">
+    <aside className="fixed left-0 top-0 z-[11] flex h-screen w-[260px] flex-col overflow-hidden bg-white p-4 shadow-md">
       {/* Header */}
       <div className="flex items-center justify-center font-semibold gap-2 min-h-12 mb-4">
         <img src={logo} alt="GuruMusik Logo" className="w-[30px] h-[30px] object-contain" />
@@ -134,7 +136,7 @@ const AdminSidebar: React.FC = () => {
 
       <div className="h-px w-full bg-neutral-300 mb-3" />
 
-      <nav>
+      <nav className="min-h-0 flex-1 overflow-y-auto pr-1">
         <ul className="space-y-2">
           {/* Manage Item */}
           <li>
@@ -522,6 +524,37 @@ const AdminSidebar: React.FC = () => {
                   }`}
                 >
                   Entry Tutor
+                </span>
+              </div>
+            </Link>
+          </li>
+
+          <li>
+            <Link
+              to="/dashboard-admin/notifications"
+              className={`group flex items-center justify-between px-2 py-3 rounded-xl
+                ${
+                  isNotificationBroadcastActive
+                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                }`}
+            >
+              <div className="flex items-center gap-3">
+                <RiNotification4Line
+                  className={`text-2xl transition-colors ${
+                    isNotificationBroadcastActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                />
+                <span
+                  className={`ml-2 font-medium text-lg transition-colors ${
+                    isNotificationBroadcastActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                  }`}
+                >
+                  Notifications
                 </span>
               </div>
             </Link>

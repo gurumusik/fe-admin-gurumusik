@@ -49,6 +49,7 @@ import AdminProfileTemplatesPage from '@/features/dashboard/pages/profile-templa
 import AdminProfileTemplateCreatePage from '@/features/dashboard/pages/profile-templates/new/page';
 import AdminProfileTemplateDetailPage from '@/features/dashboard/pages/profile-templates/detail/page';
 import ReferralMonitoringPage from '@/features/dashboard/pages/referrals/page';
+import AdminNotificationsPage from '@/features/dashboard/pages/notifications/page';
 
 export const router = createBrowserRouter([
   {
@@ -114,6 +115,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/certificate-instrument", element: <CertificateInstrumentPage /> },
       { path: "/dashboard-admin/employees", element: <EmployeePage /> },
       { path: "/dashboard-admin/billing-config", element: <BillingConfigPage /> },
+      { path: "/dashboard-admin/notifications", element: <AdminNotificationsPage /> },
       { path: "/dashboard-admin/profile-templates", element: <AdminProfileTemplatesPage /> },
       { path: "/dashboard-admin/profile-templates/new", element: <AdminProfileTemplateCreatePage /> },
       { path: "/dashboard-admin/profile-templates/:id", element: <AdminProfileTemplateDetailPage /> },
