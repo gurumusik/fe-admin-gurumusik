@@ -78,6 +78,7 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/reschedule",
     "/dashboard-admin/request-assist",
     "/dashboard-admin/wa-handoffs",
+    "/dashboard-admin/live-chat",
     "/dashboard-admin/teacher-change",
     "/dashboard-admin/tutor-report",
     "/dashboard-admin/student-report",
@@ -317,6 +318,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/wa-handoffs"
                   label="WA Admin Queue"
                   active={isExact("/dashboard-admin/wa-handoffs")}
+                />
+                <SubItem
+                  to="/dashboard-admin/live-chat"
+                  label="Live Chat"
+                  active={isUnder("/dashboard-admin/live-chat")}
                 />
                 <SubItem
                   to="/dashboard-admin/teacher-change"

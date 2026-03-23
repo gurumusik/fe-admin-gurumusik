@@ -156,6 +156,10 @@ export const ENDPOINTS = {
     LIST: '/request-assist',
     UPDATE_STATUS: (id: number | string) => `/request-assist/${id}/status`,
   },
+  ADMIN_LIVE_CHAT: {
+    OVERVIEW: '/admin/live-chat/overview',
+    DETAIL: (chatSessionId: number | string) => `/admin/live-chat/sessions/${chatSessionId}`,
+  },
   TEACHER_CHANGE: {
     ADMIN_LIST: '/teacher-change/admin',
     APPROVE: (id: number | string) => `/teacher-change/${id}/approve`,
