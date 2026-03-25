@@ -2,7 +2,7 @@ export type User = {
   id: number | string;
   nama: string;
   email: string;
-  role: 'admin'|'guru'|'murid';
+  role: 'admin'|'guru'|'murid'|'musician'|'candidate';
   profile_pic_url?: string | null;   // <- optional + boleh null
   is_verified?: boolean;             // <- opsional (datang dari login)
 };
