@@ -6,6 +6,7 @@
     type ListGuruParams,
     getGuruProfile,
     createGuruFromEntry,               // ← NEW
+    updateBulkGuruStatus,
   } from '@/services/api/guru.api';
   import {
     type GuruState,
@@ -19,6 +20,7 @@
     type CreateGuruFromEntryPayload,    // ← NEW
     type CreateGuruFromEntryResponse,   // ← NEW
   } from './types';
+  import { type UpdateBulkGuruStatusPayload } from '@/services/api/guru.api';
 
   /* ========= PROFILE STATE ========= */
   type GuruProfileState = {
@@ -215,6 +217,18 @@
         return data as GuruProfileResponse;
       } catch (e: any) {
         return (e?.message ?? 'Gagal memuat profil guru');
+      }
+    }
+  );
+
+  export const updateBulkGuruStatusThunk = createAsyncThunk(
+    'guru/updateBulkStatus',
+    async (payload: UpdateBulkGuruStatusPayload, { rejectWithValue }) => {
+      try {
+        const response = await updateBulkGuruStatus(payload);
+        return response?.data ?? response;
+      } catch (err: any) {
+        return rejectWithValue(err?.message ?? 'Gagal memperbarui status secara massal');
       }
     }
   );

@@ -21,6 +21,7 @@ export const ENDPOINTS = {
     CLASSES_RATINGS: (guruId: number | string) => `/guru/${guruId}/classes/ratings`,
     PROFILE: () => `/guru/profile`,
     STATUS: (id?: number | string) => (id ? `/guru/status?id=${id}` : `/guru/status`),
+    STATUS_BULK: `/guru/status/bulk`,
     UPDATE_IS_SHOW: (guruId?: number | string ) => `/guru/${guruId}/ratings/:ratingId/is_show`,
     CREATE_FROM_ENTRY: `/guru/admin/guru`,
   },

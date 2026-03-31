@@ -17,6 +17,7 @@ import {
   setGuruStatus,
   setGuruRatingBelow4,
   clearGuruFilters,
+  updateBulkGuruStatusThunk,
 } from '@/features/slices/guru/slice';
 import type { GuruListItem } from '@/features/slices/guru/types';
 import { getStatusColor } from '@/utils/getStatusColor';
@@ -63,19 +64,28 @@ export default function TutorListPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
 
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isBulkLoading, setIsBulkLoading] = useState(false);
+
   const {
     items, status, error, recap,
-    page, totalPages, hasPrev, hasNext,
+    limit, page, totalPages, hasPrev, hasNext,
     lastQuery,
   } = useSelector((s: RootState) => s.guru.list);
 
-  // Konsisten 5 baris / page (server-side)
-  const PAGE_SIZE = 5;
+  const PAGE_SIZE = limit || 5;
 
-  // Set limit sekali saat mount (tidak memicu fetch)
   useEffect(() => {
-    dispatch(setGuruLimit(PAGE_SIZE));
-  }, [dispatch]);
+    // Pastikan default limit saat pertama kali load adalah 5
+    if (limit === 10 && page === 1 && !lastQuery?.q) {
+      dispatch(setGuruLimit(5));
+    }
+  }, [dispatch, limit, page, lastQuery?.q]);
+
+  const handleLimitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    dispatch(setGuruLimit(parseInt(e.target.value, 10)));
+    dispatch(setGuruPage(1));
+  };
 
   // Ambil nilai filter terakhir (pakai primitif agar dep effect stabil)
   const q = lastQuery?.q ?? '';
@@ -136,6 +146,57 @@ export default function TutorListPage() {
     return items.filter(it => typeof it.rating === 'number' && it.rating < 4);
   }, [items, ratingBelow4]);
 
+  // ==== Tabel Checkbox Handlers ====
+  const allSelectableIds = rows.map((r) => r.id);
+  const isAllSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.has(id));
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      const newSet = new Set(selectedIds);
+      allSelectableIds.forEach((id) => newSet.add(id));
+      setSelectedIds(newSet);
+    }
+  };
+
+  const toggleSelectRow = (id: number) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
+  };
+
+  const handleBulkStatus = async (newStatus: 'aktif' | 'non_aktif') => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Anda yakin ingin mengubah ${selectedIds.size} guru menjadi ${newStatus}?`)) return;
+
+    setIsBulkLoading(true);
+    try {
+      await dispatch(
+        updateBulkGuruStatusThunk({
+          guru_ids: Array.from(selectedIds),
+          status_akun: newStatus,
+        })
+      ).unwrap();
+      
+      setSelectedIds(new Set());
+      // Refetch
+      dispatch(fetchGuruListThunk({
+        q: q || undefined,
+        city: city || undefined,
+        status: statusFilterRaw || undefined,
+        rating_lt: ratingBelow4 ? 4 : undefined,
+        page,
+        limit: PAGE_SIZE,
+      }) as any);
+    } catch (err: any) {
+      alert(err?.message || 'Gagal mengubah status massal');
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
   // Helpers pindah halaman
   const goTo = (p: number) => {
     const safe = Math.min(Math.max(1, p), totalPages || 1);
@@ -150,7 +211,7 @@ export default function TutorListPage() {
         <tbody>
           {Array.from({ length: PAGE_SIZE }).map((_, i) => (
             <tr key={`skeleton-${i}`}>
-              <td className="px-4 py-4" colSpan={7}>
+              <td className="px-4 py-4" colSpan={8}>
                 <div className="h-5 w-full animate-pulse rounded bg-black/10" />
               </td>
             </tr>
@@ -162,7 +223,7 @@ export default function TutorListPage() {
       return (
         <tbody>
           <tr>
-            <td className="px-4 py-6 text-red-600" colSpan={7}>
+            <td className="px-4 py-6 text-red-600 text-center" colSpan={8}>
               {error ?? 'Gagal memuat data.'}
             </td>
           </tr>
@@ -173,7 +234,7 @@ export default function TutorListPage() {
       return (
         <tbody>
           <tr>
-            <td className="px-4 py-6 text-neutral-900" colSpan={7}>
+            <td className="px-4 py-6 text-neutral-900 text-center" colSpan={8}>
               Belum ada data guru.
             </td>
           </tr>
@@ -185,6 +246,14 @@ export default function TutorListPage() {
       <tbody>
         {rows.map((t, idx) => (
           <tr key={t.id} className={idx === 0 ? 'text-md' : ''}>
+            <td className="px-4 py-4 text-center">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-(--secondary-color) cursor-pointer"
+                checked={selectedIds.has(t.id)}
+                onChange={() => toggleSelectRow(t.id)}
+              />
+            </td>
             <td className="px-4 py-4">
               <div className="h-12 w-12 overflow-hidden rounded-full">
                 <img
@@ -245,12 +314,35 @@ export default function TutorListPage() {
       </section>
 
       {/* SECTION: List Guru */}
-      <section className="mt-6 rounded-2xl bg-white p-4 md:p-6">
+      <section className="mt-6 rounded-2xl bg-white p-4 md:p-6 relative">
         {/* Header + Filters */}
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <h3 className="text-lg font-semibold text-black">List Guru</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="text-lg font-semibold text-black">List Guru</h3>
+            
+            {/* Bulk Actions Menu */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-2 border-l border-black/10 pl-4 animate-in fade-in transition-all">
+                <span className="text-sm font-medium text-black/60">{selectedIds.size} dipilih:</span>
+                <button
+                  onClick={() => handleBulkStatus('aktif')}
+                  disabled={isBulkLoading}
+                  className="rounded-xl bg-(--accent-green-color) px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
+                >
+                  Set Aktif
+                </button>
+                <button
+                  onClick={() => handleBulkStatus('non_aktif')}
+                  disabled={isBulkLoading}
+                  className="rounded-xl bg-(--accent-red-color) px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
+                >
+                  Set Non-Aktif
+                </button>
+              </div>
+            )}
+          </div>
 
-          <div className="flex flex-1 items-center gap-3 md:justify-end text-md">
+          <div className={`flex flex-1 items-center gap-3 md:justify-end text-md transition-opacity ${selectedIds.size > 0 ? 'opacity-30 pointer-events-none xl:opacity-100 xl:pointer-events-auto' : ''}`}>
             {/* Search by name */}
             <label className="relative w-full max-w-[460px]">
               <RiSearchLine className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-black/50" />
@@ -325,6 +417,15 @@ export default function TutorListPage() {
           <table className="w-full table-fixed">
             <thead>
               <tr className="bg-neutral-100 text-left text-md text-neutral-900">
+                <th className="w-[60px] p-4 font-semibold text-center">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-(--secondary-color) cursor-pointer"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={status === 'loading' || rows.length === 0}
+                  />
+                </th>
                 <th className="w-[120px] p-4 font-semibold">Profile</th>
                 <th className="p-4 font-semibold">Nama Guru</th>
                 <th className="p-4 font-semibold">No Telepon</th>
@@ -339,8 +440,23 @@ export default function TutorListPage() {
         </div>
 
         {/* Pagination (server-side) */}
-        <div className="mt-4 flex items-center justify-center gap-2">
-          <button
+        <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-black/70">
+            <span>Show</span>
+            <select
+              className="rounded-xl border border-black/10 bg-white px-2 py-1 outline-none focus:border-(--secondary-color)"
+              value={PAGE_SIZE}
+              onChange={handleLimitChange}
+            >
+              {[5, 10, 25, 50, 100].map(val => (
+                <option key={val} value={val}>{val}</option>
+              ))}
+            </select>
+            <span>entries</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
             onClick={prev}
             disabled={!hasPrev}
             className="px-3 py-2 text-md text-black/70 enabled:hover:bg-black/5 disabled:opacity-40"
@@ -378,6 +494,7 @@ export default function TutorListPage() {
           >
             &gt;
           </button>
+          </div>
         </div>
       </section>
     </div>

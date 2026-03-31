@@ -76,6 +76,20 @@ export async function updateGuruStatus(payload: UpdateGuruStatusPayload) {
   });
 }
 
+export type UpdateBulkGuruStatusPayload = {
+  guru_ids: number[];
+  status_akun: 'aktif' | 'non_aktif';
+};
+
+export async function updateBulkGuruStatus(payload: UpdateBulkGuruStatusPayload) {
+  const url = ENDPOINTS.GURU.STATUS_BULK;
+  return baseUrl.request<any>(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function createGuruFromEntry(
   payload: CreateGuruFromEntryPayload
 ) {
