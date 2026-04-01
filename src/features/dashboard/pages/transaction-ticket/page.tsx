@@ -464,7 +464,7 @@ export default function TransactionTicketPage() {
       if (!checkoutId) throw new Error('Transaksi dibuat, tetapi ID tidak tersedia.');
 
       const base = resolveWebBase();
-      const url = base ? `${base}/class/checkout/${checkoutId}` : `/class/checkout/${checkoutId}`;
+      const url = base ? `${base}/class/checkout/${checkoutId}` : `https://gurumusik.id/class/checkout/${checkoutId}`;
 
       setCheckoutResult({
         id: trxId,
