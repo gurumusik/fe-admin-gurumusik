@@ -55,6 +55,7 @@ type BaseData = {
 
 type ApproveTeacherModalProps = {
   open: boolean;
+  inactive?: boolean;
   mode: ApproveMode;
   onClose: () => void;
   onSubmit: (payload: ApproveTeacherPayload) => void;
@@ -111,6 +112,7 @@ const getDisplayCertStatus = (c: CertificateItem) => {
 
 const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   open,
+  inactive = false,
   mode,
   onClose,
   onSubmit,
@@ -132,6 +134,12 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   useEffect(() => {
     if (open && mode === 'approved') setStep(1);
   }, [open, mode]);
+
+  useEffect(() => {
+    if (!open || !inactive) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }, [open, inactive]);
 
   const certs = data?.certificates ?? [];
 
@@ -166,7 +174,13 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
     : '';
 
   return (
-    <div className="fixed inset-0 z-[80]">
+    <div
+      className={[
+        'fixed inset-0 z-[80]',
+        inactive ? 'pointer-events-none select-none' : '',
+      ].join(' ')}
+      aria-hidden={inactive}
+    >
       {/* overlay */}
       <div
         className="absolute inset-0 bg-[#0B1220]/60"
