@@ -152,6 +152,10 @@ export const ENDPOINTS = {
   },
   RESCHEDULE: {
     ADMIN_LIST: '/reschedule/admin',
+    ADMIN_CREATE: '/reschedule/admin/create',
+  },
+  SESI: {
+    ADMIN_ALL: '/sesi/admin/all',
   },
   REQUEST_ASSIST: {
     LIST: '/request-assist',

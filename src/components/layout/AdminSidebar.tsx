@@ -21,9 +21,8 @@ const DropWrap: React.FC<{ open: boolean; className?: string; children: React.Re
   children,
 }) => (
   <div
-    className={`overflow-hidden transition-all duration-200 ease-out origin-top ${
-      open ? "max-h-[80vh] opacity-100 scale-y-100" : "max-h-0 opacity-0 scale-y-95"
-    } ${className}`}
+    className={`overflow-hidden transition-all duration-200 ease-out origin-top ${open ? "max-h-[80vh] opacity-100 scale-y-100" : "max-h-0 opacity-0 scale-y-95"
+      } ${className}`}
   >
     {children}
   </div>
@@ -38,11 +37,10 @@ const SubItem: React.FC<{ to: string; label: string; active?: boolean; className
 }) => (
   <Link
     to={to}
-    className={`mt-2 flex items-center px-3 py-2 rounded-xl ${
-      active
+    className={`mt-2 flex items-center px-3 py-2 rounded-xl ${active
         ? "bg-[var(--secondary-light-color,#E6F4FF)] text-[var(--secondary-color,#0682DF)]"
         : "text-[#0f172a] hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
-    } ${className}`}
+      } ${className}`}
   >
     <span className={`text-md ${active ? "font-medium" : ""}`}>{label}</span>
   </Link>
@@ -76,6 +74,7 @@ const AdminSidebar: React.FC = () => {
   ];
   const reportPrefixes = [
     "/dashboard-admin/reschedule",
+    "/dashboard-admin/make-reschedule",
     "/dashboard-admin/request-assist",
     "/dashboard-admin/wa-handoffs",
     "/dashboard-admin/live-chat",
@@ -144,28 +143,24 @@ const AdminSidebar: React.FC = () => {
             <button
               type="button"
               onClick={() => toggleSection("manage")}
-              className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${
-                groupActiveManage ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
-              }`}
+              className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${groupActiveManage ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
+                }`}
             >
               <div className="flex items-center gap-3">
                 <RiSoundModuleLine
-                  className={`text-2xl transition-colors ${
-                    groupActiveManage ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
-                  }`}
+                  className={`text-2xl transition-colors ${groupActiveManage ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
+                    }`}
                 />
                 <span
-                  className={`ml-2 font-medium text-lg transition-colors ${
-                    groupActiveManage ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
-                  }`}
+                  className={`ml-2 font-medium text-lg transition-colors ${groupActiveManage ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
+                    }`}
                 >
                   Manage Item
                 </span>
               </div>
               <RiArrowDownSLine
-                className={`text-[18px] text-[#64748b] transition-transform ${
-                  openManage ? "rotate-180" : ""
-                }`}
+                className={`text-[18px] text-[#64748b] transition-transform ${openManage ? "rotate-180" : ""
+                  }`}
               />
             </button>
 
@@ -214,28 +209,24 @@ const AdminSidebar: React.FC = () => {
             <button
               type="button"
               onClick={() => toggleSection("finance")}
-              className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${
-                groupActiveFinance ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
-              }`}
+              className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${groupActiveFinance ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
+                }`}
             >
               <div className="flex items-center gap-3">
                 <RiCoinsLine
-                  className={`text-2xl transition-colors ${
-                    groupActiveFinance ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
-                  }`}
+                  className={`text-2xl transition-colors ${groupActiveFinance ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
+                    }`}
                 />
                 <span
-                  className={`ml-2 font-medium text-lg transition-colors ${
-                    groupActiveFinance ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
-                  }`}
+                  className={`ml-2 font-medium text-lg transition-colors ${groupActiveFinance ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
+                    }`}
                 >
                   Finance
                 </span>
               </div>
               <RiArrowDownSLine
-                className={`text-[18px] text-[#64748b] transition-transform ${
-                  openFinance ? "rotate-180" : ""
-                }`}
+                className={`text-[18px] text-[#64748b] transition-transform ${openFinance ? "rotate-180" : ""
+                  }`}
               />
             </button>
 
@@ -276,28 +267,24 @@ const AdminSidebar: React.FC = () => {
             <button
               type="button"
               onClick={() => toggleSection("report")}
-              className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${
-                groupActiveReport ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
-              }`}
+              className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${groupActiveReport ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
+                }`}
             >
               <div className="flex items-center gap-3">
                 <RiInformationLine
-                  className={`text-2xl transition-colors ${
-                    groupActiveReport ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
-                  }`}
+                  className={`text-2xl transition-colors ${groupActiveReport ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
+                    }`}
                 />
                 <span
-                  className={`ml-2 font-medium text-lg transition-colors ${
-                    groupActiveReport ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
-                  }`}
+                  className={`ml-2 font-medium text-lg transition-colors ${groupActiveReport ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
+                    }`}
                 >
                   Report
                 </span>
               </div>
               <RiArrowDownSLine
-                className={`text-[18px] text-[#64748b] transition-transform ${
-                  openReport ? "rotate-180" : ""
-                }`}
+                className={`text-[18px] text-[#64748b] transition-transform ${openReport ? "rotate-180" : ""
+                  }`}
               />
             </button>
 
@@ -308,6 +295,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/reschedule"
                   label="Reschedule"
                   active={isExact("/dashboard-admin/reschedule")}
+                />
+                <SubItem
+                  to="/dashboard-admin/make-reschedule"
+                  label="Make Reschedule"
+                  active={isUnder("/dashboard-admin/make-reschedule")}
                 />
                 <SubItem
                   to="/dashboard-admin/request-assist"
@@ -348,28 +340,24 @@ const AdminSidebar: React.FC = () => {
             <button
               type="button"
               onClick={() => toggleSection("users")}
-              className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${
-                groupActiveUsers ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
-              }`}
+              className={`w-full group flex items-center justify-between px-2 py-3 rounded-xl hover:bg-[var(--accent-blue-light-color,#E7EFFD)] ${groupActiveUsers ? "bg-[var(--secondary-light-color,#E6F4FF)]/60" : ""
+                }`}
             >
               <div className="flex items-center gap-3">
                 <RiFolderUserLine
-                  className={`text-2xl transition-colors ${
-                    groupActiveUsers ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
-                  }`}
+                  className={`text-2xl transition-colors ${groupActiveUsers ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
+                    }`}
                 />
                 <span
-                  className={`ml-2 font-medium text-lg transition-colors ${
-                    groupActiveUsers ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
-                  }`}
+                  className={`ml-2 font-medium text-lg transition-colors ${groupActiveUsers ? "text-[var(--secondary-color,#0682DF)]" : "text-[#6A7B98]"
+                    }`}
                 >
                   Data Lists
                 </span>
               </div>
               <RiArrowDownSLine
-                className={`text-[18px] text-[#64748b] transition-transform ${
-                  openUsers ? "rotate-180" : ""
-                }`}
+                className={`text-[18px] text-[#64748b] transition-transform ${openUsers ? "rotate-180" : ""
+                  }`}
               />
             </button>
 
@@ -415,26 +403,23 @@ const AdminSidebar: React.FC = () => {
             <Link
               to="/dashboard-admin/manage-rating"
               className={`group flex items-center justify-between px-2 py-3 rounded-xl
-                ${
-                  isRatingActive
-                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
-                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                ${isRatingActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
                 }`}
             >
               <div className="flex items-center gap-3">
                 <RiStarLine
-                  className={`text-2xl transition-colors ${
-                    isRatingActive
+                  className={`text-2xl transition-colors ${isRatingActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 />
                 <span
-                  className={`ml-2 font-medium text-lg transition-colors ${
-                    isRatingActive
+                  className={`ml-2 font-medium text-lg transition-colors ${isRatingActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 >
                   Manage Rating
                 </span>
@@ -446,26 +431,23 @@ const AdminSidebar: React.FC = () => {
             <Link
               to="/dashboard-admin/manage-promo"
               className={`group flex items-center justify-between px-2 py-3 rounded-xl
-                ${
-                  isPromoActive
-                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
-                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                ${isPromoActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
                 }`}
             >
               <div className="flex items-center gap-3">
                 <RiCoupon2Line
-                  className={`text-2xl transition-colors ${
-                    isPromoActive
+                  className={`text-2xl transition-colors ${isPromoActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 />
                 <span
-                  className={`ml-2 font-medium text-lg transition-colors ${
-                    isPromoActive
+                  className={`ml-2 font-medium text-lg transition-colors ${isPromoActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 >
                   Manage Promo
                 </span>
@@ -477,26 +459,23 @@ const AdminSidebar: React.FC = () => {
             <Link
               to="/dashboard-admin/verified-tutor"
               className={`group flex items-center justify-between px-2 py-3 rounded-xl
-                ${
-                  isVerifiedTutorActive
-                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
-                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                ${isVerifiedTutorActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
                 }`}
             >
               <div className="flex items-center gap-3">
                 <RiUserSearchLine
-                  className={`text-2xl transition-colors ${
-                    isVerifiedTutorActive
+                  className={`text-2xl transition-colors ${isVerifiedTutorActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 />
                 <span
-                  className={`ml-2 font-medium text-lg transition-colors ${
-                    isVerifiedTutorActive
+                  className={`ml-2 font-medium text-lg transition-colors ${isVerifiedTutorActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 >
                   Verified Tutor
                 </span>
@@ -508,26 +487,23 @@ const AdminSidebar: React.FC = () => {
             <Link
               to="/dashboard-admin/entry-tutor"
               className={`group flex items-center justify-between px-2 py-3 rounded-xl
-                ${
-                  isEntryTutorActive
-                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
-                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                ${isEntryTutorActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
                 }`}
             >
               <div className="flex items-center gap-3">
                 <RiFileAddLine
-                  className={`text-2xl transition-colors ${
-                    isEntryTutorActive
+                  className={`text-2xl transition-colors ${isEntryTutorActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 />
                 <span
-                  className={`ml-2 font-medium text-lg transition-colors ${
-                    isEntryTutorActive
+                  className={`ml-2 font-medium text-lg transition-colors ${isEntryTutorActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 >
                   Entry Tutor
                 </span>
@@ -539,26 +515,23 @@ const AdminSidebar: React.FC = () => {
             <Link
               to="/dashboard-admin/notifications"
               className={`group flex items-center justify-between px-2 py-3 rounded-xl
-                ${
-                  isNotificationBroadcastActive
-                    ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
-                    : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                ${isNotificationBroadcastActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
                 }`}
             >
               <div className="flex items-center gap-3">
                 <RiNotification4Line
-                  className={`text-2xl transition-colors ${
-                    isNotificationBroadcastActive
+                  className={`text-2xl transition-colors ${isNotificationBroadcastActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 />
                 <span
-                  className={`ml-2 font-medium text-lg transition-colors ${
-                    isNotificationBroadcastActive
+                  className={`ml-2 font-medium text-lg transition-colors ${isNotificationBroadcastActive
                       ? "text-[var(--secondary-color,#0682DF)]"
                       : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
-                  }`}
+                    }`}
                 >
                   Notifications
                 </span>

@@ -33,6 +33,7 @@ import ProfileTutorPage from "@/features/dashboard/pages/tutor-list/class-list-t
 import DetailClassTutorPage from "@/features/dashboard/pages/tutor-list/class-list-tutor/detail-class/page";
 import ManageRatingPage from "@/features/dashboard/pages/manage-rating/page";
 import ReschedulePage from "@/features/dashboard/pages/reschedule/page";
+import MakeReschedulePage from "@/features/dashboard/pages/make-reschedule/page";
 import EntryTutorPage from "@/features/dashboard/pages/entry-tutor/page"
 import InvoicePage from '@/features/dashboard/pages/invoice/page';
 import ManageProgramPage from '@/features/dashboard/pages/programs/page';
@@ -83,6 +84,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/tutor-report", element: <TutorReportPage /> },
       { path: "/dashboard-admin/student-report", element: <StudentReportPage /> },
       { path: "/dashboard-admin/reschedule", element: <ReschedulePage /> },
+      { path: "/dashboard-admin/make-reschedule", element: <MakeReschedulePage /> },
       { path: "/dashboard-admin/request-assist", element: <RequestAssistPage /> },
       { path: "/dashboard-admin/wa-handoffs", element: <WaHandoffsPage /> },
       { path: "/dashboard-admin/live-chat", element: <AdminLiveChatPage /> },

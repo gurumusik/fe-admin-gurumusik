@@ -74,3 +74,26 @@ export async function listRescheduleAdmin(
 
   return baseUrl.request<ListRescheduleAdminResponse>(url, { method: "GET" });
 }
+
+export type AdminCreateReschedulePayload = {
+  sesi_id: number;
+  new_date: string;
+  new_start: string;
+  new_end: string;
+  reason?: string | null;
+};
+
+export type AdminCreateRescheduleResponse = {
+  message: string;
+  data: RescheduleAdminItem;
+};
+
+export async function adminCreateReschedule(
+  payload: AdminCreateReschedulePayload
+) {
+  return baseUrl.request<AdminCreateRescheduleResponse>(
+    ENDPOINTS.RESCHEDULE.ADMIN_CREATE,
+    { method: "POST", json: payload }
+  );
+}
+
