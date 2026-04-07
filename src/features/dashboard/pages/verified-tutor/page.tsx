@@ -869,6 +869,7 @@ const VerifiedTutorPage: React.FC = () => {
       {/* Modal Approve / Reject */}
       <ApproveTeacherModal
         open={modalOpen}
+        inactive={revisionComposerOpen}
         mode={modalMode}
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmitModal}
