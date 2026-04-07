@@ -81,6 +81,12 @@ const MakeReschedulePage: React.FC = () => {
 
   /* ── fetch ── */
   const fetchSesi = useCallback(async (p: number, q: string) => {
+    if (!q.trim()) {
+      setSesiList([]);
+      setTotal(0);
+      setTotalPages(0);
+      return;
+    }
     setLoading(true);
     setLoadError(null);
     try {
@@ -100,6 +106,9 @@ const MakeReschedulePage: React.FC = () => {
   /* ── search debounce ── */
   function handleSearchChange(val: string) {
     setSearch(val);
+    if (!val.trim()) {
+      setSelected(null);
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setPage(1);
@@ -228,11 +237,9 @@ const MakeReschedulePage: React.FC = () => {
             </div>
 
             {/* Info */}
-            {!loading && !loadError && (
+            {!loading && !loadError && query && (
               <p className="text-xs text-neutral-400">
-                {query
-                  ? `${total} sesi ditemukan untuk "${query}"`
-                  : `Total ${total} sesi`}
+                {`${total} sesi ditemukan untuk "${query}"`}
               </p>
             )}
 
@@ -247,10 +254,20 @@ const MakeReschedulePage: React.FC = () => {
               {!loading && loadError && (
                 <p className="py-8 text-center text-sm text-red-500">{loadError}</p>
               )}
-              {!loading && !loadError && sesiList.length === 0 && (
-                <p className="py-10 text-center text-sm text-neutral-400">Tidak ada sesi.</p>
+              {!loading && !loadError && !query && (
+                <div className="py-16 text-center">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100 text-[var(--secondary-color)] mb-4">
+                    <RiSearchLine size={28} />
+                  </div>
+                  <p className="text-sm text-neutral-500">
+                    Silakan cari sesi dengan mengetik<br/>nama atau email guru/murid.
+                  </p>
+                </div>
               )}
-              {!loading && !loadError && displayList.map((s) => {
+              {!loading && !loadError && query && sesiList.length === 0 && (
+                <p className="py-10 text-center text-sm text-neutral-400">Tidak ada sesi ditemukan.</p>
+              )}
+              {!loading && !loadError && query && displayList.map((s) => {
                 const isActive = selected?.sesi_id === s.sesi_id;
                 const guruName  = resolveName(s.guru,  "Guru");
                 const muridName = resolveName(s.murid, "Murid");
