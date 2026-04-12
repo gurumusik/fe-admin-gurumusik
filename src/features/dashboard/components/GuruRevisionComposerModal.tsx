@@ -4,6 +4,10 @@ import { createPortal } from 'react-dom';
 import { RiErrorWarningFill } from 'react-icons/ri';
 import ConfirmationModal from '@/components/ui/common/ConfirmationModal';
 import { createGuruRevisionReport } from '@/services/api/guruRevision.api';
+import {
+  listRevisionTemplates,
+  type RevisionTemplateDTO,
+} from '@/services/api/revisionTemplate.api';
 import { getRevisionFieldLabel } from '@/features/dashboard/pages/verified-tutor/revisionFieldMap';
 
 type PickedField = { field_key: string; label?: string };
@@ -35,6 +39,12 @@ export default function GuruRevisionComposerModal({
   const [submitting, setSubmitting] = useState(false);
   const [generalMessage, setGeneralMessage] = useState('');
   const [messages, setMessages] = useState<Record<string, string>>({});
+  const [templateOptionsByField, setTemplateOptionsByField] = useState<
+    Record<string, RevisionTemplateDTO[]>
+  >({});
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Record<string, string>>({});
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     open: boolean;
     kind: 'success' | 'error';
@@ -64,6 +74,7 @@ export default function GuruRevisionComposerModal({
   useEffect(() => {
     setGeneralMessage('');
     setMessages({});
+    setSelectedTemplateIds({});
     fieldRefs.current = {};
     lastFocusKeyRef.current = null;
     lastSelectionRef.current = null;
@@ -75,6 +86,13 @@ export default function GuruRevisionComposerModal({
     lastSelectionRef.current = null;
 
     setMessages((prev) => {
+      const next: Record<string, string> = {};
+      for (const key of pickedFieldKeys.split('|')) {
+        if (key) next[key] = prev[key] ?? '';
+      }
+      return next;
+    });
+    setSelectedTemplateIds((prev) => {
       const next: Record<string, string> = {};
       for (const key of pickedFieldKeys.split('|')) {
         if (key) next[key] = prev[key] ?? '';
@@ -159,6 +177,77 @@ export default function GuruRevisionComposerModal({
     }
   }, [open, messages, generalMessage]);
 
+  useEffect(() => {
+    if (!open || fieldsSorted.length === 0) {
+      setTemplateOptionsByField({});
+      setTemplatesError(null);
+      setTemplatesLoading(false);
+      return;
+    }
+
+    let alive = true;
+    setTemplatesLoading(true);
+    setTemplatesError(null);
+
+    listRevisionTemplates({
+      field_keys: fieldsSorted.map((field) => field.field_key),
+      is_active: true,
+      limit: 500,
+    })
+      .then((resp) => {
+        if (!alive) return;
+        const grouped: Record<string, RevisionTemplateDTO[]> = {};
+        const rows = Array.isArray(resp?.data) ? resp.data : [];
+        for (const row of rows) {
+          const key = String(row?.field_key || '').trim();
+          if (!key) continue;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(row);
+        }
+        setTemplateOptionsByField(grouped);
+      })
+      .catch((err: any) => {
+        if (!alive) return;
+        setTemplateOptionsByField({});
+        setTemplatesError(String(err?.message || 'Gagal memuat template revisi'));
+      })
+      .finally(() => {
+        if (alive) setTemplatesLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [open, fieldsSorted]);
+
+  const applyTemplateToField = (fieldKey: string) => {
+    const selectedId = String(selectedTemplateIds[fieldKey] || '').trim();
+    if (!selectedId) return;
+
+    const templates = templateOptionsByField[fieldKey] || [];
+    const selectedTemplate =
+      templates.find((item) => String(item.id) === selectedId) ?? null;
+    if (!selectedTemplate) return;
+
+    setMessages((prev) => ({
+      ...prev,
+      [fieldKey]: selectedTemplate.message,
+    }));
+
+    const node = fieldRefs.current[fieldKey];
+    if (node) {
+      window.setTimeout(() => {
+        node.focus();
+        try {
+          node.setSelectionRange(node.value.length, node.value.length);
+        } catch {
+          // noop
+        }
+        rememberFocus(fieldKey, node);
+      }, 0);
+    }
+  };
+
   const submit = async () => {
     if (!fieldsSorted.length) return;
     setSubmitting(true);
@@ -229,13 +318,28 @@ export default function GuruRevisionComposerModal({
                     </p>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="h-9 px-4 rounded-full border border-neutral-300 text-neutral-800 hover:bg-neutral-50"
-                >
-                  Tutup
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.open(
+                        '/dashboard-admin/revision-templates',
+                        '_blank',
+                        'noopener,noreferrer'
+                      )
+                    }
+                    className="h-9 px-4 rounded-full border border-[var(--secondary-color)] text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
+                  >
+                    Kelola Template
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="h-9 px-4 rounded-full border border-neutral-300 text-neutral-800 hover:bg-neutral-50"
+                  >
+                    Tutup
+                  </button>
+                </div>
               </div>
 
               <div className="px-5 py-4 max-h-[calc(100vh-12rem)] overflow-y-auto">
@@ -250,6 +354,11 @@ export default function GuruRevisionComposerModal({
                       <p className="text-sm font-semibold text-neutral-900 mb-2">
                         Field yang perlu diperbaiki
                       </p>
+                      {templatesError ? (
+                        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                          {templatesError}
+                        </div>
+                      ) : null}
                       <div className="space-y-3">
                         {fieldsSorted.map((f) => (
                           <div key={f.field_key} className="grid grid-cols-1 gap-2">
@@ -260,6 +369,56 @@ export default function GuruRevisionComposerModal({
                                   ({f.field_key})
                                 </span>
                               </div>
+                            </div>
+                            <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+                              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                                <select
+                                  value={selectedTemplateIds[f.field_key] ?? ''}
+                                  onChange={(e) =>
+                                    setSelectedTemplateIds((prev) => ({
+                                      ...prev,
+                                      [f.field_key]: e.target.value,
+                                    }))
+                                  }
+                                  className="h-10 flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-[var(--secondary-color)]"
+                                  disabled={templatesLoading}
+                                >
+                                  <option value="">
+                                    {templatesLoading
+                                      ? 'Memuat template...'
+                                      : 'Pilih template pesan'}
+                                  </option>
+                                  {(templateOptionsByField[f.field_key] || []).map((item) => (
+                                    <option key={item.id} value={String(item.id)}>
+                                      {item.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => applyTemplateToField(f.field_key)}
+                                  disabled={!selectedTemplateIds[f.field_key]}
+                                  className={cls(
+                                    'h-10 rounded-lg px-4 text-sm font-semibold',
+                                    selectedTemplateIds[f.field_key]
+                                      ? 'bg-[var(--secondary-color)] text-white'
+                                      : 'bg-neutral-200 text-neutral-500 cursor-not-allowed'
+                                  )}
+                                >
+                                  Gunakan Template
+                                </button>
+                              </div>
+                              {selectedTemplateIds[f.field_key] ? (
+                                <div className="mt-2 rounded-lg border border-dashed border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-600 whitespace-pre-wrap">
+                                  {(
+                                    (templateOptionsByField[f.field_key] || []).find(
+                                      (item) =>
+                                        String(item.id) ===
+                                        String(selectedTemplateIds[f.field_key] || '')
+                                    )?.message || ''
+                                  ).trim() || 'Template belum dipilih.'}
+                                </div>
+                              ) : null}
                             </div>
                             <textarea
                               ref={(node) => {

@@ -53,6 +53,7 @@ import TeacherChangePage from "@/features/dashboard/pages/teacher-change/page";
 import AdminProfileTemplatesPage from '@/features/dashboard/pages/profile-templates/page';
 import AdminProfileTemplateCreatePage from '@/features/dashboard/pages/profile-templates/new/page';
 import AdminProfileTemplateDetailPage from '@/features/dashboard/pages/profile-templates/detail/page';
+import AdminRevisionTemplatesPage from '@/features/dashboard/pages/revision-templates/page';
 import ReferralMonitoringPage from '@/features/dashboard/pages/referrals/page';
 import AdminNotificationsPage from '@/features/dashboard/pages/notifications/page';
 
@@ -129,6 +130,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/profile-templates", element: <AdminProfileTemplatesPage /> },
       { path: "/dashboard-admin/profile-templates/new", element: <AdminProfileTemplateCreatePage /> },
       { path: "/dashboard-admin/profile-templates/:id", element: <AdminProfileTemplateDetailPage /> },
+      { path: "/dashboard-admin/revision-templates", element: <AdminRevisionTemplatesPage /> },
       { path: "/dashboard-admin/referrals", element: <ReferralMonitoringPage /> },
     ],
   },

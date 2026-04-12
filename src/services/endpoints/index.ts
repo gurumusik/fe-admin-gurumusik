@@ -223,6 +223,16 @@ export const ENDPOINTS = {
     DELETE: (id: number | string) => `/profile-templates/${id}`,
   },
 
+  REVISION_TEMPLATES: {
+    LIST: '/revision-templates',
+    DETAIL: (id: number | string) => `/revision-templates/${id}`,
+    CREATE: '/revision-templates',
+    UPDATE: (id: number | string) => `/revision-templates/${id}`,
+    ENABLE: (id: number | string) => `/revision-templates/${id}/enable`,
+    DISABLE: (id: number | string) => `/revision-templates/${id}/disable`,
+    DELETE: (id: number | string) => `/revision-templates/${id}`,
+  },
+
   REFERRALS: {
     REFERRERS: '/admin/referrals/referrers',
     COMMISSIONS: '/admin/referrals/commissions',

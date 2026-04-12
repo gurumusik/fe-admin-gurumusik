@@ -63,6 +63,7 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/module",
     "/dashboard-admin/certificate-instrument",
     "/dashboard-admin/profile-templates",
+    "/dashboard-admin/revision-templates",
   ];
   const financePrefixes = [
     "/dashboard-admin/earnings",
@@ -199,6 +200,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/profile-templates"
                   label="Profile Templates"
                   active={isUnder("/dashboard-admin/profile-templates")}
+                />
+                <SubItem
+                  to="/dashboard-admin/revision-templates"
+                  label="Revision Templates"
+                  active={isUnder("/dashboard-admin/revision-templates")}
                 />
               </div>
             </DropWrap>
