@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   RiCloseLine,
   RiArrowRightSLine,
@@ -12,7 +12,7 @@ import type { AwardCertificateData } from '@/features/dashboard/components/Award
 import { resolveImageUrl } from '@/utils/resolveImageUrl';
 import { getLanguageIcon } from '@/utils/getLanguageIcon';
 
-export type ApproveMode = 'approved' | 'rejected';
+export type ApproveMode = 'approved' | 'revision' | 'rejected';
 
 export type ApproveTeacherPayload =
   | { mode: 'approved' }
@@ -51,6 +51,10 @@ type BaseData = {
   }>;
   awardList?: AwardCertificateData[];
   educationList?: EducationCertificateData[];
+  screeningState?: string | null;
+  revisionCount?: number | null;
+  screeningNote?: string | null;
+  revisedFieldKeys?: string[];
 };
 
 type ApproveTeacherModalProps = {
@@ -59,6 +63,7 @@ type ApproveTeacherModalProps = {
   mode: ApproveMode;
   onClose: () => void;
   onSubmit: (payload: ApproveTeacherPayload) => void;
+  onRejectFromReview?: () => void;
   data?: BaseData;
   onOpenCertificates?: (opts?: { instrumentName?: string | null }) => void;
   onOpenCertificateDetail?: (item: CertificateItem) => void;
@@ -77,7 +82,27 @@ const inputCls =
   'w-full h-11 rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 text-sm text-neutral-800 outline-none';
 const textareaCls =
   'w-full min-h-[84px] rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 py-2 text-sm text-neutral-800 outline-none resize-none';
-const labelCls = 'text-md text-neutral-900 mb-1 block';
+const FieldLabel: React.FC<{
+  children: React.ReactNode;
+  isNew?: boolean;
+}> = ({ children, isNew }) => (
+  <label className="text-md text-neutral-900 mb-1 inline-flex items-center gap-1.5">
+    <span>{children}</span>
+    {isNew ? (
+      <span className="inline-flex items-center rounded-full bg-[var(--secondary-light-color)] px-2 py-0.5 text-xs font-semibold text-[var(--secondary-color)]">
+        (Baru)
+      </span>
+    ) : null}
+  </label>
+);
+
+const revisedFieldAliases: Record<string, string[]> = {
+  'profile.nama': ['profile.name', 'nama'],
+  'location.address': ['location.alamat'],
+  'location.coordinates': ['location.coordinate'],
+  'certificates.instrument': ['documents.portfolio'],
+  'certificates.award': ['documents.award_certificate'],
+};
 
 const RevisionToggle: React.FC<{
   field_key: string;
@@ -116,6 +141,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   mode,
   onClose,
   onSubmit,
+  onRejectFromReview,
   data,
   onOpenCertificates,
   onOpenCertificateDetail,
@@ -130,10 +156,13 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   const [file] = useState<File | null>(null);
   const [reason, setReason] = useState('');
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const isRevisionMode = mode === 'revision';
+  const isReviewMode = mode === 'approved' || isRevisionMode;
+  const selectedRevisionCount = Object.keys(revisionSelected || {}).length;
 
   useEffect(() => {
-    if (open && mode === 'approved') setStep(1);
-  }, [open, mode]);
+    if (open && isReviewMode) setStep(1);
+  }, [open, isReviewMode]);
 
   useEffect(() => {
     if (!open || !inactive) return;
@@ -142,12 +171,23 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   }, [open, inactive]);
 
   const certs = data?.certificates ?? [];
+  const revisedFieldKeySet = useMemo(() => {
+    if (data?.screeningState !== 'revision_resubmitted') return new Set<string>();
+    const keys = Array.isArray(data?.revisedFieldKeys) ? data.revisedFieldKeys : [];
+    return new Set(keys.map((key) => String(key || '').trim()).filter(Boolean));
+  }, [data?.screeningState, data?.revisedFieldKeys]);
+
+  const isRevisedField = (fieldKey: string) => {
+    if (revisedFieldKeySet.has(fieldKey)) return true;
+    return (revisedFieldAliases[fieldKey] || []).some((alias) => revisedFieldKeySet.has(alias));
+  };
 
   const [, setActiveInstrument] = useState<string | null>(null);
 
   if (!open) return null;
 
   const submitApproved = () => onSubmit({ mode: 'approved' });
+  const submitRevision = () => onOpenRevisionComposer?.();
   const submitRejected = () =>
     onSubmit({ mode: 'rejected', reason, attachment: file });
 
@@ -195,10 +235,12 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
             <h3 className="text-lg font-semibold text-neutral-900">
               {mode === 'approved'
                 ? 'Formulir Calon Tutor'
+                : isRevisionMode
+                ? 'Formulir Revisi Calon Tutor'
                 : 'Formulir Penolakan Calon Tutor'}
             </h3>
             <div className="flex items-center gap-2">
-              {mode === 'approved' && onOpenRevisionComposer && (
+              {isRevisionMode && onOpenRevisionComposer && (
                 <button
                   type="button"
                   onClick={onOpenRevisionComposer}
@@ -223,9 +265,19 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
           </div>
 
           {/* body */}
-          {mode === 'approved' ? (
+          {isReviewMode ? (
             <div className="px-5 pb-5 pt-4 max-h-[calc(100vh-7.5rem)] overflow-y-auto">
               <div className="mb-4 text-sm text-neutral-600">Step {step} dari 3</div>
+
+              {data?.screeningState === 'revision_resubmitted' ? (
+                <div className="mb-4 rounded-lg border border-[var(--secondary-color)] bg-[var(--secondary-light-color)] px-4 py-3 text-sm text-neutral-900">
+                  <p className="font-semibold">Data ini hasil submit ulang revisi.</p>
+                  <p className="mt-1 text-neutral-700">
+                    Total revisi: {Number(data?.revisionCount || 0)}x
+                    {data?.screeningNote ? ` - Catatan terakhir: ${data.screeningNote}` : ''}
+                  </p>
+                </div>
+              ) : null}
 
               {step === 1 ? (
                 <>
@@ -248,7 +300,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     <div className="flex gap-2">
                       <div className="w-1/2">
                         <div className="flex items-center gap-2">
-                          <label className={labelCls}>Nama Lengkap</label>
+                          <FieldLabel isNew={isRevisedField('profile.nama')}>Nama Lengkap</FieldLabel>
                           <RevisionToggle
                             field_key="profile.nama"
                             label="Nama lengkap"
@@ -260,7 +312,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                       </div>
                       <div className="w-1/2">
                         <div className="flex items-center gap-2">
-                          <label className={labelCls}>Nama Panggilan</label>
+                          <FieldLabel isNew={isRevisedField('profile.nama_panggilan')}>Nama Panggilan</FieldLabel>
                           <RevisionToggle
                             field_key="profile.nama_panggilan"
                             label="Nama panggilan"
@@ -274,7 +326,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     <div className="flex gap-2">
                       <div className="w-1/2">
                         <div className="flex items-center gap-2">
-                          <label className={labelCls}>Email</label>
+                          <FieldLabel isNew={isRevisedField('profile.email')}>Email</FieldLabel>
                           <RevisionToggle
                             field_key="profile.email"
                             label="Email"
@@ -286,7 +338,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                       </div>
                       <div className="w-1/2">
                         <div className="flex items-center gap-2">
-                          <label className={labelCls}>No Telepon</label>
+                          <FieldLabel isNew={isRevisedField('profile.phone')}>No Telepon</FieldLabel>
                           <RevisionToggle
                             field_key="profile.phone"
                             label="Nomor telepon"
@@ -300,7 +352,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     <div className="flex gap-2">
                       <div className="w-1/2">
                         <div className="flex items-center gap-2">
-                          <label className={labelCls}>Provinsi</label>
+                          <FieldLabel isNew={isRevisedField('location.province')}>Provinsi</FieldLabel>
                           <RevisionToggle
                             field_key="location.province"
                             label="Provinsi"
@@ -312,7 +364,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                       </div>
                       <div className="w-1/2">
                         <div className="flex items-center gap-2">
-                          <label className={labelCls}>Kota</label>
+                          <FieldLabel isNew={isRevisedField('location.city')}>Kota</FieldLabel>
                           <RevisionToggle
                             field_key="location.city"
                             label="Kota"
@@ -326,7 +378,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
 
                     <div>
                       <div className="flex items-center gap-2">
-                        <label className={labelCls}>Alamat</label>
+                        <FieldLabel isNew={isRevisedField('location.address')}>Alamat</FieldLabel>
                         <RevisionToggle
                           field_key="location.address"
                           label="Alamat"
@@ -339,7 +391,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
 
                     <div>
                       <div className="flex items-center gap-2">
-                        <label className={labelCls}>Titik Koordinat</label>
+                        <FieldLabel isNew={isRevisedField('location.coordinates')}>Titik Koordinat</FieldLabel>
                         <RevisionToggle
                           field_key="location.coordinates"
                           label="Titik koordinat"
@@ -402,7 +454,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     {hasLanguages && (
                       <div>
                         <div className="flex items-center gap-2">
-                          <label className={labelCls}>Bahasa</label>
+                          <FieldLabel isNew={isRevisedField('languages')}>Bahasa</FieldLabel>
                           <RevisionToggle
                             field_key="languages"
                             label="Bahasa"
@@ -429,9 +481,9 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     {/* Sertifikat instrumen (lokal/internasional) */}
                     <div>
                       <div className="flex items-center gap-2">
-                        <label className={labelCls}>
+                        <FieldLabel isNew={isRevisedField('certificates.instrument')}>
                           Sertifikat Instrumen (Lokal/Internasional)
-                        </label>
+                        </FieldLabel>
                         <RevisionToggle
                           field_key="certificates.instrument"
                           label="Sertifikat instrumen"
@@ -493,7 +545,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     {hasAwards && (
                       <div className="mt-3">
                         <div className="flex items-center gap-2">
-                          <label className={labelCls}>Sertifikat Penghargaan</label>
+                          <FieldLabel isNew={isRevisedField('certificates.award')}>Sertifikat Penghargaan</FieldLabel>
                           <RevisionToggle
                             field_key="certificates.award"
                             label="Sertifikat penghargaan"
@@ -548,7 +600,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     {hasEducation && (
                       <div className="mt-3">
                         <div className="flex items-center gap-2">
-                          <label className={labelCls}>Sertifikat Pendidikan</label>
+                          <FieldLabel isNew={isRevisedField('certificates.education')}>Sertifikat Pendidikan</FieldLabel>
                           <RevisionToggle
                             field_key="certificates.education"
                             label="Sertifikat pendidikan"
@@ -622,7 +674,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                   <div className="grid grid-cols-1 gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <label className={labelCls}>Judul Kelas</label>
+                        <FieldLabel isNew={isRevisedField('class.title')}>Judul Kelas</FieldLabel>
                         <RevisionToggle
                           field_key="class.title"
                           label="Judul kelas"
@@ -638,7 +690,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <label className={labelCls}>Tentang Kelas</label>
+                        <FieldLabel isNew={isRevisedField('class.about')}>Tentang Kelas</FieldLabel>
                         <RevisionToggle
                           field_key="class.about"
                           label="Tentang kelas"
@@ -654,7 +706,7 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <label className={labelCls}>Value Kelas</label>
+                        <FieldLabel isNew={isRevisedField('class.values')}>Value Kelas</FieldLabel>
                         <RevisionToggle
                           field_key="class.values"
                           label="Value kelas"
@@ -683,20 +735,39 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                       Kembali
                     </button>
                     <div className="text-right">
-                      <button
-                        type="button"
-                        onClick={submitApproved}
-                        disabled={approveDisabled}
-                        className={[
-                          'h-11 px-6 rounded-full font-semibold text-neutral-900',
-                          approveDisabled
-                            ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed'
-                            : 'bg-[var(--primary-color)] cursor-pointer',
-                        ].join(' ')}
-                      >
-                        Setujui (Guru)
-                      </button>
-                      {approveDisabled && approveDisabledHint && (
+                      <div className="flex flex-wrap items-center justify-end gap-3">
+                        {!isRevisionMode && onRejectFromReview ? (
+                          <button
+                            type="button"
+                            onClick={onRejectFromReview}
+                            className="h-11 px-6 rounded-full font-semibold border border-[var(--accent-red-color)] text-[var(--accent-red-color)] bg-white hover:bg-[var(--accent-red-light-color)] cursor-pointer"
+                          >
+                            Tolak
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={isRevisionMode ? submitRevision : submitApproved}
+                          disabled={isRevisionMode ? selectedRevisionCount === 0 : approveDisabled}
+                          className={[
+                            'h-11 px-6 rounded-full font-semibold text-neutral-900',
+                            isRevisionMode
+                              ? selectedRevisionCount === 0
+                                ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed'
+                                : 'bg-[var(--primary-color)] cursor-pointer'
+                              : approveDisabled
+                              ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed'
+                              : 'bg-[var(--primary-color)] cursor-pointer',
+                          ].join(' ')}
+                        >
+                          {isRevisionMode ? 'Kirim Laporan Kesalahan' : 'Setujui (Guru)'}
+                        </button>
+                      </div>
+                      {isRevisionMode && selectedRevisionCount === 0 ? (
+                        <p className="mt-2 text-sm text-neutral-600">
+                          Tandai minimal 1 field yang perlu direvisi.
+                        </p>
+                      ) : !isRevisionMode && approveDisabled && approveDisabledHint && (
                         <p className="mt-2 text-sm text-neutral-600">{approveDisabledHint}</p>
                       )}
                     </div>

@@ -14,6 +14,7 @@ type Props = {
   applicationId: number;
   applicationName?: string;
   pickedFields: PickedField[];
+  resetKey?: string | number | null;
   onSent?: () => void;
 };
 
@@ -28,6 +29,7 @@ export default function GuruRevisionComposerModal({
   applicationId,
   applicationName,
   pickedFields,
+  resetKey,
   onSent,
 }: Props) {
   const [submitting, setSubmitting] = useState(false);
@@ -60,12 +62,26 @@ export default function GuruRevisionComposerModal({
   );
 
   useEffect(() => {
-    if (!open) return;
-    const next: Record<string, string> = {};
-    for (const f of pickedFields) next[f.field_key] = messages[f.field_key] ?? '';
-    setMessages(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, pickedFieldKeys]);
+    setGeneralMessage('');
+    setMessages({});
+    fieldRefs.current = {};
+    lastFocusKeyRef.current = null;
+    lastSelectionRef.current = null;
+  }, [resetKey]);
+
+  useEffect(() => {
+    fieldRefs.current = {};
+    lastFocusKeyRef.current = null;
+    lastSelectionRef.current = null;
+
+    setMessages((prev) => {
+      const next: Record<string, string> = {};
+      for (const key of pickedFieldKeys.split('|')) {
+        if (key) next[key] = prev[key] ?? '';
+      }
+      return next;
+    });
+  }, [applicationId, pickedFieldKeys]);
 
   const fieldsSorted = useMemo(() => {
     const list = pickedFields

@@ -13,6 +13,9 @@ import AdminRefundPage from "@/features/dashboard/pages/refund/page";
 import TutorReportPage from "@/features/dashboard/pages/tutor-report/page";
 import StudentReportPage from "@/features/dashboard/pages/student-report/page";
 import VerifiedTutorPage from "@/features/dashboard/pages/verified-tutor/page";
+import VerifiedTutorRevisionsPage from "@/features/dashboard/pages/verified-tutor/revisions/page";
+import VerifiedTutorCertificationsPage from "@/features/dashboard/pages/verified-tutor/certifications/page";
+import VerifiedTutorManualCertificationsPage from "@/features/dashboard/pages/verified-tutor/manual-certifications/page";
 import AdminEarningsPage from "@/features/dashboard/pages/earnings/page";
 import TutorListPage from "@/features/dashboard/pages/tutor-list/page";
 import TutorIncompletePage from "@/features/dashboard/pages/tutor-incomplete/page";
@@ -89,6 +92,9 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/wa-handoffs", element: <WaHandoffsPage /> },
       { path: "/dashboard-admin/live-chat", element: <AdminLiveChatPage /> },
       { path: "/dashboard-admin/verified-tutor", element: <VerifiedTutorPage /> },
+      { path: "/dashboard-admin/verified-tutor/revisions", element: <VerifiedTutorRevisionsPage /> },
+      { path: "/dashboard-admin/verified-tutor/certifications", element: <VerifiedTutorCertificationsPage /> },
+      { path: "/dashboard-admin/verified-tutor/manual-certifications", element: <VerifiedTutorManualCertificationsPage /> },
       { path: "/dashboard-admin/earnings", element: <AdminEarningsPage /> },
       { path: "/dashboard-admin/tutor-list", element: <TutorListPage /> },
       { path: "/dashboard-admin/tutor-incomplete", element: <TutorIncompletePage /> },

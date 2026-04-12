@@ -2,6 +2,20 @@
 // src/features/slices/guruApplication/types.ts
 
 export type GAStatus = 'proses' | 'diterima' | 'ditolak';
+export type GAScreeningState =
+  | 'new'
+  | 'revision_required'
+  | 'revision_resubmitted'
+  | 'certification_offered'
+  | 'certification_requested'
+  | 'verified'
+  | 'rejected';
+export type GAQueue =
+  | 'screening'
+  | 'revision'
+  | 'certification'
+  | 'certification_offer'
+  | 'manual_certification';
 export type GAListSortBy = 'created_at' | 'decided_at' | 'nama' | 'status';
 export type GAListSortDir = 'ASC' | 'DESC';
 
@@ -117,6 +131,10 @@ export type GuruApplicationDTO = {
   value_kelas?: string[] | null;
   bahasa?: string[] | null;
   status: GAStatus;
+  screening_state?: GAScreeningState;
+  screening_note?: string | null;
+  screening_meta?: any | null;
+  screening_state_updated_at?: string | null;
   decided_by: number | null;
   decided_at: string | null; // ISO dari backend
   note: string | null;
@@ -130,6 +148,9 @@ export type GuruApplicationDTO = {
   error_count?: number;
   submission_state?: 'NEW' | 'REVISION';
   has_pending_revision?: boolean;
+  is_revision_resubmitted?: boolean;
+  is_in_revision_queue?: boolean;
+  is_in_certification_queue?: boolean;
 
   user?: GAUserLite | null;
   decider?: GADeciderLite | null;
@@ -155,6 +176,11 @@ export type GARecap = {
   proses: number;
   diterima: number;
   ditolak: number;
+  screening?: number;
+  revision?: number;
+  certification?: number;
+  certification_offered?: number;
+  manual_certification?: number;
 };
 
 export type GAListParams = {
@@ -162,6 +188,7 @@ export type GAListParams = {
   page?: number;
   limit?: number;
   status?: GAStatus;
+  queue?: GAQueue;
   created_from?: string;
   created_to?: string;
   sortBy?: GAListSortBy;

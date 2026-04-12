@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/features/dashboard/pages/teacher/VerifiedTutorPage.tsx
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   RiUser2Fill,
   RiCheckFill,
-  RiCloseFill,
   RiArrowLeftSLine,
   RiArrowRightSLine,
   RiCheckboxCircleFill,
   RiCloseLine,
+  RiArrowRightLine,
 } from 'react-icons/ri';
 
 import type { GuruApplicationDTO } from '@/features/slices/guruApplication/types';
@@ -40,10 +41,17 @@ const cls = (...xs: Array<string | false | null | undefined>) =>
   xs.filter(Boolean).join(' ');
 
 const PAGE_SIZE = 5;
+type VerifiedTutorQueue =
+  | 'screening'
+  | 'revision'
+  | 'certification'
+  | 'certification_offer'
+  | 'manual_certification';
+const CERTIFICATION_QUEUE_STATES = ['certification_offered', 'certification_requested'];
 
 /* ======================== Subcomponents (UI sama persis) ======================== */
 
-const Header: React.FC = () => (
+const Header: React.FC<{ title?: string }> = ({ title = 'List Calon Tutor' }) => (
   <div className="flex items-center gap-3 mb-5">
     <div
       className="w-10 h-10 rounded-full grid place-items-center"
@@ -51,7 +59,7 @@ const Header: React.FC = () => (
     >
       <RiUser2Fill size={25} className="text-black" />
     </div>
-    <h2 className="text-lg font-semibold text-[#1C1C1C]">List Calon Tutor</h2>
+    <h2 className="text-lg font-semibold text-[#1C1C1C]">{title}</h2>
   </div>
 );
 
@@ -69,8 +77,6 @@ const TableHeader: React.FC = () => {
         <th className={headCls}>Mengajar ABK</th>
         <th className={headCls}>State</th>
         <th className={headCls}>Revisi</th>
-        <th className={headCls}>Kesalahan</th>
-        <th className={headCls}>Pending</th>
         <th className={headCls}>Aksi</th>
       </tr>
     </thead>
@@ -79,9 +85,11 @@ const TableHeader: React.FC = () => {
 
 const ActionButtons: React.FC<{
   onApprove?: () => void;
-  onReject?: () => void;
-}> = ({ onApprove, onReject }) => (
-  <div className="flex items-center gap-4">
+  onRevision?: () => void;
+  onCertification?: () => void;
+  showRevision?: boolean;
+}> = ({ onApprove, onRevision, onCertification, showRevision = true }) => (
+  <div className="flex items-center gap-2">
     <button
       type="button"
       onClick={onApprove}
@@ -92,24 +100,43 @@ const ActionButtons: React.FC<{
       <RiCheckFill size={25} className="text-[#18A957]" />
     </button>
 
-    <button
-      type="button"
-      onClick={onReject}
-      className="grid place-items-center cursor-pointer"
-      aria-label="Tolak"
-      title="Tolak"
-    >
-      <RiCloseFill size={25} className="text-[#F14A7E]" />
-    </button>
+    {showRevision ? (
+      <button
+        type="button"
+        onClick={onRevision}
+        className="h-9 px-3 rounded-lg border border-[var(--accent-orange-color)] text-[var(--accent-orange-color)] text-xs font-semibold cursor-pointer"
+        aria-label="Revisi"
+        title="Revisi"
+      >
+        Revisi
+      </button>
+    ) : null}
+
+    {onCertification ? (
+      <button
+        type="button"
+        onClick={onCertification}
+        className="h-9 px-3 rounded-lg border border-[var(--secondary-color)] text-[var(--secondary-color)] text-xs font-semibold cursor-pointer"
+        aria-label="Tawarkan sertifikasi"
+        title="Tawarkan sertifikasi"
+      >
+        Sertifikasi
+      </button>
+    ) : null}
+
   </div>
 );
 
 const RowItem: React.FC<{
   row: GuruApplicationDTO;
   onApprove: () => void;
-  onReject: () => void;
+  onRevision: () => void;
+  onCertification: () => void;
   onOpenRevisionDetail?: () => void;
-}> = ({ row, onApprove, onReject, onOpenRevisionDetail }) => {
+  revisionQueue?: boolean;
+  certificationQueue?: boolean;
+  hideRevisionAction?: boolean;
+}> = ({ row, onApprove, onRevision, onCertification, onOpenRevisionDetail, revisionQueue, certificationQueue, hideRevisionAction }) => {
   const profileUrl = resolveImageUrl(row.user?.profile_pic_url ?? null) || defaultUser;
 
   const createdAt = row.created_at
@@ -126,9 +153,20 @@ const RowItem: React.FC<{
     ? 'var(--accent-green-color)'
     : 'var(--accent-red-color)';
 
-  const submission = row.submission_state === 'REVISION' ? 'Data Revisi' : 'Pengajuan Data Baru';
+  const submission =
+    row.screening_state === 'certification_requested'
+      ? 'Pengajuan Mandiri'
+      : row.screening_state === 'certification_offered'
+        ? 'Ditawarkan Sertifikasi'
+        : row.screening_state === 'revision_resubmitted'
+      ? 'Habis Revisi'
+      : row.submission_state === 'REVISION'
+        ? 'Data Revisi'
+        : 'Pengajuan Data Baru';
   const submissionCls =
-    row.submission_state === 'REVISION'
+    CERTIFICATION_QUEUE_STATES.includes(String(row.screening_state || ''))
+      ? 'bg-[var(--secondary-light-color)] text-[var(--secondary-color)]'
+      : row.submission_state === 'REVISION' || row.screening_state === 'revision_resubmitted'
       ? 'bg-[var(--secondary-light-color)] text-[var(--secondary-color)]'
       : 'bg-neutral-100 text-neutral-700';
 
@@ -137,10 +175,6 @@ const RowItem: React.FC<{
   const revCls = revDanger
     ? 'bg-[var(--accent-red-light-color)] text-[var(--accent-red-color)]'
     : 'bg-neutral-100 text-neutral-700';
-
-  const errCount = Number(row.error_count || 0);
-  const errBtnDisabled = !(onOpenRevisionDetail && (errCount > 0 || row.has_pending_revision));
-  const pending = row.has_pending_revision === true;
 
   return (
     <tr>
@@ -196,48 +230,24 @@ const RowItem: React.FC<{
         </span>
       </td>
 
-      {/* Kesalahan */}
-      <td className="py-3 px-4">
-        {errCount > 0 ? (
-          <button
-            type="button"
-            onClick={onOpenRevisionDetail}
-            className="text-sm font-semibold text-[var(--secondary-color)] hover:underline cursor-pointer"
-            title="Lihat detail kesalahan"
-          >
-            {errCount} kesalahan
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onOpenRevisionDetail}
-            disabled={errBtnDisabled}
-            className={cls(
-              'text-sm font-semibold',
-              errBtnDisabled ? 'text-neutral-400 cursor-not-allowed' : 'text-[var(--secondary-color)] hover:underline cursor-pointer'
-            )}
-            title={errBtnDisabled ? 'Belum ada laporan' : 'Lihat laporan terakhir'}
-          >
-            -
-          </button>
-        )}
-      </td>
-
-      {/* Pending */}
-      <td className="py-3 px-4">
-        {pending ? (
-          <span className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--accent-orange-color)]">
-            <span className="w-2 h-2 rounded-full bg-[var(--accent-orange-color)]" />
-            Perlu revisi
-          </span>
-        ) : (
-          <span className="text-xs text-neutral-500">-</span>
-        )}
-      </td>
-
       {/* Aksi */}
       <td className="py-3 px-4">
-        <ActionButtons onApprove={onApprove} onReject={onReject} />
+        {revisionQueue ? (
+          <button
+            type="button"
+            onClick={onOpenRevisionDetail}
+            className="h-9 px-3 rounded-lg border border-[var(--secondary-color)] text-[var(--secondary-color)] text-xs font-semibold cursor-pointer"
+          >
+            Lihat Revisi
+          </button>
+        ) : (
+          <ActionButtons
+            onApprove={onApprove}
+            onRevision={onRevision}
+            onCertification={certificationQueue ? undefined : onCertification}
+            showRevision={!hideRevisionAction}
+          />
+        )}
       </td>
     </tr>
   );
@@ -364,6 +374,31 @@ const normalizeLanguages = (values: any[]) => {
   });
 };
 
+const extractRevisionFieldKeys = (meta: any): string[] => {
+  let parsedMeta = meta;
+  if (typeof meta === 'string') {
+    try {
+      parsedMeta = JSON.parse(meta);
+    } catch {
+      parsedMeta = null;
+    }
+  }
+
+  const rawFields: any[] = Array.isArray(parsedMeta?.revision_fields)
+    ? parsedMeta.revision_fields
+    : Array.isArray(parsedMeta?.revisionFields)
+    ? parsedMeta.revisionFields
+    : [];
+
+  return Array.from(
+    new Set<string>(
+      rawFields
+        .map((fieldKey: any) => String(fieldKey || '').trim())
+        .filter((fieldKey): fieldKey is string => Boolean(fieldKey))
+    )
+  );
+};
+
 const buildCertificatesFromApplication = (
   row: GuruApplicationDTO | null
 ): CertificateItem[] => {
@@ -463,11 +498,42 @@ const buildCertificatesFromApplication = (
 
 /* ======================== Main Page ======================== */
 
-const VerifiedTutorPage: React.FC = () => {
+type CertificationCriteriaState = {
+  high_skill_video: boolean;
+  stable_technique: boolean;
+  assessable_audio_visual: boolean;
+  growth_potential: boolean;
+};
+
+const emptyCertificationCriteria: CertificationCriteriaState = {
+  high_skill_video: false,
+  stable_technique: false,
+  assessable_audio_visual: false,
+  growth_potential: false,
+};
+
+const CERTIFICATION_CRITERIA_OPTIONS: Array<{
+  key: keyof CertificationCriteriaState;
+  label: string;
+}> = [
+  { key: 'high_skill_video', label: 'Video menunjukkan skill level tinggi' },
+  { key: 'stable_technique', label: 'Teknik bermain rapi, stabil, dan konsisten' },
+  { key: 'assessable_audio_visual', label: 'Audio dan visual layak dinilai' },
+  { key: 'growth_potential', label: 'Kandidat punya potensi berkembang' },
+];
+
+export const VerifiedTutorPageContent: React.FC<{
+  queue?: VerifiedTutorQueue;
+  title?: string;
+}> = ({ queue = 'screening', title = 'List Calon Tutor' }) => {
+  const navigate = useNavigate();
   const [itemsAll, setItemsAll] = useState<GuruApplicationDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [revisionQueueCount, setRevisionQueueCount] = useState(0);
+  const [certificationOfferQueueCount, setCertificationOfferQueueCount] = useState(0);
+  const [manualCertificationQueueCount, setManualCertificationQueueCount] = useState(0);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ApproveMode>('approved');
@@ -475,7 +541,7 @@ const VerifiedTutorPage: React.FC = () => {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmKind, setConfirmKind] = useState<'success' | 'error'>('success');
-  const [confirmCtx, setConfirmCtx] = useState<'approved' | 'rejected'>(
+  const [confirmCtx, setConfirmCtx] = useState<'approved' | 'rejected' | 'certification'>(
     'approved'
   );
   const [confirmErrorText, setConfirmErrorText] = useState<string | null>(null);
@@ -504,6 +570,10 @@ const VerifiedTutorPage: React.FC = () => {
   const [eduDrafts, setEduDrafts] = useState<Record<string, 'approved' | 'rejected'>>({});
   const [awardDrafts, setAwardDrafts] = useState<Record<string, 'approved' | 'rejected'>>({});
   const [hiddenIds, setHiddenIds] = useState<Record<number, true>>({});
+  const [certOfferOpen, setCertOfferOpen] = useState(false);
+  const [certOfferReason, setCertOfferReason] = useState('');
+  const [certCriteria, setCertCriteria] =
+    useState<CertificationCriteriaState>(emptyCertificationCriteria);
 
   // revision report (compose)
   const [revisionSelected, setRevisionSelected] = useState<Record<string, true>>({});
@@ -515,8 +585,11 @@ const VerifiedTutorPage: React.FC = () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const resp = await listRecruitmentApplications({ status: 'proses' });
+      const resp = await listRecruitmentApplications({ status: 'proses', queue });
       setItemsAll(Array.isArray(resp?.data) ? resp.data : []);
+      setRevisionQueueCount(Number(resp?.recap?.revision || 0));
+      setCertificationOfferQueueCount(Number(resp?.recap?.certification_offered || 0));
+      setManualCertificationQueueCount(Number(resp?.recap?.manual_certification || 0));
     } catch (err: any) {
       setErrorMsg(String(err?.message || 'Gagal memuat data'));
     } finally {
@@ -528,10 +601,13 @@ const VerifiedTutorPage: React.FC = () => {
     let mounted = true;
     setLoading(true);
     setErrorMsg(null);
-    listRecruitmentApplications({ status: 'proses' })
+    listRecruitmentApplications({ status: 'proses', queue })
       .then((resp) => {
         if (!mounted) return;
         setItemsAll(Array.isArray(resp?.data) ? resp.data : []);
+        setRevisionQueueCount(Number(resp?.recap?.revision || 0));
+        setCertificationOfferQueueCount(Number(resp?.recap?.certification_offered || 0));
+        setManualCertificationQueueCount(Number(resp?.recap?.manual_certification || 0));
       })
       .catch((err: any) => {
         if (!mounted) return;
@@ -542,13 +618,26 @@ const VerifiedTutorPage: React.FC = () => {
       });
 
     return () => { mounted = false; };
-  }, []);
+  }, [queue]);
 
   // Filter client-side juga (untuk berjaga)
   const items = useMemo(
     () =>
-      itemsAll.filter((r) => r.status === 'proses' && !hiddenIds[Number(r.id)]),
-    [itemsAll, hiddenIds]
+      itemsAll.filter((r) => {
+        if (hiddenIds[Number(r.id)]) return false;
+        if (queue === 'revision') return r.screening_state === 'revision_required';
+        if (queue === 'certification_offer') return r.screening_state === 'certification_offered';
+        if (queue === 'manual_certification') return r.screening_state === 'certification_requested';
+        if (queue === 'certification') {
+          return CERTIFICATION_QUEUE_STATES.includes(String(r.screening_state || ''));
+        }
+        return (
+          r.status === 'proses' &&
+          r.screening_state !== 'revision_required' &&
+          !CERTIFICATION_QUEUE_STATES.includes(String(r.screening_state || ''))
+        );
+      }),
+    [itemsAll, hiddenIds, queue]
   );
 
   useEffect(() => {
@@ -574,6 +663,13 @@ const VerifiedTutorPage: React.FC = () => {
       setEduDrafts({});
       setAwardDrafts({});
     }
+  };
+
+  const openCertificationOffer = (row: GuruApplicationDTO) => {
+    setSelected(row);
+    setCertOfferReason('');
+    setCertCriteria(emptyCertificationCriteria);
+    setCertOfferOpen(true);
   };
 
   const toggleRevisionField = (field_key: string, label: string, next: boolean) => {
@@ -778,8 +874,55 @@ const VerifiedTutorPage: React.FC = () => {
     }
   };
 
+  const handleCertificationOfferSubmit = async () => {
+    if (!selected) return;
+    const allCriteriaChecked = Object.values(certCriteria).every(Boolean);
+    if (!allCriteriaChecked) {
+      setConfirmKind('error');
+      setConfirmCtx('certification');
+      setConfirmErrorText('Semua kriteria sertifikasi wajib dicentang.');
+      setConfirmOpen(true);
+      return;
+    }
+    if (!certOfferReason.trim()) {
+      setConfirmKind('error');
+      setConfirmCtx('certification');
+      setConfirmErrorText('Alasan penawaran sertifikasi wajib diisi.');
+      setConfirmOpen(true);
+      return;
+    }
+
+    setCertOfferOpen(false);
+    setDeciding(true);
+    setConfirmErrorText(null);
+    try {
+      await decideApplication(selected.id, {
+        decision: 'offer_certification',
+        note: certOfferReason.trim(),
+        certification_criteria: certCriteria,
+      });
+      setConfirmKind('success');
+      setHiddenIds((prev) =>
+        selected?.id ? { ...prev, [Number(selected.id)]: true } : prev
+      );
+      await reload();
+    } catch (err: any) {
+      setConfirmKind('error');
+      setConfirmErrorText(String(err?.message || 'Request failed'));
+    } finally {
+      setConfirmCtx('certification');
+      setSelected(null);
+      setDeciding(false);
+      setConfirmOpen(true);
+    }
+  };
+
   const confirmTitle =
-    confirmCtx === 'approved'
+    confirmCtx === 'certification'
+      ? confirmKind === 'success'
+        ? 'Sertifikasi berhasil ditawarkan.'
+        : 'Gagal menawarkan sertifikasi'
+      : confirmCtx === 'approved'
       ? confirmKind === 'success'
         ? 'Tutor berhasil disetujui.'
         : 'Gagal menyetujui tutor'
@@ -788,7 +931,14 @@ const VerifiedTutorPage: React.FC = () => {
       : 'Gagal menolak tutor';
 
   const confirmTexts =
-    confirmCtx === 'approved'
+    confirmCtx === 'certification'
+      ? confirmKind === 'success'
+        ? ['Kandidat dipindahkan ke jalur sertifikasi dan tidak muncul di screening utama.']
+        : [
+            confirmErrorText ||
+              'Terjadi kendala saat menawarkan sertifikasi. Silakan coba lagi.',
+          ]
+      : confirmCtx === 'approved'
       ? confirmKind === 'success'
         ? [
             'Tutor ini kini resmi terdaftar di platform dan sudah dapat menerima murid.',
@@ -811,7 +961,72 @@ const VerifiedTutorPage: React.FC = () => {
       {/* Overlay loading approve/reject */}
       {deciding && <LoadingScreen />}
 
-      <Header />
+      <Header title={title} />
+
+      {queue === 'screening' ? (
+        <div className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
+          <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-neutral-900">Guru sedang revisi data</p>
+              <p className="text-sm text-neutral-600">
+                {revisionQueueCount} kandidat menunggu submit ulang data.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard-admin/verified-tutor/revisions')}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--secondary-color)] px-4 text-sm font-semibold text-white cursor-pointer"
+            >
+              Lihat Perlu Revisi
+              <RiArrowRightLine />
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-neutral-900">Tawaran ujian sertifikasi</p>
+              <p className="text-sm text-neutral-600">
+                {certificationOfferQueueCount} kandidat ditawari admin untuk ujian sertifikasi.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard-admin/verified-tutor/certifications')}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--primary-color)] px-4 text-sm font-semibold text-neutral-900 cursor-pointer"
+            >
+              Lihat Tawaran
+              <RiArrowRightLine />
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-neutral-900">Pengajuan sertifikasi mandiri</p>
+              <p className="text-sm text-neutral-600">
+                {manualCertificationQueueCount} kandidat submit sertifikat/video untuk direview.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard-admin/verified-tutor/manual-certifications')}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--primary-color)] px-4 text-sm font-semibold text-neutral-900 cursor-pointer"
+            >
+              Lihat Mandiri
+              <RiArrowRightLine />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard-admin/verified-tutor')}
+            className="h-10 rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-900 cursor-pointer hover:bg-neutral-50"
+          >
+            Kembali ke Screening
+          </button>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">
@@ -825,7 +1040,7 @@ const VerifiedTutorPage: React.FC = () => {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={11} className="p-6 text-sm text-neutral-600">
+                <td colSpan={9} className="p-6 text-sm text-neutral-600">
                   Memuat data...
                 </td>
               </tr>
@@ -833,7 +1048,7 @@ const VerifiedTutorPage: React.FC = () => {
 
             {!loading && items.length === 0 && (
               <tr>
-                <td colSpan={11} className="p-8 text-center text-neutral-600">
+                <td colSpan={9} className="p-8 text-center text-neutral-600">
                   Belum ada pendaftar.
                 </td>
               </tr>
@@ -845,7 +1060,18 @@ const VerifiedTutorPage: React.FC = () => {
                   key={row.id}
                   row={row}
                   onApprove={() => openModal('approved', row)}
-                  onReject={() => openModal('rejected', row)}
+                  onRevision={() => openModal('revision', row)}
+                  onCertification={() => openCertificationOffer(row)}
+                  revisionQueue={queue === 'revision'}
+                  certificationQueue={
+                    queue === 'certification' ||
+                    queue === 'certification_offer' ||
+                    queue === 'manual_certification'
+                  }
+                  hideRevisionAction={
+                    queue === 'certification_offer' ||
+                    queue === 'manual_certification'
+                  }
                   onOpenRevisionDetail={() => {
                     setRevisionDetailApp({ id: Number(row.id), name: row.nama ?? undefined });
                     setRevisionDetailOpen(true);
@@ -873,6 +1099,14 @@ const VerifiedTutorPage: React.FC = () => {
         mode={modalMode}
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmitModal}
+        onRejectFromReview={
+          modalMode === 'approved'
+            ? () => {
+                setRevisionSelected({});
+                setModalMode('rejected');
+              }
+            : undefined
+        }
         approveDisabled={
           modalMode === 'approved' &&
           ((selected?.has_pending_revision === true) ||
@@ -919,6 +1153,13 @@ const VerifiedTutorPage: React.FC = () => {
           },
           awardList: awardListWithDrafts,
           educationList: educationListWithDrafts,
+          screeningState: selected?.screening_state,
+          revisionCount: selected?.revision_count,
+          screeningNote: selected?.screening_note,
+          revisedFieldKeys:
+            selected?.screening_state === 'revision_resubmitted'
+              ? extractRevisionFieldKeys(selected?.screening_meta)
+              : [],
         }}
         onOpenCertificates={(opts) => {
           const all = applyDrafts(certItems);
@@ -948,9 +1189,11 @@ const VerifiedTutorPage: React.FC = () => {
           setAwardModalData(award);
           setAwardModalOpen(true);
         }}
-        revisionSelected={revisionSelected}
-        onToggleRevisionField={toggleRevisionField}
-        onOpenRevisionComposer={() => setRevisionComposerOpen(true)}
+        revisionSelected={modalMode === 'revision' ? revisionSelected : undefined}
+        onToggleRevisionField={modalMode === 'revision' ? toggleRevisionField : undefined}
+        onOpenRevisionComposer={
+          modalMode === 'revision' ? () => setRevisionComposerOpen(true) : undefined
+        }
       />
 
       <GuruRevisionComposerModal
@@ -959,9 +1202,14 @@ const VerifiedTutorPage: React.FC = () => {
         applicationId={selected?.id ?? 0}
         applicationName={selected?.nama ?? undefined}
         pickedFields={pickedRevisionFields}
+        resetKey={modalOpen && selected?.id ? selected.id : 'closed'}
         onSent={async () => {
+          const sentId = selected?.id ? Number(selected.id) : null;
           setRevisionSelected({});
+          setModalOpen(false);
+          if (sentId) setHiddenIds((prev) => ({ ...prev, [sentId]: true }));
           await reload();
+          setSelected(null);
         }}
       />
 
@@ -974,6 +1222,79 @@ const VerifiedTutorPage: React.FC = () => {
         applicationId={revisionDetailApp?.id ?? 0}
         applicationName={revisionDetailApp?.name}
       />
+
+      {certOfferOpen && selected ? (
+        <div className="fixed inset-0 z-[90]">
+          <div className="absolute inset-0 bg-[#0B1220]/60" onClick={() => setCertOfferOpen(false)} />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-900">
+                    Tawarkan Ujian Sertifikasi
+                  </h3>
+                  <p className="mt-1 text-sm text-neutral-600">
+                    {selected.nama} akan dipindahkan ke jalur sertifikasi.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCertOfferOpen(false)}
+                  className="grid h-8 w-8 place-items-center rounded-lg hover:bg-neutral-100"
+                >
+                  <RiCloseLine className="text-xl" />
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {CERTIFICATION_CRITERIA_OPTIONS.map((item) => (
+                  <label
+                    key={item.key}
+                    className="flex items-start gap-3 rounded-lg border border-neutral-200 p-3 text-sm text-neutral-800"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={certCriteria[item.key]}
+                      onChange={(event) =>
+                        setCertCriteria((prev) => ({
+                          ...prev,
+                          [item.key]: event.target.checked,
+                        }))
+                      }
+                      className="mt-1"
+                    />
+                    <span>{item.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              <textarea
+                value={certOfferReason}
+                onChange={(event) => setCertOfferReason(event.target.value)}
+                placeholder="Jelaskan alasan singkat dan next step untuk kandidat"
+                className="mt-4 min-h-[110px] w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-[var(--secondary-color)]"
+              />
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCertOfferOpen(false)}
+                  className="h-10 rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-900"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCertificationOfferSubmit}
+                  className="h-10 rounded-lg bg-[var(--primary-color)] px-4 text-sm font-semibold text-neutral-900"
+                >
+                  Kirim Penawaran
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Modal konfirmasi approve/reject aplikasi */}
       <ConfirmationModal
@@ -1060,5 +1381,7 @@ const VerifiedTutorPage: React.FC = () => {
     </div>
   );
 };
+
+const VerifiedTutorPage: React.FC = () => <VerifiedTutorPageContent />;
 
 export default VerifiedTutorPage;

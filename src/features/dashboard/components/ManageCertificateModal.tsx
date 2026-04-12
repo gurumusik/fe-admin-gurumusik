@@ -56,7 +56,7 @@ type Props = {
   canDecide?: boolean;
   decisionMode?: "immediate" | "draft";
   onPreview?: (item: CertificateItem) => void;
-  onApprove?: (item: CertificateItem) => void;
+  onApprove?: (item: CertificateItem) => void | Promise<void>;
   onReject?: (item: CertificateItem) => void; // legacy
   onRejectSubmit?: (item: CertificateItem, payload: RejectPayload) => void | Promise<void>;
   onShowRejectNote?: (item: CertificateItem) => void; // tidak dipakai (kita handle internal)
@@ -293,8 +293,7 @@ const ManageCertificateModal: React.FC<Props> = ({
           status: "rejected",
           reason: reason.trim() || null,
         });
-        setPhase("list");
-        setSelected(null);
+        handleClose();
         return;
       }
       if (onRejectSubmit) {
@@ -617,14 +616,16 @@ const ManageCertificateModal: React.FC<Props> = ({
                     Tolak
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (decisionMode === "draft") {
                         onDraftChange?.(selected, { status: "approved", reason: null });
-                        setPhase("list");
-                        setSelected(null);
+                        handleClose();
                         return;
                       }
-                      if (onApprove) onApprove(selected);
+                      if (onApprove) {
+                        await onApprove(selected);
+                      }
+                      handleClose();
                     }}
                     className="rounded-full px-8 py-3 font-semibold shadow
                              bg-[var(--primary-color)] text-neutral-900 hover:brightness-95"

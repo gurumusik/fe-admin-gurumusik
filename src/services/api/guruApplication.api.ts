@@ -9,6 +9,7 @@ export async function listGuruApplications(params?: GAListParams) {
   if (params?.page) qs.set('page', String(params.page));
   if (params?.limit) qs.set('limit', String(params.limit));
   if (params?.status) qs.set('status', params.status);
+  if (params?.queue) qs.set('queue', params.queue);
   if (params?.created_from) qs.set('created_from', params.created_from);
   if (params?.created_to) qs.set('created_to', params.created_to);
   if (params?.sortBy) qs.set('sortBy', params.sortBy);
