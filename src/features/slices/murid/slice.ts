@@ -53,6 +53,8 @@ const initialState: MuridState = {
   q: '',
   city: '',
   statusLabel: '',
+  startDate: '',
+  endDate: '',
 
   status: 'idle',
   error: null,
@@ -87,10 +89,14 @@ export const fetchStudentsThunk = createAsyncThunk<
     const q = undefIfEmpty(params?.q ?? st.q);
     const city = undefIfEmpty(params?.city ?? st.city);
     const status = mapStatusLabelToRaw(params?.statusLabel ?? st.statusLabel);
+    const start_date = undefIfEmpty(params?.startDate ?? st.startDate);
+    const end_date = undefIfEmpty(params?.endDate ?? st.endDate);
     const res = await API.listStudents({
       q,
       city,
       status,
+      start_date,
+      end_date,
       page: params?.page ?? st.page,
       limit: params?.limit ?? st.limit,
       sort_by: 'created_at',
@@ -155,6 +161,22 @@ const slice = createSlice({
     },
     setStatusLabel(s, a: PayloadAction<MuridState['statusLabel'] | undefined>) {
       s.statusLabel = (a.payload ?? '') as MuridState['statusLabel'];
+    },
+    setDateRange(
+      s,
+      a: PayloadAction<{ startDate?: string | undefined; endDate?: string | undefined }>,
+    ) {
+      s.startDate = a.payload?.startDate ?? '';
+      s.endDate = a.payload?.endDate ?? '';
+      s.page = 1;
+    },
+    setStartDate(s, a: PayloadAction<string | undefined>) {
+      s.startDate = a.payload ?? '';
+      s.page = 1;
+    },
+    setEndDate(s, a: PayloadAction<string | undefined>) {
+      s.endDate = a.payload ?? '';
+      s.page = 1;
     },
     setPage(s, a: PayloadAction<number | undefined>) {
       s.page = a.payload ?? 1;
@@ -239,7 +261,7 @@ const slice = createSlice({
 
 export const {
   // list
-  setQuery, setCity, setStatusLabel, setPage, setLimit,
+  setQuery, setCity, setStatusLabel, setDateRange, setStartDate, setEndDate, setPage, setLimit,
   // detail
   resetStudentDetail,
   // classes

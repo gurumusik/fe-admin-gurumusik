@@ -19,6 +19,8 @@ export type ListGuruParams = {
   status?: 'aktif' | 'cuti' | 'non_aktif';
   ratingBelow4?: boolean;
   rating_lt?: number;
+  start_date?: string;
+  end_date?: string;
 };
 
 export async function listGuru(params: ListGuruParams = {}) {
@@ -30,6 +32,8 @@ export async function listGuru(params: ListGuruParams = {}) {
   if (params.status) qs.set('status', params.status);
   if (params.ratingBelow4) qs.set('rating_lt', '4');
   if (params.rating_lt != null) qs.set('rating_lt', String(params.rating_lt));
+  if (params.start_date) qs.set('start_date', params.start_date);
+  if (params.end_date) qs.set('end_date', params.end_date);
 
   const qstr = qs.toString() ? `?${qs.toString()}` : '';
   return baseUrl.request<any>(`${ENDPOINTS.GURU.LIST}${qstr}`, { method: 'GET' });

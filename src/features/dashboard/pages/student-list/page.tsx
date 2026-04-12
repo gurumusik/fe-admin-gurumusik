@@ -6,12 +6,14 @@ import { useNavigate } from 'react-router-dom';
 import { RiUser2Fill, RiSearchLine } from 'react-icons/ri';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch } from '@/app/store';
+import DateRangeFilter from '@/components/ui/common/DateRangeFilter';
 import {
   fetchStudentsThunk,
   selectStudentList,
   setQuery,
   setCity,
   setStatusLabel,
+  setDateRange,
   setPage,
   setLimit,
 } from '@/features/slices/murid/slice';
@@ -85,7 +87,7 @@ export default function StudentListPage() {
 
   useEffect(() => {
     dispatch(fetchStudentsThunk(undefined));
-  }, [dispatch, list.q, list.city, list.statusLabel, list.page, list.limit]);
+  }, [dispatch, list.q, list.city, list.statusLabel, list.startDate, list.endDate, list.page, list.limit]);
 
   const recap: StudentRecap = list.recap;
   const rows = useMemo(() => list.items, [list.items]);
@@ -159,6 +161,14 @@ export default function StudentListPage() {
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
+
+            <DateRangeFilter
+              startDate={list.startDate || undefined}
+              endDate={list.endDate || undefined}
+              onChange={({ startDate, endDate }) => {
+                dispatch(setDateRange({ startDate, endDate }));
+              }}
+            />
           </div>
         </div>
 

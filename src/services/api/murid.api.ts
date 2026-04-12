@@ -44,6 +44,8 @@ export type ListStudentsParams = {
   limit?: number;
   sort_by?: 'nama' | 'city' | 'created_at' | 'updated_at';
   sort_dir?: 'asc' | 'desc';
+  start_date?: string;
+  end_date?: string;
 };
 
 export type StudentHeader = {
@@ -157,6 +159,8 @@ export async function listStudents(params?: ListStudentsParams) {
   if (params?.limit) qs.set('limit', String(params.limit));
   if (params?.sort_by) qs.set('sort_by', params.sort_by);
   if (params?.sort_dir) qs.set('sort_dir', params.sort_dir);
+  if (params?.start_date) qs.set('start_date', params.start_date);
+  if (params?.end_date) qs.set('end_date', params.end_date);
   const qstr = qs.toString() ? `?${qs.toString()}` : '';
 
   return baseUrl.request<ListStudentsResp>(

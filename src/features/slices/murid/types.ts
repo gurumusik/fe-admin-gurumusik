@@ -32,6 +32,8 @@ export type StudentListState = {
   q: string;
   city: string;
   statusLabel: '' | 'Aktif' | 'Non-Aktif' | 'Cuti';
+  startDate: string;
+  endDate: string;
 
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
@@ -41,6 +43,8 @@ export type ListStudentsParams = {
   q?: string;
   city?: string;
   statusLabel?: '' | 'Aktif' | 'Non-Aktif' | 'Cuti';
+  startDate?: string;
+  endDate?: string;
   page?: number;
   limit?: number;
 };

@@ -7,6 +7,7 @@ import { RiUser2Fill, RiSearchLine, RiStarFill } from 'react-icons/ri';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/app/store';
 import { resolveImageUrl } from '@/utils/resolveImageUrl';
+import DateRangeFilter from '@/components/ui/common/DateRangeFilter';
 
 import {
   fetchGuruListThunk,
@@ -15,6 +16,7 @@ import {
   setGuruQuery,
   setGuruCity,
   setGuruStatus,
+  setGuruDateRange,
   setGuruRatingBelow4,
   clearGuruFilters,
   updateBulkGuruStatusThunk,
@@ -75,13 +77,6 @@ export default function TutorListPage() {
 
   const PAGE_SIZE = limit || 5;
 
-  useEffect(() => {
-    // Pastikan default limit saat pertama kali load adalah 5
-    if (limit === 10 && page === 1 && !lastQuery?.q) {
-      dispatch(setGuruLimit(5));
-    }
-  }, [dispatch, limit, page, lastQuery?.q]);
-
   const handleLimitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     dispatch(setGuruLimit(parseInt(e.target.value, 10)));
     dispatch(setGuruPage(1));
@@ -91,13 +86,15 @@ export default function TutorListPage() {
   const q = lastQuery?.q ?? '';
   const city = lastQuery?.city ?? '';
   const statusFilterRaw = (lastQuery?.status ?? '') as '' | 'aktif' | 'non_aktif' | 'cuti';
+  const startDate = lastQuery?.start_date ?? '';
+  const endDate = lastQuery?.end_date ?? '';
   const ratingBelow4 = !!lastQuery?.ratingBelow4;
 
   // ==== Deduplicate request (StrictMode & rerender) ====
   // ratingBelow4 ikut key agar refetch saat toggle
   const sentKeyRef = useRef<string>('');
   useEffect(() => {
-    const key = `${page}|${PAGE_SIZE}|${q}|${city}|${statusFilterRaw}|${ratingBelow4 ? 'rb4' : 'all'}`;
+    const key = `${page}|${PAGE_SIZE}|${q}|${city}|${statusFilterRaw}|${startDate}|${endDate}|${ratingBelow4 ? 'rb4' : 'all'}`;
     if (sentKeyRef.current === key) return;
     sentKeyRef.current = key;
 
@@ -106,13 +103,15 @@ export default function TutorListPage() {
         q: q || undefined,
         city: city || undefined,
         status: statusFilterRaw || undefined, // raw backend: 'aktif' | 'non_aktif' | 'cuti'
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
         // kirim ke server supaya server yang filter & paginate ulang
         rating_lt: ratingBelow4 ? 4 : undefined,
         page,
         limit: PAGE_SIZE,
       }) as any
     );
-  }, [dispatch, page, PAGE_SIZE, q, city, statusFilterRaw, ratingBelow4]);
+  }, [dispatch, page, PAGE_SIZE, q, city, statusFilterRaw, startDate, endDate, ratingBelow4]);
 
   // ==== Search input dengan debounce ====
   const [searchText, setSearchText] = useState<string>(q ?? '');
@@ -186,6 +185,8 @@ export default function TutorListPage() {
         q: q || undefined,
         city: city || undefined,
         status: statusFilterRaw || undefined,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
         rating_lt: ratingBelow4 ? 4 : undefined,
         page,
         limit: PAGE_SIZE,
@@ -344,7 +345,7 @@ export default function TutorListPage() {
 
           <div className={`flex flex-1 items-center gap-3 md:justify-end text-md transition-opacity ${selectedIds.size > 0 ? 'opacity-30 pointer-events-none xl:opacity-100 xl:pointer-events-auto' : ''}`}>
             {/* Search by name */}
-            <label className="relative w-full max-w-[460px]">
+            <label className="relative w-full max-w-[320px]">
               <RiSearchLine className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-black/50" />
               <input
                 className="w-full rounded-xl border border-black/10 bg-white py-2 pl-10 pr-3 outline-none placeholder:text-black/40 focus:border-(--secondary-color)"
@@ -383,6 +384,19 @@ export default function TutorListPage() {
               <option value="non_aktif">Non-Aktif</option>
               <option value="cuti">Cuti</option>
             </select>
+
+            <DateRangeFilter
+              startDate={startDate || undefined}
+              endDate={endDate || undefined}
+              onChange={({ startDate: nextStartDate, endDate: nextEndDate }) => {
+                dispatch(
+                  setGuruDateRange({
+                    start_date: nextStartDate,
+                    end_date: nextEndDate,
+                  }),
+                );
+              }}
+            />
 
             {/* Checkbox rating < 4 */}
             <label className="flex select-none items-center gap-2 rounded-xl px-2 py-1 text-md 60">

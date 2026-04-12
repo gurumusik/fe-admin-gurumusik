@@ -61,7 +61,7 @@
     recap: { active: 0, inactive: 0, onLeave: 0 },
     total: 0,
     page: 1,
-    limit: 10,
+    limit: 5,
     totalPages: 1,
     hasPrev: false,
     hasNext: false,
@@ -72,6 +72,8 @@
       city: undefined,
       status: undefined,
       ratingBelow4: undefined,
+      start_date: undefined,
+      end_date: undefined,
     },
   };
 
@@ -262,7 +264,7 @@
       // list
       resetGuruList: (s) => { s.list = initialList; },
       setGuruPage: (s, a: PayloadAction<number | undefined>) => { s.list.page = Number(a.payload || 1); },
-      setGuruLimit: (s, a: PayloadAction<number | undefined>) => { s.list.limit = Number(a.payload || 10); },
+      setGuruLimit: (s, a: PayloadAction<number | undefined>) => { s.list.limit = Number(a.payload || 5); },
 
       // filters
       setGuruQuery: (s, a: PayloadAction<string | undefined>) => {
@@ -280,13 +282,39 @@
         s.list.lastQuery = { ...(s.list.lastQuery ?? {}), status };
         s.list.page = 1;
       },
+      setGuruDateRange: (
+        s,
+        a: PayloadAction<{ start_date?: string | undefined; end_date?: string | undefined }>,
+      ) => {
+        const start_date = (a.payload?.start_date ?? '').trim() || undefined;
+        const end_date = (a.payload?.end_date ?? '').trim() || undefined;
+        s.list.lastQuery = { ...(s.list.lastQuery ?? {}), start_date, end_date };
+        s.list.page = 1;
+      },
+      setGuruStartDate: (s, a: PayloadAction<string | undefined>) => {
+        const start_date = (a.payload ?? '').trim() || undefined;
+        s.list.lastQuery = { ...(s.list.lastQuery ?? {}), start_date };
+        s.list.page = 1;
+      },
+      setGuruEndDate: (s, a: PayloadAction<string | undefined>) => {
+        const end_date = (a.payload ?? '').trim() || undefined;
+        s.list.lastQuery = { ...(s.list.lastQuery ?? {}), end_date };
+        s.list.page = 1;
+      },
       setGuruRatingBelow4: (s, a: PayloadAction<boolean>) => {
         const flag = a.payload ? true : undefined;
         s.list.lastQuery = { ...(s.list.lastQuery ?? {}), ratingBelow4: flag };
         s.list.page = 1;
       },
       clearGuruFilters: (s) => {
-        s.list.lastQuery = { q: undefined, city: undefined, status: undefined, ratingBelow4: undefined };
+        s.list.lastQuery = {
+          q: undefined,
+          city: undefined,
+          status: undefined,
+          ratingBelow4: undefined,
+          start_date: undefined,
+          end_date: undefined,
+        };
         s.list.page = 1;
       },
 
@@ -336,6 +364,8 @@
           q: arg?.q,
           city: arg?.city,
           status: arg?.status as any,
+          start_date: arg?.start_date,
+          end_date: arg?.end_date,
           ratingBelow4:
             arg?.ratingBelow4 !== undefined
               ? arg.ratingBelow4
@@ -391,6 +421,9 @@
     setGuruQuery,
     setGuruCity,
     setGuruStatus,
+    setGuruDateRange,
+    setGuruStartDate,
+    setGuruEndDate,
     setGuruRatingBelow4,
     clearGuruFilters,
     resetGuruProfile,
