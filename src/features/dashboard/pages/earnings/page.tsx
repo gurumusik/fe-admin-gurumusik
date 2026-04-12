@@ -35,14 +35,12 @@ import type { RootState, AppDispatch } from "@/app/store";
 import {
   setCategory,
   setQuery,
-  setStatusFilter,
   setPage as setReduxPage,
   setLimit as setReduxLimit,
   fetchAllTxThunk,
 } from "@/features/slices/transaksi/slice";
 import type {
   TxCategoryChip,
-  TxStatusLabel,
   AllTransactionItem,
   TxStatusRaw,
 } from "@/features/slices/transaksi/types";
@@ -54,6 +52,7 @@ import {
 import type { EarningsChartPoint, EarningsRecap } from "@/features/slices/earnings/types";
 
 import { resolveImageUrl } from "@/utils/resolveImageUrl";
+import { followUpTransaksiApproval } from "@/services/api/transaksi.api";
 
 /* UI helpers */
 const toneClasses = {
@@ -236,7 +235,16 @@ type HistoryRow = {
   price: string;
   date: string;
   status: string;
+  canFollowUp?: boolean;
 };
+
+type EarningsStatusFilter =
+  | "All"
+  | "Menunggu Approval Guru"
+  | "Menunggu Murid Membayar"
+  | "Pembayaran Berhasil"
+  | "Pembayaran Kedaluwarsa"
+  | "Pembayaran Gagal";
 
 /* utils */
 const formatIDR = (n: number) =>
@@ -250,15 +258,48 @@ const formatDate = (iso: string) => {
   return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-/** fallback mapper kalau status_label tidak dikirim */
-const rawToLabel = (raw?: TxStatusRaw | string | null): TxStatusLabel => {
-  const v = String(raw || "").toLowerCase();
-  if (v === "lunas") return "Success";
-  if (v === "pending" || v === "menunggu_pembayaran") return "On Progress";
-  if (v === "expired") return "Expired";
-  if (v === "gagal") return "Failed";
-  return "Canceled";
+const mapStatusFilterToRaw = (value: EarningsStatusFilter): TxStatusRaw | undefined => {
+  if (value === "Menunggu Approval Guru") return "pending";
+  if (value === "Menunggu Murid Membayar") return "menunggu_pembayaran";
+  if (value === "Pembayaran Berhasil") return "lunas";
+  if (value === "Pembayaran Kedaluwarsa") return "expired";
+  if (value === "Pembayaran Gagal") return "gagal";
+  return undefined;
 };
+
+const detailedStatusLabel = (raw?: TxStatusRaw | string | null): string => {
+  const v = String(raw || "").toLowerCase();
+  if (v === "pending") return "Menunggu Approval Guru";
+  if (v === "menunggu_pembayaran") return "Menunggu Murid Membayar";
+  if (v === "lunas") return "Pembayaran Berhasil";
+  if (v === "expired") return "Pembayaran Kedaluwarsa";
+  if (v === "gagal") return "Pembayaran Gagal";
+  return "Dibatalkan";
+};
+
+const earningsStatusColor = (status: string) => {
+  if (status === "Pembayaran Berhasil") return "text-(--accent-green-color)";
+  if (status === "Menunggu Approval Guru" || status === "Menunggu Murid Membayar") {
+    return "text-(--primary-color)";
+  }
+  if (
+    status === "Pembayaran Kedaluwarsa" ||
+    status === "Pembayaran Gagal" ||
+    status === "Dibatalkan"
+  ) {
+    return "text-(--accent-red-color)";
+  }
+  return getStatusColor(status);
+};
+
+function pageWindow(total: number, current: number) {
+  if (total <= 6) return Array.from({ length: total }, (_, i) => i + 1);
+  if (current <= 4) return [1, 2, 3, 4, "...", total] as const;
+  if (current >= total - 3) {
+    return [1, "...", total - 3, total - 2, total - 1, total] as const;
+  }
+  return [1, "...", current - 1, current, current + 1, "...", total] as const;
+}
 
 /* ===== Overlay komponen: Info & Month Range Picker ===== */
 const InfoOverlay: React.FC<{
@@ -490,14 +531,19 @@ const AdminEarningsPage: React.FC = () => {
 
   // local input (mirror redux)
   const [searchQ, setSearchQ] = React.useState(tx.q ?? "");
-  const [statusQ, setStatusQ] = React.useState<string>(tx.statusFilter === "ALL" ? "All" : String(tx.statusFilter));
+  const [statusQ, setStatusQ] = React.useState<EarningsStatusFilter>("All");
+  const [followUpLoadingId, setFollowUpLoadingId] = React.useState<string | null>(null);
+  const [followUpNotice, setFollowUpNotice] = React.useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // init transaksi list
   React.useEffect(() => {
     if (tx.limit !== PAGE_SIZE) dispatch(setReduxLimit(PAGE_SIZE));
     dispatch(setCategory("Kursus"));
     dispatch(setReduxPage(1));
-    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+    dispatch(fetchAllTxThunk({ net: netOnly, status: mapStatusFilterToRaw(statusQ) } as any));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -519,7 +565,8 @@ const AdminEarningsPage: React.FC = () => {
     const chip: TxCategoryChip = tab === "kursus" ? "Kursus" : "Modul";
     dispatch(setCategory(chip));
     dispatch(setReduxPage(1));
-    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+    dispatch(fetchAllTxThunk({ net: netOnly, status: mapStatusFilterToRaw(statusQ) } as any));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, dispatch, netOnly]);
 
   // search
@@ -527,40 +574,60 @@ const AdminEarningsPage: React.FC = () => {
     const handler = setTimeout(() => {
       dispatch(setQuery(searchQ));
       dispatch(setReduxPage(1));
-      dispatch(fetchAllTxThunk({ net: netOnly } as any));
+      dispatch(fetchAllTxThunk({ net: netOnly, status: mapStatusFilterToRaw(statusQ) } as any));
     }, 400);
     return () => clearTimeout(handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQ, dispatch, netOnly]);
 
   // status filter
   React.useEffect(() => {
-    const mapUIToLabel = (v: string): TxStatusLabel | "ALL" => {
-      if (!v || v === "All") return "ALL";
-      if (v === "Dibatalkan") return "Canceled";
-      return v as TxStatusLabel;
-    };
-    dispatch(setStatusFilter(mapUIToLabel(statusQ)));
     dispatch(setReduxPage(1));
-    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+    dispatch(fetchAllTxThunk({ net: netOnly, status: mapStatusFilterToRaw(statusQ) } as any));
   }, [statusQ, dispatch, netOnly]);
+
+  React.useEffect(() => {
+    if (!followUpNotice) return undefined;
+    const timeoutId = window.setTimeout(() => setFollowUpNotice(null), 4500);
+    return () => window.clearTimeout(timeoutId);
+  }, [followUpNotice]);
 
   // pagination
   const onPrev = () => {
     if (tx.page <= 1) return;
     dispatch(setReduxPage(tx.page - 1));
-    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+    dispatch(fetchAllTxThunk({ net: netOnly, status: mapStatusFilterToRaw(statusQ) } as any));
   };
 
   const onNext = () => {
     const pages = Math.max(1, Math.ceil((tx.allTotal || 0) / (tx.limit || PAGE_SIZE)));
     if (tx.page >= pages) return;
     dispatch(setReduxPage(tx.page + 1));
-    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+    dispatch(fetchAllTxThunk({ net: netOnly, status: mapStatusFilterToRaw(statusQ) } as any));
   };
 
   const onGoto = (p: number) => {
     dispatch(setReduxPage(p));
-    dispatch(fetchAllTxThunk({ net: netOnly } as any));
+    dispatch(fetchAllTxThunk({ net: netOnly, status: mapStatusFilterToRaw(statusQ) } as any));
+  };
+
+  const handleFollowUp = async (transaksiId: string) => {
+    setFollowUpNotice(null);
+    setFollowUpLoadingId(transaksiId);
+    try {
+      const result = await followUpTransaksiApproval(transaksiId);
+      setFollowUpNotice({
+        kind: "success",
+        text: result.message || "Follow up approval berhasil dikirim ke guru.",
+      });
+    } catch (err: any) {
+      setFollowUpNotice({
+        kind: "error",
+        text: err?.message || "Gagal mengirim follow up approval ke guru.",
+      });
+    } finally {
+      setFollowUpLoadingId(null);
+    }
   };
 
   /* Normalisasi rows untuk tabel */
@@ -583,7 +650,8 @@ const AdminEarningsPage: React.FC = () => {
           const price = Number(m.price ?? m.total_harga ?? 0);
           const date = m.date ?? m.tanggal_transaksi;
           const type = mod?.type ?? "Module Online";
-          const label = m.status_label || rawToLabel(m.status);
+          const label = detailedStatusLabel(m.status);
+          const canFollowUp = String(m.status || "").toLowerCase() === "pending";
 
           return {
             uuid: String(m.id),
@@ -594,6 +662,7 @@ const AdminEarningsPage: React.FC = () => {
             price: formatIDR(price),
             date: formatDate(date),
             status: label,
+            canFollowUp,
           };
         });
     }
@@ -616,7 +685,8 @@ const AdminEarningsPage: React.FC = () => {
         const pkg = pkgNameRaw ? `${pkgNameRaw}${sessions ? ` - ${sessions} Sesi` : ""}` : "-";
         const price = Number(x.price ?? x.total_harga ?? 0);
         const date = x.date ?? x.tanggal_transaksi;
-        const label = x.status_label || rawToLabel(x.status);
+        const label = detailedStatusLabel(x.status);
+        const canFollowUp = String(x.status || "").toLowerCase() === "pending";
 
         return {
           uuid: String(x.id),
@@ -627,6 +697,7 @@ const AdminEarningsPage: React.FC = () => {
           price: formatIDR(price),
           date: formatDate(date),
           status: label,
+          canFollowUp,
         };
       });
   }, [tx.allItems, tab]);
@@ -796,14 +867,19 @@ const AdminEarningsPage: React.FC = () => {
                 <span className="hidden sm:inline">Pendapatan Bersih</span>
                 <button
                   type="button"
-                  onClick={() =>
-                    setNetOnly((prev) => {
-                      const next = !prev;
-                      // ⬇️ refetch recap + data dengan mode baru
-                      dispatch(fetchAllTxThunk({ net: next } as any));
-                      return next;
-                    })
-                  }
+	                  onClick={() =>
+	                    setNetOnly((prev) => {
+	                      const next = !prev;
+	                      // ⬇️ refetch recap + data dengan mode baru
+	                      dispatch(
+	                        fetchAllTxThunk({
+	                          net: next,
+	                          status: mapStatusFilterToRaw(statusQ),
+	                        } as any)
+	                      );
+	                      return next;
+	                    })
+	                  }
                   className={cls(
                     "relative h-[24px] w-[44px] rounded-full transition",
                     netOnly ? "bg-[var(--secondary-color)]" : "bg-neutral-300"
@@ -1043,11 +1119,18 @@ const AdminEarningsPage: React.FC = () => {
 
               <select
                 value={statusQ}
-                onChange={(e) => setStatusQ(e.target.value)}
+                onChange={(e) => setStatusQ(e.target.value as EarningsStatusFilter)}
                 className="h-9 rounded-xl border border-[var(--secondary-light-color)] bg-white px-3 text-sm text-[#0F172A] cursor-pointer"
                 title="Filter Status"
               >
-                {["All", "Success", "On Progress", "Expired", "Failed"].map((s) => (
+                {[
+                  "All",
+                  "Menunggu Approval Guru",
+                  "Menunggu Murid Membayar",
+                  "Pembayaran Berhasil",
+                  "Pembayaran Kedaluwarsa",
+                  "Pembayaran Gagal",
+                ].map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -1067,6 +1150,19 @@ const AdminEarningsPage: React.FC = () => {
 
           {/* Table */}
           <div className="px-4 sm:px-5 py-3">
+            {followUpNotice && (
+              <div
+                className={cls(
+                  "mb-4 rounded-2xl border px-4 py-3 text-sm",
+                  followUpNotice.kind === "success"
+                    ? "border-[var(--accent-green-color)] bg-[var(--accent-green-light-color)] text-[var(--accent-green-color)]"
+                    : "border-[var(--accent-red-color)] bg-[var(--accent-red-light-color)] text-[var(--accent-red-color)]"
+                )}
+              >
+                {followUpNotice.text}
+              </div>
+            )}
+
             <div className="overflow-hidden rounded-2xl">
               <table className="w-full">
                 <thead>
@@ -1109,17 +1205,35 @@ const AdminEarningsPage: React.FC = () => {
                         <td className="p-3 text-[#0F172A]">{r.buyer ?? "-"}</td>
                         <td className="p-3 text-[#0F172A]">{r.date}</td>
                         <td className="p-3">
-                          <span className={cls("text-sm font-medium", getStatusColor(r.status))}>{r.status || "-"}</span>
+                          <span className={cls("inline-block max-w-[220px] text-sm font-medium leading-5", earningsStatusColor(r.status))}>
+                            {r.status || "-"}
+                          </span>
                         </td>
                         <td className="p-3">
-                          <button
-                            type="button"
-                            className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--secondary-color)] px-3 text-sm text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
-                            onClick={() => navigate(`/dashboard-admin/invoice/${r.uuid}`)}
-                          >
-                            <RiDownloadLine className="text-[18px]" />
-                            Invoice
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {r.canFollowUp && (
+                              <button
+                                type="button"
+                                disabled={followUpLoadingId === r.uuid}
+                                className={cls(
+                                  "inline-flex h-9 items-center rounded-full border px-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-60",
+                                  "border-[var(--primary-color)] text-[var(--primary-color)] hover:bg-[var(--primary-light-color)]"
+                                )}
+                                onClick={() => void handleFollowUp(r.uuid)}
+                              >
+                                {followUpLoadingId === r.uuid ? "Mengirim..." : "Follow Up"}
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--secondary-color)] px-3 text-sm text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
+                              onClick={() => navigate(`/dashboard-admin/invoice/${r.uuid}`)}
+                            >
+                              <RiDownloadLine className="text-[18px]" />
+                              Invoice
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -1138,17 +1252,35 @@ const AdminEarningsPage: React.FC = () => {
                         <td className="p-3 text-[#0F172A]">{r.price}</td>
                         <td className="p-3 text-[#0F172A]">{r.date}</td>
                         <td className="p-3">
-                          <span className={cls("text-sm font-medium", getStatusColor(r.status))}>{r.status || "-"}</span>
+                          <span className={cls("inline-block max-w-[220px] text-sm font-medium leading-5", earningsStatusColor(r.status))}>
+                            {r.status || "-"}
+                          </span>
                         </td>
                         <td className="p-3">
-                          <button
-                            type="button"
-                            className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--secondary-color)] px-3 text-sm text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
-                            onClick={() => navigate(`/dashboard-admin/invoice/${r.uuid}`)}
-                          >
-                            <RiDownloadLine className="text-[18px]" />
-                            Invoice
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {r.canFollowUp && (
+                              <button
+                                type="button"
+                                disabled={followUpLoadingId === r.uuid}
+                                className={cls(
+                                  "inline-flex h-9 items-center rounded-full border px-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-60",
+                                  "border-[var(--primary-color)] text-[var(--primary-color)] hover:bg-[var(--primary-light-color)]"
+                                )}
+                                onClick={() => void handleFollowUp(r.uuid)}
+                              >
+                                {followUpLoadingId === r.uuid ? "Mengirim..." : "Follow Up"}
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--secondary-color)] px-3 text-sm text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
+                              onClick={() => navigate(`/dashboard-admin/invoice/${r.uuid}`)}
+                            >
+                              <RiDownloadLine className="text-[18px]" />
+                              Invoice
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -1178,22 +1310,26 @@ const AdminEarningsPage: React.FC = () => {
                   <RiArrowLeftSLine className="text-xl" />
                 </button>
 
-                {Array.from({ length: pages }, (_, i) => {
-                  const p = i + 1;
-                  return (
+                {pageWindow(pages, tx.page).map((item, index) =>
+                  item === "..." ? (
+                    <span key={`ellipsis-${index}`} className="px-2 text-sm text-neutral-500">
+                      ...
+                    </span>
+                  ) : (
                     <button
-                      key={p}
-                      onClick={() => onGoto(p)}
+                      key={item}
+                      onClick={() => onGoto(item)}
                       disabled={isLoading}
                       className={cls(
                         "min-w-9 h-9 rounded-lg border border-[var(--secondary-color)] px-3 text-sm text-[#0F172A] hover:bg-[var(--secondary-light-color)]",
-                        p === tx.page && "border-[var(--primary-color)] bg-[var(--secondary-color)]/20 font-medium"
+                        item === tx.page &&
+                          "border-[var(--primary-color)] bg-[var(--secondary-color)]/20 font-medium"
                       )}
                     >
-                      {p}
+                      {item}
                     </button>
-                  );
-                })}
+                  )
+                )}
 
                 <button
                   className="grid h-9 w-9 place-items-center rounded-lg text-[#0F172A] hover:bg-[var(--secondary-light-color)] disabled:opacity-40"

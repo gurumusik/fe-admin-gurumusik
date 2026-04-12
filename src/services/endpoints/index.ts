@@ -138,6 +138,7 @@ export const ENDPOINTS = {
 
   TRANSAKSI: {
     DETAIL: (id: number | string) => `/transaksi/${id}`,
+    FOLLOW_UP_APPROVAL: (id: number | string) => `/transaksi/${id}/follow-up-approval`,
     BY_PROMO: (promoId: number | string) => `/transaksi/promo/${promoId}/transactions`,
     ALL: () => `/transaksi/all`,
     RECAP: () => `/transaksi/recap`,

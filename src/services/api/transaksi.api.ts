@@ -376,6 +376,29 @@ export type MonthlyTxStatsResp = {
   };
 };
 
+export type FollowUpApprovalResp = {
+  message?: string;
+  transaksi?: {
+    id?: number;
+    status?: string;
+  };
+  delivery?: {
+    whatsapp?: Array<{
+      success?: boolean;
+      skipped?: boolean;
+      reason?: string;
+      error?: string | null;
+      target?: string;
+    }>;
+    email?: {
+      success?: boolean;
+      skipped?: boolean;
+      reason?: string;
+      error?: string;
+    };
+  };
+};
+
 /* ========================= HELPERS ========================= */
 
 export function mapTxStatusLabel(raw: TxStatusRaw): TxStatusLabel {
@@ -452,6 +475,13 @@ export async function getTransaksiDetail(id: number | string) {
   return baseUrl.request<TransaksiDetailResp>(
     ENDPOINTS.TRANSAKSI.DETAIL(id),
     { method: 'GET' }
+  );
+}
+
+export async function followUpTransaksiApproval(id: number | string) {
+  return baseUrl.request<FollowUpApprovalResp>(
+    ENDPOINTS.TRANSAKSI.FOLLOW_UP_APPROVAL(id),
+    { method: 'POST' }
   );
 }
 
