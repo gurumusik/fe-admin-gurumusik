@@ -136,10 +136,10 @@ const EmployeePage: React.FC = () => {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-neutral-900">
-                Employee Demo Access
+                Employee Access
               </h2>
               <p className="text-sm text-neutral-600">
-                Tentukan siapa yang boleh akses demo (role guru/murid).
+                Kelola allowlist employee yang bisa menerima akses internal.
               </p>
             </div>
           </div>
@@ -162,8 +162,8 @@ const EmployeePage: React.FC = () => {
 
         <div className="mt-5 rounded-2xl border border-neutral-200 p-4">
           <div className="mb-3 rounded-xl bg-[var(--accent-blue-light-color)]/60 p-3 text-sm text-neutral-700">
-            Jika <b>belum ada</b> employee aktif, semua guru/murid tetap bisa akses demo.
-            Setelah ada employee aktif, hanya yang terdaftar di sini yang bisa masuk.
+            Akun <b>role admin</b> yang aktif di sini bisa menerima login dashboard admin via magic-link.
+            Akun dengan <b>role superadmin</b> otomatis punya akses penuh ke halaman ini.
           </div>
           <p className="text-sm text-neutral-600 mb-3">
             Tambah employee dengan email atau user_id (angka).

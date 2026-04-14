@@ -26,7 +26,7 @@ const AdminGuard: React.FC<Props> = ({ children }) => {
       }
       try {
         if (!user) {
-          await dispatch(meThunk()).unwrap(); // isi user dari /auth/me
+          await dispatch(meThunk()).unwrap(); // isi user dari /admin-auth/me
         }
       } catch {
         // biarkan guard di bawah yang memutuskan redirect
@@ -50,7 +50,7 @@ const AdminGuard: React.FC<Props> = ({ children }) => {
 
   // 3) role check
   const role = String((user as any)?.role ?? (user as any)?.user?.role ?? "").toLowerCase();
-  const isAdmin = role === "admin";
+  const isAdmin = role === "admin" || role === "superadmin";
   if (!user || !isAdmin) {
     return <Navigate to="/" replace state={{ from: location }} />;
   }

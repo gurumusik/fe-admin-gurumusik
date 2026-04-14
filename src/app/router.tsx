@@ -5,6 +5,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { DashboardPage } from "@/features/dashboard/pages/page";
 import AdminLayout from "@/components/layout/AdminLayout";
 import AdminGuard from "@/features/auth/components/AdminGuard";
+import SuperAdminGuard from "@/features/auth/components/SuperAdminGuard";
 import { AdminInstrumentPage } from "@/features/dashboard/pages/instrument/page";
 import InstrumentDetailPage from "@/features/dashboard/pages/instrument/InstrumentDetailPage/page";
 import AdminModulePage from "@/features/dashboard/pages/module/page";
@@ -124,7 +125,14 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/programs", element: <ManageProgramPage /> },
       { path: "/dashboard-admin/paket", element: <ManagePaketPage /> },
       { path: "/dashboard-admin/certificate-instrument", element: <CertificateInstrumentPage /> },
-      { path: "/dashboard-admin/employees", element: <EmployeePage /> },
+      {
+        path: "/dashboard-admin/employees",
+        element: (
+          <SuperAdminGuard>
+            <EmployeePage />
+          </SuperAdminGuard>
+        ),
+      },
       { path: "/dashboard-admin/billing-config", element: <BillingConfigPage /> },
       { path: "/dashboard-admin/notifications", element: <AdminNotificationsPage /> },
       { path: "/dashboard-admin/profile-templates", element: <AdminProfileTemplatesPage /> },
