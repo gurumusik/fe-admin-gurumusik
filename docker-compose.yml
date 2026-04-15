@@ -11,6 +11,18 @@ services:
     stdin_open: true
     tty: true
 
+  vite-frontend-demo:
+    build: .
+    ports:
+      - "5174:5174"
+    restart: always
+    env_file:
+      - .env.demo
+    networks:
+      - localnet
+    stdin_open: true
+    tty: true
+
 networks:
   localnet:
     driver: bridge
