@@ -1,5 +1,4 @@
 import React from "react";
-import { useSelector } from "react-redux";
 import { Link, useLocation } from "react-router-dom";
 import {
   RiCoinsLine,
@@ -14,7 +13,6 @@ import {
   RiNotification4Line,
 } from "react-icons/ri";
 import logo from "@/assets/images/gurumusik.png";
-import type { RootState } from "@/app/store";
 
 /* Animasi dropdown */
 const DropWrap: React.FC<{ open: boolean; className?: string; children: React.ReactNode }> = ({
@@ -50,9 +48,6 @@ const SubItem: React.FC<{ to: string; label: string; active?: boolean; className
 
 const AdminSidebar: React.FC = () => {
   const location = useLocation();
-  const rawUser = useSelector((state: RootState) => state.auth.user as any);
-  const user = (rawUser?.user ?? rawUser) || null;
-  const isSuperAdmin = Boolean(user?.is_super_admin);
 
   // helpers active
   const isExact = (p: string) => location.pathname === p;
@@ -395,13 +390,11 @@ const AdminSidebar: React.FC = () => {
                   label="Transaction List"
                   active={isUnder("/dashboard-admin/transaction-list")}
                 />
-                {isSuperAdmin ? (
-                  <SubItem
-                    to="/dashboard-admin/employees"
-                    label="Employee Access"
-                    active={isUnder("/dashboard-admin/employees")}
-                  />
-                ) : null}
+                <SubItem
+                  to="/dashboard-admin/employees"
+                  label="Employee Access"
+                  active={isUnder("/dashboard-admin/employees")}
+                />
                 <SubItem
                   to="/dashboard-admin/transaction-ticket"
                   label="Transaction Ticket"

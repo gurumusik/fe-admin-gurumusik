@@ -212,6 +212,7 @@ export const ENDPOINTS = {
   EMPLOYEES: {
     LIST: '/admin/employees',
     CREATE: '/admin/employees',
+    CREATE_ADMIN: '/admin/employees/admin',
     UPDATE: (id: number | string) => `/admin/employees/${id}`,
   },
 
