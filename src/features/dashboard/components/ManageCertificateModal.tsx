@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { getStatusColor } from "@/utils/getStatusColor";
 import {
   RiCloseLine,
+  RiExternalLinkLine,
   RiEyeFill,
   RiMusic2Line,
   RiStickyNoteFill,
@@ -12,7 +13,11 @@ import {
 } from "react-icons/ri";
 import { resolveImageUrl } from "@/utils/resolveImageUrl";
 
-export type CertStatus = "Menunggu Verifikasi" | "Disetujui" | "Tidak Disetujui";
+export type CertStatus =
+  | "Menunggu Verifikasi"
+  | "Revisi"
+  | "Disetujui"
+  | "Tidak Disetujui";
 
 export type CertificateItem = {
   id: string | number;
@@ -40,7 +45,7 @@ export type CertificateItem = {
   }>;
   /** legacy (single video) */
   video?: { title?: string; description?: string; link?: string } | null;
-  draftStatus?: "approved" | "rejected" | null;
+  draftStatus?: "approved" | "rejected" | "revision" | null;
   draftReason?: string | null;
   /** alasan penolakan dari backend (nullable) */
   rejectReason?: string | null;
@@ -62,12 +67,15 @@ type Props = {
   onShowRejectNote?: (item: CertificateItem) => void; // tidak dipakai (kita handle internal)
   onDraftChange?: (
     item: CertificateItem,
-    payload: { status: "approved" | "rejected"; reason?: string | null }
+    payload: { status: "approved" | "rejected" | "revision"; reason?: string | null }
   ) => void;
+  onDraftReset?: (item: CertificateItem) => void;
   initialItemId?: string | number;
   initialPhase?: "list" | "detail" | "preview";
   
 };
+
+type DraftDecision = "pending" | "approved" | "rejected" | "revision" | "certification";
 
 const FALLBACK: CertificateItem[] = [
   { id: 1, title: "Rockstar 3", school: "Javas Music School", instrument: "Piano", grade: "Grade III", status: "Menunggu Verifikasi",  link: "/assets/images/certificate-demo.jpg" },
@@ -136,6 +144,56 @@ const resolveVideoEmbedUrl = (raw?: string | null): string | null => {
   return null;
 };
 
+const CERT_TYPE_OPTIONS: Array<{ key: string; label: string }> = [
+  { key: "internasional", label: "Internasional" },
+  { key: "lokal", label: "Lokal" },
+  { key: "universitas", label: "Universitas" },
+  { key: "penghargaan", label: "Penghargaan" },
+];
+
+const getDraftDecision = (item?: CertificateItem | null): DraftDecision => {
+  if (!item) return "pending";
+  if (item.draftStatus === "approved") return "approved";
+  if (item.draftStatus === "rejected") return "rejected";
+  if (item.draftStatus === "revision") return "revision";
+  if (item.status === "Disetujui") return "approved";
+  if (item.status === "Tidak Disetujui") return "rejected";
+  return "pending";
+};
+
+const isLocalOrInternationalType = (certType?: string | null) => {
+  const value = String(certType || "").trim().toLowerCase();
+  return !value || value === "lokal" || value === "internasional";
+};
+
+const getPrimaryVideoUrl = (item?: CertificateItem | null) => {
+  if (!item) return "";
+  if (Array.isArray(item.videoClips) && item.videoClips.length > 0) {
+    return resolveHttpsUrl(item.videoClips[0]?.link ?? null);
+  }
+  return resolveHttpsUrl(item.video?.link ?? null);
+};
+
+const getPrimaryCertificateUrl = (item?: CertificateItem | null) => {
+  if (!item) return "";
+  if (Array.isArray(item.files) && item.files.length > 0) {
+    return resolveCertUrl(item.files[0]?.file_url ?? undefined) ?? "";
+  }
+  return resolveCertUrl(item.link) ?? "";
+};
+
+const getDisplayFileName = (item?: CertificateItem | null) => {
+  const raw = getPrimaryCertificateUrl(item);
+  if (!raw) return "-";
+  try {
+    const withoutQuery = raw.split("?")[0] || raw;
+    const filename = withoutQuery.split("/").pop() || withoutQuery;
+    return decodeURIComponent(filename);
+  } catch {
+    return raw;
+  }
+};
+
 const ManageCertificateModal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -148,6 +206,7 @@ const ManageCertificateModal: React.FC<Props> = ({
   canDecide = true,
   decisionMode = "immediate",
   onDraftChange,
+  onDraftReset,
   initialItemId,
   initialPhase = "detail",
 }) => {
@@ -158,7 +217,9 @@ const ManageCertificateModal: React.FC<Props> = ({
 
   const getDisplayStatus = (item: CertificateItem): CertStatus => {
     if (decisionMode === "draft" && item.draftStatus) {
-      return item.draftStatus === "approved" ? "Disetujui" : "Tidak Disetujui";
+      if (item.draftStatus === "approved") return "Disetujui";
+      if (item.draftStatus === "rejected") return "Tidak Disetujui";
+      return "Revisi";
     }
     return item.status;
   };
@@ -177,6 +238,7 @@ const ManageCertificateModal: React.FC<Props> = ({
   const [err, setErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [rejectReadonly, setRejectReadonly] = useState(false);
+  const [draftDecision, setDraftDecision] = useState<DraftDecision>("pending");
 
   const resetAll = () => {
     setPhase("list");
@@ -185,6 +247,7 @@ const ManageCertificateModal: React.FC<Props> = ({
     setErr(null);
     setSubmitting(false);
     setRejectReadonly(false);
+    setDraftDecision("pending");
     setBlobErr(null);
     setBlobLoading(false);
     setBlobType(null);
@@ -280,9 +343,22 @@ const ManageCertificateModal: React.FC<Props> = ({
     }
   }, [phase]);
 
+  useEffect(() => {
+    if (phase !== "detail") return;
+    setDraftDecision(getDraftDecision(selected));
+  }, [phase, selected]);
+
   if (!isOpen) return null;
 
   const canSubmitReject = reason.trim().length >= 5 && !submitting && !rejectReadonly;
+  const selectedTypeKey = (() => {
+    const raw = String(selected?.certType || "").trim().toLowerCase();
+    return CERT_TYPE_OPTIONS.some((item) => item.key === raw) ? raw : "lokal";
+  })();
+  const selectedVideoUrl = getPrimaryVideoUrl(selected);
+  const selectedCertificateUrl = getPrimaryCertificateUrl(selected);
+  const selectedCertificateFileName = getDisplayFileName(selected);
+  const useDraftRedesign = decisionMode === "draft" && isLocalOrInternationalType(selected?.certType);
 
   const submitReject = async () => {
     if (!selected) return;
@@ -309,7 +385,25 @@ const ManageCertificateModal: React.FC<Props> = ({
     }
   };
 
-  const showDecisionButtons = canDecide && selected?.status === "Menunggu Verifikasi";
+  const submitDraftDecision = () => {
+    if (!selected || decisionMode !== "draft") return;
+    if (draftDecision === "approved") {
+      onDraftChange?.(selected, { status: "approved", reason: null });
+    } else if (draftDecision === "rejected") {
+      onDraftChange?.(selected, { status: "rejected", reason: null });
+    } else if (draftDecision === "revision") {
+      onDraftChange?.(selected, { status: "revision", reason: null });
+    } else {
+      onDraftReset?.(selected);
+    }
+    handleClose();
+  };
+
+  const showDecisionButtons =
+    canDecide &&
+    !!selected &&
+    (getDisplayStatus(selected) === "Menunggu Verifikasi" ||
+      getDisplayStatus(selected) === "Revisi");
 
   return (
     <div
@@ -342,7 +436,9 @@ const ManageCertificateModal: React.FC<Props> = ({
             <hr className="border-t border-neutral-300 mb-2 mx-5" />
             <div className="px-5 pb-5 max-h-[calc(100vh-9rem)] overflow-y-auto">
               <ul>
-                {items.map((item) => (
+                {items.map((item) => {
+                  const displayStatus = getDisplayStatus(item);
+                  return (
                   <li key={item.id} className="py-3 border-b border-neutral-300 px-3">
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
@@ -359,30 +455,25 @@ const ManageCertificateModal: React.FC<Props> = ({
                             <span className="text-neutral-400">•</span>
                             <span className="font-medium">{item.grade}</span>
                           </span>
-                          {(() => {
-                            const displayStatus = getDisplayStatus(item);
-                            return (
-                              <span className={`text-md font-medium ${getStatusColor(displayStatus)}`}>
-                                {displayStatus}
-                              </span>
-                            );
-                          })()}
+                          <span className={`text-md font-medium ${getStatusColor(displayStatus)}`}>
+                            {displayStatus}
+                          </span>
                         </div>
                       </div>
 
-                      {item.status === "Disetujui" && (
+                      {displayStatus === "Disetujui" && (
                         <BtnSquare ariaLabel="Lihat detail sertifikat" onClick={() => openDetail(item)} bordered>
                           <RiEyeFill size={22} className="text-[var(--secondary-color)]" />
                         </BtnSquare>
                       )}
 
-                      {item.status === "Menunggu Verifikasi" && (
+                      {(displayStatus === "Menunggu Verifikasi" || displayStatus === "Revisi") && (
                         <BtnSquare ariaLabel="Setujui / Review sertifikat" onClick={() => openDetail(item)} bordered>
                           <RiCheckboxMultipleFill size={22} className="text-[var(--secondary-color)]" />
                         </BtnSquare>
                       )}
 
-                      {item.status === "Tidak Disetujui" && (
+                      {displayStatus === "Tidak Disetujui" && (
                         <div className="flex items-center gap-3">
                           <BtnSquare
                             ariaLabel="Lihat alasan penolakan"
@@ -402,7 +493,7 @@ const ManageCertificateModal: React.FC<Props> = ({
                       )}
                     </div>
                   </li>
-                ))}
+                )})}
               </ul>
             </div>
           </>
@@ -410,7 +501,227 @@ const ManageCertificateModal: React.FC<Props> = ({
 
         {/* ========== PHASE 2: DETAIL ========== */}
         {phase === "detail" && selected && (
-          <>
+          useDraftRedesign ? (
+            <>
+              <div className="px-5 pt-5 pb-3">
+                <div className="grid grid-cols-3 items-center">
+                  <div className="justify-self-start">
+                    <button
+                      onClick={backToList}
+                      className="inline-grid h-9 w-9 place-items-center rounded-full hover:bg-neutral-100"
+                      aria-label="Kembali"
+                    >
+                      <RiArrowLeftSLine size={20} className="text-neutral-800" />
+                    </button>
+                  </div>
+                  <div className="justify-self-center">
+                    <h3 className="text-[18px] font-semibold text-neutral-900">
+                      Pengajuan Sertifikasi
+                    </h3>
+                  </div>
+                  <div className="justify-self-end">
+                    <button
+                      aria-label="Tutup"
+                      onClick={handleClose}
+                      className="inline-grid h-9 w-9 place-items-center rounded-full hover:bg-neutral-100"
+                      title="Tutup"
+                    >
+                      <RiCloseLine size={20} className="text-neutral-800" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <hr className="mx-5 mb-2 border-t border-[#DCE5EF]" />
+
+              <div className="px-5 pb-5 max-h-[calc(100vh-9rem)] overflow-y-auto">
+                <div className="mb-5">
+                  <p className="mb-3 text-[16px] font-semibold text-[#2D3445]">
+                    Tipe Sertifikasi
+                  </p>
+                  <div className="flex flex-wrap gap-x-6 gap-y-3">
+                    {CERT_TYPE_OPTIONS.map((option) => {
+                      const checked = selectedTypeKey === option.key;
+                      return (
+                        <label
+                          key={option.key}
+                          className="inline-flex items-center gap-3 text-[15px] text-[#2D3445]"
+                        >
+                          <input
+                            type="radio"
+                            name={`cert-type-${selected.id}`}
+                            checked={checked}
+                            readOnly
+                            className="h-[18px] w-[18px] accent-[var(--secondary-color)]"
+                          />
+                          <span className={!checked ? "text-[#8A94A6]" : undefined}>
+                            {option.label}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+                    Nama Sertifikasi
+                  </div>
+                  <div className="rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-[15px] text-[#334155]">
+                    {selected.title || "-"}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+                    Penyelenggara Sertifikasi
+                  </div>
+                  <div className="rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-[15px] text-[#334155]">
+                    {selected.school || "-"}
+                  </div>
+                </div>
+
+                <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div>
+                    <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">Tahun</div>
+                    <div className="rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-[15px] text-[#334155]">
+                      {selected.year ? String(selected.year) : "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+                      Instrumen
+                    </div>
+                    <div className="flex items-center gap-2 rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-[15px] text-[#334155]">
+                      <span className="inline-grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white">
+                        {selected.instrumentIcon ? (
+                          <img
+                            src={selected.instrumentIcon}
+                            alt={selected.instrument}
+                            className="h-4 w-4 object-contain"
+                          />
+                        ) : (
+                          <RiMusic2Line className="text-base" />
+                        )}
+                      </span>
+                      <span className="truncate">{selected.instrument || "-"}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">Grade</div>
+                    <div className="rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-[15px] text-[#334155]">
+                      {selected.grade || "-"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+                    Video Performa
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!selectedVideoUrl}
+                    onClick={() => {
+                      if (!selectedVideoUrl) return;
+                      window.open(selectedVideoUrl, "_blank", "noopener,noreferrer");
+                    }}
+                    className="flex w-full items-center gap-3 rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-left text-[15px] text-[#334155] transition hover:border-[var(--secondary-color)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {selectedVideoUrl || "Video performa belum tersedia"}
+                    </span>
+                    <RiExternalLinkLine className="shrink-0 text-xl text-[#2D3445]" />
+                  </button>
+                </div>
+
+                <div className="mb-5">
+                  <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+                    File Sertifikasi
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!selectedCertificateUrl}
+                    onClick={() => {
+                      if (!selectedCertificateUrl) return;
+                      window.open(selectedCertificateUrl, "_blank", "noopener,noreferrer");
+                    }}
+                    className="flex w-full items-center gap-3 rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-left text-[15px] text-[#334155] transition hover:border-[var(--secondary-color)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {selectedCertificateFileName}
+                    </span>
+                    <RiExternalLinkLine className="shrink-0 text-xl text-[#2D3445]" />
+                  </button>
+                </div>
+
+                {canDecide ? (
+                <div className="border-t border-[#DCE5EF] pt-4">
+                  <p className="mb-3 text-[16px] font-semibold text-[#2D3445]">
+                    Pilih Aksi Dibawah!!
+                  </p>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                    <div className="grid flex-1 grid-cols-2 overflow-hidden rounded-full border border-[#D6E1EC] bg-white sm:grid-cols-4">
+                      <button
+                        type="button"
+                        disabled
+                        className="h-12 border-r border-[#E4ECF4] bg-[#F7FAFD] px-4 text-[15px] font-medium text-[#9FB0C5] cursor-not-allowed"
+                        title="Sedang maintenance"
+                      >
+                        Ajukan Ujian
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDraftDecision("revision")}
+                        className={[
+                          "h-12 border-r border-[#E4ECF4] px-4 text-[15px] font-medium transition",
+                          draftDecision === "revision"
+                            ? "bg-[#E9F3FF] text-[var(--secondary-color)]"
+                            : "bg-white text-[#2D3445] hover:bg-[#F7FAFD]",
+                        ].join(" ")}
+                      >
+                        Revisi
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDraftDecision("rejected")}
+                        className={[
+                          "h-12 border-r border-[#E4ECF4] px-4 text-[15px] font-medium transition",
+                          draftDecision === "rejected"
+                            ? "bg-[#FFF1F5] text-[var(--accent-red-color)]"
+                            : "bg-white text-[#2D3445] hover:bg-[#F7FAFD]",
+                        ].join(" ")}
+                      >
+                        Tolak
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDraftDecision("approved")}
+                        className={[
+                          "h-12 px-4 text-[15px] font-medium transition",
+                          draftDecision === "approved"
+                            ? "bg-[#EEF9F2] text-[#18B968]"
+                            : "bg-white text-[#2D3445] hover:bg-[#F7FAFD]",
+                        ].join(" ")}
+                      >
+                        Setujui
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={submitDraftDecision}
+                      className="h-12 rounded-full bg-[var(--primary-color)] px-8 text-[15px] font-semibold text-neutral-900 transition hover:brightness-95 lg:min-w-[140px]"
+                    >
+                      Simpan
+                    </button>
+                  </div>
+                </div>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
             <div className="px-5 pt-5 pb-3">
               <div className="grid grid-cols-3 items-center">
                 <div className="justify-self-start">
@@ -636,6 +947,7 @@ const ManageCertificateModal: React.FC<Props> = ({
               )}
             </div>
           </>
+          )
         )}
 
         {/* ========== PHASE 3: PREVIEW ========== */}

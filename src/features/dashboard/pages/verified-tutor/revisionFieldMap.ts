@@ -11,6 +11,7 @@ export function humanizeFieldKey(fieldKey: string) {
 // Label yang kita tampilkan di UI (kalau key tidak ada -> fallback humanizeFieldKey)
 export const REVISION_FIELD_LABELS: Record<string, string> = {
   'profile.avatar': 'Foto profil',
+  'profile.nama': 'Nama lengkap',
   'profile.nama_panggilan': 'Nama panggilan',
   'profile.email': 'Email',
   'profile.phone': 'Nomor telepon',

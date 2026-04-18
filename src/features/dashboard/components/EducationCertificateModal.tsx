@@ -1,7 +1,12 @@
 'use client';
 
-import React from 'react';
-import { RiCloseLine, RiDownloadLine, RiMusic2Line } from 'react-icons/ri';
+import React, { useEffect, useState } from 'react';
+import {
+  RiArrowLeftSLine,
+  RiCloseLine,
+  RiExternalLinkLine,
+  RiMusic2Line,
+} from 'react-icons/ri';
 import { resolveImageUrl } from '@/utils/resolveImageUrl';
 
 export type EducationCertificateData = {
@@ -9,27 +14,37 @@ export type EducationCertificateData = {
   nama_kampus?: string | null;
   major_instrument_id?: number | string | null;
   minor_instrument_id?: number | string | null;
-  majorInstrument?: { id?: number | null; nama_instrumen?: string | null; icon?: string | null } | null;
-  minorInstrument?: { id?: number | null; nama_instrumen?: string | null; icon?: string | null } | null;
+  majorInstrument?: {
+    id?: number | null;
+    nama_instrumen?: string | null;
+    icon?: string | null;
+  } | null;
+  minorInstrument?: {
+    id?: number | null;
+    nama_instrumen?: string | null;
+    icon?: string | null;
+  } | null;
   url_sertifikat_kelulusan?: string | null;
   video_url?: string | null;
-  draftStatus?: 'approved' | 'rejected' | null;
+  draftStatus?: 'approved' | 'rejected' | 'revision' | null;
 };
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   data?: EducationCertificateData | null;
-  decisionStatus?: 'approved' | 'rejected' | null;
-  onDecisionChange?: (status: 'approved' | 'rejected') => void;
+  decisionStatus?: 'approved' | 'rejected' | 'revision' | null;
+  onDecisionChange?: (status: 'approved' | 'rejected' | 'revision' | null) => void;
 };
 
-const pillBase =
-  'inline-flex items-center gap-2 h-8 px-3 rounded-full border text-sm';
-const pillEnabled =
-  'border-[var(--secondary-color)] text-[var(--secondary-color)] bg-white';
-const pillDisabled =
-  'border-neutral-300 text-neutral-400 bg-neutral-100 cursor-not-allowed pointer-events-none';
+type DraftDecision = 'pending' | 'approved' | 'rejected' | 'revision';
+
+const CERT_TYPE_OPTIONS = [
+  { key: 'internasional', label: 'Internasional' },
+  { key: 'lokal', label: 'Lokal' },
+  { key: 'universitas', label: 'Universitas' },
+  { key: 'penghargaan', label: 'Penghargaan' },
+] as const;
 
 const resolveHttpsUrl = (raw?: string | null): string => {
   if (!raw) return '';
@@ -38,10 +53,32 @@ const resolveHttpsUrl = (raw?: string | null): string => {
   if (url.startsWith('https://')) return url;
   if (/^https?:\/\//i.test(url)) return url.replace(/^http:\/\//i, 'https://');
   if (/^www\./i.test(url)) return `https://${url}`;
-  if (/^(tiktok\.com|www\.tiktok\.com|youtu\.be|youtube\.com|www\.youtube\.com)\//i.test(url)) {
+  if (
+    /^(tiktok\.com|www\.tiktok\.com|youtu\.be|youtube\.com|www\.youtube\.com)\//i.test(url)
+  ) {
     return `https://${url}`;
   }
   return '';
+};
+
+const getFileNameFromUrl = (raw?: string | null) => {
+  if (!raw) return '-';
+  try {
+    const normalized = raw.split('?')[0] || raw;
+    const fileName = normalized.split('/').pop() || normalized;
+    return decodeURIComponent(fileName);
+  } catch {
+    return raw;
+  }
+};
+
+const getInitialDecision = (
+  status?: 'approved' | 'rejected' | 'revision' | null
+): DraftDecision => {
+  if (status === 'approved') return 'approved';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'revision') return 'revision';
+  return 'pending';
 };
 
 const EducationCertificateModal: React.FC<Props> = ({
@@ -51,158 +88,255 @@ const EducationCertificateModal: React.FC<Props> = ({
   decisionStatus,
   onDecisionChange,
 }) => {
-  if (!isOpen) return null;
+  const [draftDecision, setDraftDecision] = useState<DraftDecision>('pending');
 
-  const currentDecision = decisionStatus ?? data?.draftStatus ?? null;
+  useEffect(() => {
+    if (!isOpen) return;
+    setDraftDecision(getInitialDecision(decisionStatus ?? data?.draftStatus ?? null));
+  }, [isOpen, decisionStatus, data?.draftStatus]);
+
+  if (!isOpen) return null;
 
   const certResolved =
     resolveImageUrl(data?.url_sertifikat_kelulusan ?? null) ||
     data?.url_sertifikat_kelulusan ||
     '';
-  const certDisabled = !certResolved;
-
   const videoResolved = resolveHttpsUrl(data?.video_url ?? null);
-  const videoDisabled = !videoResolved;
 
   const majorName = data?.majorInstrument?.nama_instrumen || '-';
   const minorName = data?.minorInstrument?.nama_instrumen || '-';
-  const majorIcon = data?.majorInstrument?.icon ? resolveImageUrl(data?.majorInstrument?.icon ?? null) : null;
-  const minorIcon = data?.minorInstrument?.icon ? resolveImageUrl(data?.minorInstrument?.icon ?? null) : null;
+  const majorIcon = data?.majorInstrument?.icon
+    ? resolveImageUrl(data?.majorInstrument?.icon ?? null)
+    : null;
+  const minorIcon = data?.minorInstrument?.icon
+    ? resolveImageUrl(data?.minorInstrument?.icon ?? null)
+    : null;
 
-  const decisionLabel =
-    currentDecision === 'approved'
-      ? 'Disetujui'
-      : currentDecision === 'rejected'
-      ? 'Tidak Disetujui'
-      : 'Menunggu Verifikasi';
-
-  const decisionPillClass =
-    currentDecision === 'approved'
-      ? 'bg-[var(--accent-green-light-color)] text-[#18A957] border-[var(--accent-green-color)]'
-      : currentDecision === 'rejected'
-      ? 'bg-[var(--accent-red-light-color)] text-[#F14A7E] border-[var(--accent-red-color)]'
-      : 'bg-neutral-100 text-neutral-600 border-neutral-300';
-
-  const decisionBtnBase =
-    'h-9 px-4 rounded-full text-sm font-semibold border transition';
-  const approveBtnClass =
-    currentDecision === 'approved'
-      ? 'bg-[var(--accent-green-light-color)] border-[var(--accent-green-color)] text-[#18A957]'
-      : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50';
-  const rejectBtnClass =
-    currentDecision === 'rejected'
-      ? 'bg-[var(--accent-red-light-color)] border-[var(--accent-red-color)] text-[#F14A7E]'
-      : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50';
+  const saveDecision = () => {
+    if (draftDecision === 'approved') onDecisionChange?.('approved');
+    else if (draftDecision === 'rejected') onDecisionChange?.('rejected');
+    else if (draftDecision === 'revision') onDecisionChange?.('revision');
+    else onDecisionChange?.(null);
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center px-4" aria-modal="true" role="dialog">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl max-h-[calc(100vh-2rem)] overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E6EAF0]">
-          <h3 className="text-lg font-semibold text-neutral-900">Sertifikat Pendidikan</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 grid place-items-center rounded-full hover:bg-neutral-100 cursor-pointer"
-            aria-label="Tutup"
-            title="Tutup"
-          >
-            <RiCloseLine className="text-2xl text-neutral-900" />
-          </button>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4"
+      aria-modal="true"
+      role="dialog"
+      onMouseDown={onClose}
+    >
+      <div
+        className="w-full max-w-2xl overflow-hidden rounded-[28px] bg-white shadow-xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-3">
+          <div className="grid grid-cols-3 items-center">
+            <div className="justify-self-start">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-grid h-9 w-9 place-items-center rounded-full hover:bg-neutral-100"
+                aria-label="Kembali"
+              >
+                <RiArrowLeftSLine className="text-xl text-neutral-900" />
+              </button>
+            </div>
+            <div className="justify-self-center">
+              <h3 className="text-[18px] font-semibold text-[#1D2433]">
+                Pengajuan Sertifikasi
+              </h3>
+            </div>
+            <div className="justify-self-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-grid h-9 w-9 place-items-center rounded-full hover:bg-neutral-100"
+                aria-label="Tutup"
+              >
+                <RiCloseLine className="text-xl text-neutral-900" />
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="px-5 pb-5 pt-4 max-h-[calc(100vh-7.5rem)] overflow-y-auto">
-          <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="text-md text-neutral-900 mb-1 block">Nama Kampus</label>
-              <input className="w-full h-11 rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 text-sm text-neutral-800 outline-none" value={data?.nama_kampus ?? '-'} readOnly />
-            </div>
+        <hr className="mx-5 mb-2 border-t border-[#DCE5EF]" />
 
+        <div className="max-h-[calc(100vh-9rem)] overflow-y-auto px-5 pb-5">
+          <div className="mb-5">
+            <p className="mb-3 text-[16px] font-semibold text-[#2D3445]">
+              Tipe Sertifikasi
+            </p>
+            <div className="flex flex-wrap gap-x-6 gap-y-3">
+              {CERT_TYPE_OPTIONS.map((option) => {
+                const checked = option.key === 'universitas';
+                return (
+                  <label
+                    key={option.key}
+                    className="inline-flex items-center gap-3 text-[15px] text-[#2D3445]"
+                  >
+                    <input
+                      type="radio"
+                      name="education-cert-type"
+                      checked={checked}
+                      readOnly
+                      className="h-[18px] w-[18px] accent-[var(--secondary-color)]"
+                    />
+                    <span className={!checked ? 'text-[#8A94A6]' : undefined}>
+                      {option.label}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+              Nama Kampus
+            </div>
+            <div className="rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-[15px] text-[#334155]">
+              {data?.nama_kampus || '-'}
+            </div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="text-md text-neutral-900 mb-1 block">Major Instrument</label>
-              <div className="flex items-center gap-2 rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 py-2">
-                {majorIcon ? (
-                  <img src={majorIcon} alt={majorName} className="h-5 w-5 object-contain" />
-                ) : (
-                  <RiMusic2Line className="text-[var(--secondary-color)]" />
-                )}
-                <span className="text-sm text-neutral-800">{majorName}</span>
+              <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+                Major Instrumen
               </div>
-            </div>
-
-            <div>
-              <label className="text-md text-neutral-900 mb-1 block">Minor Instrument</label>
-              <div className="flex items-center gap-2 rounded-lg border border-[#DDE3EA] bg-[#F5F7FA] px-3 py-2">
-                {minorIcon ? (
-                  <img src={minorIcon} alt={minorName} className="h-5 w-5 object-contain" />
-                ) : (
-                  <RiMusic2Line className="text-[var(--secondary-color)]" />
-                )}
-                <span className="text-sm text-neutral-800">{minorName}</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-md text-neutral-900 mb-1 block">Sertifikat Kelulusan</label>
-              <a
-                href={certResolved || '#'}
-                target={certDisabled ? undefined : '_blank'}
-                rel={certDisabled ? undefined : 'noopener noreferrer'}
-                aria-disabled={certDisabled}
-                onClick={(e) => {
-                  if (certDisabled) e.preventDefault();
-                }}
-                className={`${pillBase} ${certDisabled ? pillDisabled : pillEnabled}`}
-              >
-                <RiDownloadLine /> Lihat Sertifikat
-              </a>
-            </div>
-
-            <div>
-              <label className="text-md text-neutral-900 mb-1 block">Video Performa</label>
-              <a
-                href={videoResolved || '#'}
-                target={videoDisabled ? undefined : '_blank'}
-                rel={videoDisabled ? undefined : 'noopener noreferrer'}
-                aria-disabled={videoDisabled}
-                onClick={(e) => {
-                  if (videoDisabled) e.preventDefault();
-                }}
-                className={`${pillBase} ${videoDisabled ? pillDisabled : pillEnabled}`}
-              >
-                <RiDownloadLine /> Lihat Video
-              </a>
-            </div>
-
-            <div>
-              <label className="text-md text-neutral-900 mb-1 block">Keputusan Admin</label>
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={[
-                    'inline-flex items-center px-3 py-1 rounded-full text-xs border',
-                    decisionPillClass,
-                  ].join(' ')}
-                >
-                  {decisionLabel}
+              <div className="flex items-center gap-2 rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-[15px] text-[#334155]">
+                <span className="inline-grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white">
+                  {majorIcon ? (
+                    <img src={majorIcon} alt={majorName} className="h-4 w-4 object-contain" />
+                  ) : (
+                    <RiMusic2Line className="text-base" />
+                  )}
                 </span>
-                <div className="ml-auto flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onDecisionChange?.('approved')}
-                    className={`${decisionBtnBase} ${approveBtnClass}`}
-                  >
-                    Setujui
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDecisionChange?.('rejected')}
-                    className={`${decisionBtnBase} ${rejectBtnClass}`}
-                  >
-                    Tolak
-                  </button>
-                </div>
+                <span className="truncate">{majorName}</span>
+              </div>
+            </div>
+            <div>
+              <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+                Minor Instrumen
+              </div>
+              <div className="flex items-center gap-2 rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-[15px] text-[#334155]">
+                <span className="inline-grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white">
+                  {minorIcon ? (
+                    <img src={minorIcon} alt={minorName} className="h-4 w-4 object-contain" />
+                  ) : (
+                    <RiMusic2Line className="text-base" />
+                  )}
+                </span>
+                <span className="truncate">{minorName}</span>
               </div>
             </div>
           </div>
+
+          <div className="mb-4">
+            <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+              Video Performa
+            </div>
+            <button
+              type="button"
+              disabled={!videoResolved}
+              onClick={() => {
+                if (!videoResolved) return;
+                window.open(videoResolved, '_blank', 'noopener,noreferrer');
+              }}
+              className="flex w-full items-center gap-3 rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-left text-[15px] text-[#334155] transition hover:border-[var(--secondary-color)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="min-w-0 flex-1 truncate">
+                {videoResolved || 'Video performa belum tersedia'}
+              </span>
+              <RiExternalLinkLine className="shrink-0 text-xl text-[#2D3445]" />
+            </button>
+          </div>
+
+          <div className="mb-5">
+            <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+              File Sertifikasi
+            </div>
+            <button
+              type="button"
+              disabled={!certResolved}
+              onClick={() => {
+                if (!certResolved) return;
+                window.open(certResolved, '_blank', 'noopener,noreferrer');
+              }}
+              className="flex w-full items-center gap-3 rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-left text-[15px] text-[#334155] transition hover:border-[var(--secondary-color)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="min-w-0 flex-1 truncate">
+                {getFileNameFromUrl(certResolved)}
+              </span>
+              <RiExternalLinkLine className="shrink-0 text-xl text-[#2D3445]" />
+            </button>
+          </div>
+
+          {onDecisionChange ? (
+          <div className="border-t border-[#DCE5EF] pt-4">
+            <p className="mb-3 text-[16px] font-semibold text-[#2D3445]">
+              Pilih Aksi Dibawah!!
+            </p>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="grid flex-1 grid-cols-2 overflow-hidden rounded-full border border-[#D6E1EC] bg-white sm:grid-cols-4">
+                <button
+                  type="button"
+                  disabled
+                  className="h-12 border-r border-[#E4ECF4] bg-[#F7FAFD] px-4 text-[15px] font-medium text-[#9FB0C5] cursor-not-allowed"
+                  title="Sedang maintenance"
+                >
+                  Ajukan Ujian
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraftDecision('revision')}
+                  className={[
+                    'h-12 border-r border-[#E4ECF4] px-4 text-[15px] font-medium transition',
+                    draftDecision === 'revision'
+                      ? 'bg-[#E9F3FF] text-[var(--secondary-color)]'
+                      : 'bg-white text-[#2D3445] hover:bg-[#F7FAFD]',
+                  ].join(' ')}
+                >
+                  Revisi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraftDecision('rejected')}
+                  className={[
+                    'h-12 border-r border-[#E4ECF4] px-4 text-[15px] font-medium transition',
+                    draftDecision === 'rejected'
+                      ? 'bg-[#FFF1F5] text-[var(--accent-red-color)]'
+                      : 'bg-white text-[#2D3445] hover:bg-[#F7FAFD]',
+                  ].join(' ')}
+                >
+                  Tolak
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraftDecision('approved')}
+                  className={[
+                    'h-12 px-4 text-[15px] font-medium transition',
+                    draftDecision === 'approved'
+                      ? 'bg-[#EEF9F2] text-[#18B968]'
+                      : 'bg-white text-[#2D3445] hover:bg-[#F7FAFD]',
+                  ].join(' ')}
+                >
+                  Setujui
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={saveDecision}
+                className="h-12 rounded-full bg-[var(--primary-color)] px-8 text-[15px] font-semibold text-neutral-900 transition hover:brightness-95 lg:min-w-[140px]"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+          ) : null}
         </div>
       </div>
     </div>
