@@ -49,6 +49,7 @@ const cls = (...xs: Array<string | false | null | undefined>) =>
   xs.filter(Boolean).join(' ');
 
 const PAGE_SIZE = 5;
+const CERTIFICATION_FEATURE_MAINTENANCE = true;
 type VerifiedTutorQueue =
   | 'screening'
   | 'revision'
@@ -56,6 +57,7 @@ type VerifiedTutorQueue =
   | 'certification_offer'
   | 'manual_certification';
 type ScreeningTabKey = 'all' | 'new' | 'reviewed';
+type RevisionTabKey = 'all' | 'revision' | 'resubmitted';
 type CandidateInstrument = { name: string; iconUrl?: string };
 type CandidateInstrumentOption = { value: string; label: string };
 const CERTIFICATION_QUEUE_STATES = ['certification_offered', 'certification_requested'];
@@ -175,6 +177,30 @@ const getScreeningStateMeta = (row: GuruApplicationDTO) => {
   };
 };
 
+const getRevisionTabKey = (row: GuruApplicationDTO): Exclude<RevisionTabKey, 'all'> =>
+  row.screening_state === 'revision_resubmitted' ? 'resubmitted' : 'revision';
+
+const getRevisionStateMeta = (row: GuruApplicationDTO) => {
+  const key = getRevisionTabKey(row);
+  if (key === 'resubmitted') {
+    return {
+      key,
+      label: 'Perbaikan',
+      className: 'text-[#8A63D2]',
+      badgeClassName: 'bg-[#F1E8FF] text-[#8A63D2]',
+      reviewEnabled: true,
+    };
+  }
+
+  return {
+    key,
+    label: 'Revisi',
+    className: 'text-[#F26A4B]',
+    badgeClassName: 'bg-[#FFEDE8] text-[#F26A4B]',
+    reviewEnabled: false,
+  };
+};
+
 const PageTitle: React.FC<{
   title?: string;
   actions?: React.ReactNode;
@@ -244,6 +270,41 @@ const ScreeningTabs: React.FC<{
     { key: 'all', label: 'Semua' },
     { key: 'new', label: 'Baru' },
     { key: 'reviewed', label: 'Ditinjau' },
+  ];
+
+  return (
+    <div className="mb-4 grid grid-cols-3 border-b border-[#D8E2ED]">
+      {tabs.map((tab) => {
+        const active = tab.key === activeTab;
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => onChange(tab.key)}
+            className={cls(
+              'w-full min-w-0 border-b-2 px-4 pb-3 text-center text-sm font-medium transition',
+              active
+                ? 'border-[var(--secondary-color)] text-[var(--secondary-color)]'
+                : 'border-transparent text-[#7B8BA3] hover:text-[#244C9A]'
+            )}
+          >
+            {tab.label} ({counts[tab.key]})
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const RevisionTabs: React.FC<{
+  activeTab: RevisionTabKey;
+  counts: Record<RevisionTabKey, number>;
+  onChange: (value: RevisionTabKey) => void;
+}> = ({ activeTab, counts, onChange }) => {
+  const tabs: Array<{ key: RevisionTabKey; label: string }> = [
+    { key: 'all', label: 'Semua' },
+    { key: 'revision', label: 'Revisi' },
+    { key: 'resubmitted', label: 'Perbaikan' },
   ];
 
   return (
@@ -374,6 +435,113 @@ const ScreeningRowItem: React.FC<{
   );
 };
 
+const RevisionTableHeader: React.FC = () => {
+  const headCls =
+    'bg-[#F5F8FA] px-4 py-4 text-left text-md font-semibold text-[#2C3445] first:rounded-tl-[16px] last:rounded-tr-[16px]';
+
+  return (
+    <thead>
+      <tr>
+        <th className={headCls}>Instrumen</th>
+        <th className={headCls}>Nama Calon Tutor</th>
+        <th className={headCls}>No Telepon</th>
+        <th className={headCls}>Asal Kota</th>
+        <th className={headCls}>Repetisi</th>
+        <th className={headCls}>Mengajar ABK</th>
+        <th className={headCls}>State</th>
+        <th className={headCls}>Aksi</th>
+      </tr>
+    </thead>
+  );
+};
+
+const RevisionRowItem: React.FC<{
+  row: GuruApplicationDTO;
+  instruments: CandidateInstrument[];
+  onReview: () => void;
+}> = ({ row, instruments, onReview }) => {
+  const state = getRevisionStateMeta(row);
+  const primaryInstrument = instruments[0];
+  const fullInstrumentLabel = instruments.length
+    ? instruments.map((instrument) => instrument.name).join(', ')
+    : '-';
+  const revCount = Math.max(0, Number(row.revision_count || 0));
+  const cellCls =
+    'bg-white px-4 py-4 text-[15px] text-[#2A3241] first:rounded-l-[22px] last:rounded-r-[22px]';
+
+  return (
+    <tr className="align-middle">
+      <td className={cls(cellCls, 'w-[170px] max-w-[170px]')}>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#F4F7FB] text-[#4A5C7A]">
+            {primaryInstrument?.iconUrl ? (
+              <img
+                src={primaryInstrument.iconUrl}
+                alt={primaryInstrument.name}
+                className="h-5 w-5 object-contain"
+              />
+            ) : (
+              <RiMusic2Line className="text-lg" />
+            )}
+          </span>
+          <span
+            className="block min-w-0 flex-1 truncate whitespace-nowrap text-[15px] text-[#344054]"
+            title={fullInstrumentLabel}
+          >
+            {fullInstrumentLabel}
+          </span>
+        </div>
+      </td>
+      <td className={cls(cellCls, 'max-w-[220px]')}>
+        <p className="truncate text-[16px] text-[#232C3D]">{row.nama || '-'}</p>
+      </td>
+      <td className={cls(cellCls, 'whitespace-nowrap text-[#344054]')}>{row.no_telp ?? '-'}</td>
+      <td className={cls(cellCls, 'whitespace-nowrap text-[#344054]')}>{row.domisili ?? '-'}</td>
+      <td className={cls(cellCls, 'whitespace-nowrap text-[#344054]')}>{revCount}x</td>
+      <td className={cellCls}>
+        {row.is_abk ? (
+          <RiCheckboxCircleFill
+            className="text-2xl text-[#18B968]"
+            title="Bersedia mengajar ABK"
+            aria-label="Bersedia mengajar ABK"
+          />
+        ) : (
+          <RiCloseCircleFill
+            className="text-2xl text-[#F25584]"
+            title="Belum bersedia mengajar ABK"
+            aria-label="Belum bersedia mengajar ABK"
+          />
+        )}
+      </td>
+      <td className={cellCls}>
+        <span
+          className={cls(
+            'inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold',
+            state.badgeClassName
+          )}
+        >
+          {state.label}
+        </span>
+      </td>
+      <td className={cellCls}>
+        <button
+          type="button"
+          onClick={state.reviewEnabled ? onReview : undefined}
+          disabled={!state.reviewEnabled}
+          className={cls(
+            'inline-flex h-11 items-center justify-center rounded-full border px-5 text-sm font-semibold transition',
+            state.reviewEnabled
+              ? 'cursor-pointer border-[var(--secondary-color)] text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]'
+              : 'cursor-not-allowed border-[#BFCCE0] bg-[#F5F8FC] text-[#9DB0CC]'
+          )}
+        >
+          Periksa
+        </button>
+      </td>
+    </tr>
+  );
+};
+
 const LegacyTableHeader: React.FC = () => {
   const headCls =
     'text-md whitespace-nowrap p-4 text-left font-semibold text-neutral-900';
@@ -442,7 +610,7 @@ const LegacyRowItem: React.FC<{
   row: GuruApplicationDTO;
   onApprove: () => void;
   onRevision: () => void;
-  onCertification: () => void;
+  onCertification?: () => void;
   onOpenRevisionDetail?: () => void;
   revisionQueue?: boolean;
   certificationQueue?: boolean;
@@ -712,6 +880,65 @@ const extractRevisionFieldKeys = (meta: any): string[] => {
         .filter((fieldKey): fieldKey is string => Boolean(fieldKey))
     )
   );
+};
+
+type RevisedItemStatusIndex = {
+  instrumentAll: boolean;
+  instrumentIds: Set<string>;
+  educationAll: boolean;
+  educationIds: Set<string>;
+  awardAll: boolean;
+  awardIds: Set<string>;
+};
+
+const createRevisedItemStatusIndex = (): RevisedItemStatusIndex => ({
+  instrumentAll: false,
+  instrumentIds: new Set<string>(),
+  educationAll: false,
+  educationIds: new Set<string>(),
+  awardAll: false,
+  awardIds: new Set<string>(),
+});
+
+const buildRevisedItemStatusIndex = (fieldKeys: string[]): RevisedItemStatusIndex => {
+  const index = createRevisedItemStatusIndex();
+
+  (fieldKeys || []).forEach((rawFieldKey) => {
+    const fieldKey = String(rawFieldKey || '').trim();
+    if (!fieldKey) return;
+
+    if (fieldKey === 'certificates.instrument' || fieldKey === 'documents.portfolio') {
+      index.instrumentAll = true;
+      return;
+    }
+    if (fieldKey === 'certificates.education') {
+      index.educationAll = true;
+      return;
+    }
+    if (fieldKey === 'certificates.award' || fieldKey === 'documents.award_certificate') {
+      index.awardAll = true;
+      return;
+    }
+
+    const instrumentMatch = fieldKey.match(/^certificates\.instrument\.(\d+)$/);
+    if (instrumentMatch) {
+      index.instrumentIds.add(String(Number(instrumentMatch[1])));
+      return;
+    }
+
+    const educationMatch = fieldKey.match(/^certificates\.education\.(\d+)$/);
+    if (educationMatch) {
+      index.educationIds.add(String(Number(educationMatch[1])));
+      return;
+    }
+
+    const awardMatch = fieldKey.match(/^certificates\.award\.(\d+)$/);
+    if (awardMatch) {
+      index.awardIds.add(String(Number(awardMatch[1])));
+    }
+  });
+
+  return index;
 };
 
 const buildCertificatesFromApplication = (
@@ -984,6 +1211,9 @@ export const VerifiedTutorPageContent: React.FC<{
 }> = ({ queue = 'screening', title = 'List Calon Tutor' }) => {
   const navigate = useNavigate();
   const isScreeningQueue = queue === 'screening';
+  const isRevisionQueue = queue === 'revision';
+  const useModernQueue = isScreeningQueue || isRevisionQueue;
+  const allowReviewRevisionFlow = isScreeningQueue || isRevisionQueue;
   const [itemsAll, setItemsAll] = useState<GuruApplicationDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -991,10 +1221,23 @@ export const VerifiedTutorPageContent: React.FC<{
   const [searchQuery, setSearchQuery] = useState('');
   const [instrumentFilter, setInstrumentFilter] = useState('all');
   const [screeningTab, setScreeningTab] = useState<ScreeningTabKey>('all');
+  const [revisionTab, setRevisionTab] = useState<RevisionTabKey>('all');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ApproveMode>('approved');
   const [selected, setSelected] = useState<GuruApplicationDTO | null>(null);
+  const isSelectedRevisionResubmitted = selected?.screening_state === 'revision_resubmitted';
+  const selectedRevisedFieldKeys = useMemo(
+    () =>
+      isSelectedRevisionResubmitted
+        ? extractRevisionFieldKeys(selected?.screening_meta)
+        : [],
+    [isSelectedRevisionResubmitted, selected?.screening_meta]
+  );
+  const selectedRevisedItemStatusIndex = useMemo(
+    () => buildRevisedItemStatusIndex(selectedRevisedFieldKeys),
+    [selectedRevisedFieldKeys]
+  );
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmKind, setConfirmKind] = useState<'success' | 'error'>('success');
@@ -1002,6 +1245,7 @@ export const VerifiedTutorPageContent: React.FC<{
     'approved'
   );
   const [confirmErrorText, setConfirmErrorText] = useState<string | null>(null);
+  const [lastRejectHasRevision, setLastRejectHasRevision] = useState(false);
 
   // state untuk overlay loading submit decide
   const [deciding, setDeciding] = useState(false);
@@ -1045,6 +1289,8 @@ export const VerifiedTutorPageContent: React.FC<{
   const [awardDrafts, setAwardDrafts] = useState<
     Record<string, 'approved' | 'rejected' | 'revision'>
   >({});
+  const [eduRevisionReasons, setEduRevisionReasons] = useState<Record<string, string>>({});
+  const [awardRevisionReasons, setAwardRevisionReasons] = useState<Record<string, string>>({});
   const [hiddenIds, setHiddenIds] = useState<Record<number, true>>({});
   const [certOfferOpen, setCertOfferOpen] = useState(false);
   const [certOfferReason, setCertOfferReason] = useState('');
@@ -1124,7 +1370,12 @@ export const VerifiedTutorPageContent: React.FC<{
     () =>
       itemsAll.filter((r) => {
         if (hiddenIds[Number(r.id)]) return false;
-        if (queue === 'revision') return r.screening_state === 'revision_required';
+        if (queue === 'revision') {
+          return (
+            r.screening_state === 'revision_required' ||
+            r.screening_state === 'revision_resubmitted'
+          );
+        }
         if (queue === 'certification_offer') return r.screening_state === 'certification_offered';
         if (queue === 'manual_certification') return r.screening_state === 'certification_requested';
         if (queue === 'certification') {
@@ -1133,6 +1384,7 @@ export const VerifiedTutorPageContent: React.FC<{
         return (
           r.status === 'proses' &&
           r.screening_state !== 'revision_required' &&
+          r.screening_state !== 'revision_resubmitted' &&
           !CERTIFICATION_QUEUE_STATES.includes(String(r.screening_state || ''))
         );
       }),
@@ -1145,7 +1397,7 @@ export const VerifiedTutorPageContent: React.FC<{
 
   useEffect(() => {
     setPage(1);
-  }, [queue, searchQuery, instrumentFilter, screeningTab]);
+  }, [queue, searchQuery, instrumentFilter, screeningTab, revisionTab]);
 
   const instrumentsByItemId = useMemo(() => {
     const map = new Map<number, CandidateInstrument[]>();
@@ -1183,13 +1435,31 @@ export const VerifiedTutorPageContent: React.FC<{
     return counts;
   }, [items]);
 
+  const revisionCounts = useMemo<Record<RevisionTabKey, number>>(() => {
+    const counts: Record<RevisionTabKey, number> = {
+      all: items.length,
+      revision: 0,
+      resubmitted: 0,
+    };
+    items.forEach((item) => {
+      counts[getRevisionTabKey(item)] += 1;
+    });
+    return counts;
+  }, [items]);
+
   const visibleItems = useMemo(() => {
-    if (!isScreeningQueue) return items;
+    if (!isScreeningQueue && !isRevisionQueue) return items;
 
     const keyword = searchQuery.trim().toLowerCase();
     return items.filter((item) => {
-      const itemTab = getScreeningTabKey(item);
-      if (screeningTab !== 'all' && itemTab !== screeningTab) return false;
+      if (isScreeningQueue) {
+        const itemTab = getScreeningTabKey(item);
+        if (screeningTab !== 'all' && itemTab !== screeningTab) return false;
+      }
+      if (isRevisionQueue) {
+        const itemTab = getRevisionTabKey(item);
+        if (revisionTab !== 'all' && itemTab !== revisionTab) return false;
+      }
 
       if (keyword) {
         const haystack = [
@@ -1212,7 +1482,16 @@ export const VerifiedTutorPageContent: React.FC<{
 
       return true;
     });
-  }, [isScreeningQueue, items, searchQuery, screeningTab, instrumentFilter, instrumentsByItemId]);
+  }, [
+    isScreeningQueue,
+    isRevisionQueue,
+    items,
+    searchQuery,
+    screeningTab,
+    revisionTab,
+    instrumentFilter,
+    instrumentsByItemId,
+  ]);
 
   const total = visibleItems.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -1233,10 +1512,19 @@ export const VerifiedTutorPageContent: React.FC<{
       setCertDrafts({});
       setEduDrafts({});
       setAwardDrafts({});
+      setEduRevisionReasons({});
+      setAwardRevisionReasons({});
     }
   };
 
   const openCertificationOffer = (row: GuruApplicationDTO) => {
+    if (CERTIFICATION_FEATURE_MAINTENANCE) {
+      setConfirmKind('error');
+      setConfirmCtx('certification');
+      setConfirmErrorText('Fitur penawaran ujian sertifikasi sedang maintenance.');
+      setConfirmOpen(true);
+      return;
+    }
     setSelected(row);
     setCertOfferReason('');
     setCertCriteria(emptyCertificationCriteria);
@@ -1263,10 +1551,16 @@ export const VerifiedTutorPageContent: React.FC<{
 
   const applyDrafts = (items: CertificateItem[]) =>
     items.map((item) => {
-      const draft = certDrafts[String(item.id)];
+      const key = String(item.id);
+      const draft = certDrafts[key];
+      const fallbackRevision =
+        !draft &&
+        isSelectedRevisionResubmitted &&
+        (selectedRevisedItemStatusIndex.instrumentAll ||
+          selectedRevisedItemStatusIndex.instrumentIds.has(key));
       return {
         ...item,
-        draftStatus: draft?.status ?? null,
+        draftStatus: draft?.status ?? (fallbackRevision ? 'revision' : null),
         draftReason: draft?.reason ?? null,
       };
     });
@@ -1300,16 +1594,6 @@ export const VerifiedTutorPageContent: React.FC<{
   );
 
   const hasInstrumentCerts = certItems.length > 0;
-  const totalInstrumentCerts = certItems.length;
-
-  const decidedInstrumentDraftCount = useMemo(
-    () =>
-      certItems.filter((item) => {
-        const status = certDrafts[String(item.id)]?.status;
-        return status === 'approved' || status === 'rejected';
-      }).length,
-    [certItems, certDrafts]
-  );
 
   const selectedLanguages = useMemo(() => {
     const a = Array.isArray(selected?.bahasa) ? selected?.bahasa : [];
@@ -1352,28 +1636,122 @@ export const VerifiedTutorPageContent: React.FC<{
     () =>
       selectedAwardList.map((a) => ({
         ...a,
-        draftStatus: a.id != null ? awardDrafts[String(a.id)] ?? null : null,
+        draftStatus: (() => {
+          const key = a.id != null ? String(a.id) : '';
+          if (!key) return null;
+          const explicitDraft = awardDrafts[key];
+          if (explicitDraft) return explicitDraft;
+          if (
+            isSelectedRevisionResubmitted &&
+            (selectedRevisedItemStatusIndex.awardAll ||
+              selectedRevisedItemStatusIndex.awardIds.has(key))
+          ) {
+            return 'revision' as const;
+          }
+          return null;
+        })(),
       })),
-    [selectedAwardList, awardDrafts]
+    [selectedAwardList, awardDrafts, isSelectedRevisionResubmitted, selectedRevisedItemStatusIndex]
   );
 
   const educationListWithDrafts = useMemo(
     () =>
       selectedEducationList.map((e) => ({
         ...e,
-        draftStatus: e.id != null ? eduDrafts[String(e.id)] ?? null : null,
+        draftStatus: (() => {
+          const key = e.id != null ? String(e.id) : '';
+          if (!key) return null;
+          const explicitDraft = eduDrafts[key];
+          if (explicitDraft) return explicitDraft;
+          if (
+            isSelectedRevisionResubmitted &&
+            (selectedRevisedItemStatusIndex.educationAll ||
+              selectedRevisedItemStatusIndex.educationIds.has(key))
+          ) {
+            return 'revision' as const;
+          }
+          return null;
+        })(),
       })),
-    [selectedEducationList, eduDrafts]
+    [selectedEducationList, eduDrafts, isSelectedRevisionResubmitted, selectedRevisedItemStatusIndex]
   );
 
-  const totalAwards = awardListWithDrafts.length;
-  const decidedAwardCount = awardListWithDrafts.filter(
-    (a) => a.draftStatus === 'approved' || a.draftStatus === 'rejected'
-  ).length;
-  const totalEducation = educationListWithDrafts.length;
-  const decidedEducationCount = educationListWithDrafts.filter(
-    (e) => e.draftStatus === 'approved' || e.draftStatus === 'rejected'
-  ).length;
+  const buildRevisionItemFieldKey = (prefix: string, rawId: unknown) => {
+    const id = Number(rawId);
+    if (!Number.isFinite(id) || id <= 0) return '';
+    return `${prefix}.${Math.trunc(id)}`;
+  };
+
+  const composeRevisionItemMessage = (label: string, reason?: string | null) => {
+    const cleanLabel = String(label || '').trim();
+    const cleanReason = String(reason || '').trim();
+    if (cleanLabel && cleanReason) return `${cleanLabel}: ${cleanReason}`;
+    if (cleanReason) return cleanReason;
+    if (cleanLabel) return cleanLabel;
+    return '';
+  };
+
+  const buildApproveRevisionFields = () => {
+    const merged = new Map<string, string>();
+
+    Object.entries(revisionDrafts).forEach(([fieldKey, draft]) => {
+      const key = String(fieldKey || '').trim();
+      if (!key) return;
+      const message = String(draft?.message || '').trim();
+      merged.set(key, message);
+    });
+
+    certItems.forEach((cert) => {
+      const draft = certDrafts[String(cert.id)];
+      if (!draft || draft.status !== 'revision') return;
+      const fieldKey = buildRevisionItemFieldKey('certificates.instrument', cert.id);
+      if (!fieldKey) return;
+      const label = cert.instrument || cert.title || `Sertifikat instrumen ${String(cert.id)}`;
+      const message = composeRevisionItemMessage(label, draft.reason ?? null);
+      merged.set(fieldKey, message);
+    });
+
+    selectedEducationList.forEach((item) => {
+      const key = item.id != null ? String(item.id) : '';
+      if (!key) return;
+      if (eduDrafts[key] !== 'revision') return;
+      const fieldKey = buildRevisionItemFieldKey('certificates.education', item.id);
+      if (!fieldKey) return;
+      const label =
+        item.majorInstrument?.nama_instrumen ||
+        item.nama_kampus ||
+        `Sertifikat pendidikan ${key}`;
+      const message = composeRevisionItemMessage(label, eduRevisionReasons[key] ?? null);
+      merged.set(fieldKey, message);
+    });
+
+    selectedAwardList.forEach((item) => {
+      const key = item.id != null ? String(item.id) : '';
+      if (!key) return;
+      if (awardDrafts[key] !== 'revision') return;
+      const fieldKey = buildRevisionItemFieldKey('certificates.award', item.id);
+      if (!fieldKey) return;
+      const label =
+        item.instrument?.nama_instrumen ||
+        item.judul_penghargaan ||
+        `Sertifikat penghargaan ${key}`;
+      const message = composeRevisionItemMessage(label, awardRevisionReasons[key] ?? null);
+      merged.set(fieldKey, message);
+    });
+
+    const fields: Array<{ field_key: string; message?: string | null }> = [];
+    merged.forEach((rawMessage, field_key) => {
+      const key = String(field_key || '').trim();
+      if (!key) return;
+      const message = String(rawMessage || '').trim();
+      if (message) {
+        fields.push({ field_key: key, message });
+      } else {
+        fields.push({ field_key: key });
+      }
+    });
+    return fields;
+  };
 
   // Panggil endpoint APPROVE/REJECT via thunk + tampilkan LoadingScreen
   const handleSubmitModal = async (payload: ApproveTeacherPayload) => {
@@ -1384,63 +1762,30 @@ export const VerifiedTutorPageContent: React.FC<{
 
     try {
       if (payload.mode === 'approved') {
+        setLastRejectHasRevision(false);
         const cert_decisions = buildCertDecisions(certItems);
-        const hasAltCerts =
-          (Array.isArray(selected?.pendidikan_guru) &&
-            selected.pendidikan_guru.length > 0) ||
-          (Array.isArray(selected?.sertifikat_penghargaan) &&
-            selected.sertifikat_penghargaan.length > 0);
-        const education_decisions = educationListWithDrafts
-          .filter(
-            (e) =>
-              e.id != null &&
-              (e.draftStatus === 'approved' || e.draftStatus === 'rejected')
-          )
-          .map((e) => ({
-            id: e.id as number | string,
-            status:
-              e.draftStatus === 'approved'
-                ? ('approved' as const)
-                : ('rejected' as const),
-          }));
-        const award_decisions = awardListWithDrafts
-          .filter(
-            (a) =>
-              a.id != null &&
-              (a.draftStatus === 'approved' || a.draftStatus === 'rejected')
-          )
-          .map((a) => ({
-            id: a.id as number | string,
-            status:
-              a.draftStatus === 'approved'
-                ? ('approved' as const)
-                : ('rejected' as const),
-          }));
-
-        if (hasInstrumentCerts && cert_decisions.length !== totalInstrumentCerts) {
-          throw new Error('Semua sertifikat instrumen harus diputuskan');
-        }
-        if (totalEducation > 0 && decidedEducationCount !== totalEducation) {
-          throw new Error('Semua sertifikat pendidikan harus diputuskan');
-        }
-        if (totalAwards > 0 && decidedAwardCount !== totalAwards) {
-          throw new Error('Semua sertifikat penghargaan harus diputuskan');
-        }
-        if (!hasInstrumentCerts && !hasAltCerts) {
-          throw new Error('Minimal 1 sertifikat harus tersedia');
+        const revision_fields = buildApproveRevisionFields();
+        if (!hasInstrumentCerts) {
+          throw new Error('Minimal 1 sertifikat lokal/internasional wajib tersedia');
         }
         await decideApplication(selected.id, {
           decision: 'approve',
-          cert_decisions: hasInstrumentCerts ? cert_decisions : [],
-          education_decisions,
-          award_decisions,
+          cert_decisions,
+          ...(revision_fields.length > 0 ? { revision_fields } : {}),
         });
       } else {
+        const revision_fields = buildApproveRevisionFields();
+        const hasRejectRevision = revision_fields.length > 0;
+        setLastRejectHasRevision(hasRejectRevision);
         const reason =
           (payload as any)?.reason ||
           (payload as any)?.notes ||
           'Ditolak oleh admin';
-        await decideApplication(selected.id, { decision: 'reject', note: reason });
+        await decideApplication(selected.id, {
+          decision: 'reject',
+          note: reason,
+          ...(hasRejectRevision ? { revision_fields } : {}),
+        });
       }
       setConfirmKind('success');
       setHiddenIds((prev) =>
@@ -1459,6 +1804,13 @@ export const VerifiedTutorPageContent: React.FC<{
   };
 
   const handleCertificationOfferSubmit = async () => {
+    if (CERTIFICATION_FEATURE_MAINTENANCE) {
+      setConfirmKind('error');
+      setConfirmCtx('certification');
+      setConfirmErrorText('Fitur penawaran ujian sertifikasi sedang maintenance.');
+      setConfirmOpen(true);
+      return;
+    }
     if (!selected) return;
     const allCriteriaChecked = Object.values(certCriteria).every(Boolean);
     if (!allCriteriaChecked) {
@@ -1510,6 +1862,10 @@ export const VerifiedTutorPageContent: React.FC<{
       ? confirmKind === 'success'
         ? 'Tutor berhasil disetujui.'
         : 'Gagal menyetujui tutor'
+      : lastRejectHasRevision
+      ? confirmKind === 'success'
+        ? 'Laporan revisi berhasil dikirim.'
+        : 'Gagal mengirim laporan revisi'
       : confirmKind === 'success'
       ? 'Tutor berhasil ditolak.'
       : 'Gagal menolak tutor';
@@ -1531,6 +1887,15 @@ export const VerifiedTutorPageContent: React.FC<{
             confirmErrorText ||
               'Terjadi kendala saat menyetujui tutor ini. Silakan coba lagi beberapa saat lagi.',
           ]
+      : lastRejectHasRevision
+      ? confirmKind === 'success'
+        ? [
+            'Kandidat tetap berada di pendaftaran-guru dan diminta melengkapi data revisi sesuai catatan.',
+          ]
+        : [
+            confirmErrorText ||
+              'Terjadi kendala saat mengirim laporan revisi. Silakan coba lagi beberapa saat lagi.',
+          ]
       : confirmKind === 'success'
       ? [
           'Tutor ini tidak akan muncul di daftar calon tutor dan tidak dapat mengajar di platform.',
@@ -1541,15 +1906,10 @@ export const VerifiedTutorPageContent: React.FC<{
         ];
 
   return (
-    <div
-      className={cls(
-        'rounded-[28px] p-4 sm:p-6',
-        isScreeningQueue ? 'bg-white' : 'bg-white'
-      )}
-    >
+    <div className="rounded-[28px] bg-white p-4 sm:p-6">
       {deciding && <LoadingScreen />}
 
-      {isScreeningQueue ? (
+      {useModernQueue ? (
         <>
           <PageTitle
             title={title}
@@ -1563,11 +1923,19 @@ export const VerifiedTutorPageContent: React.FC<{
               />
             }
           />
-          <ScreeningTabs
-            activeTab={screeningTab}
-            counts={screeningCounts}
-            onChange={setScreeningTab}
-          />
+          {isScreeningQueue ? (
+            <ScreeningTabs
+              activeTab={screeningTab}
+              counts={screeningCounts}
+              onChange={setScreeningTab}
+            />
+          ) : (
+            <RevisionTabs
+              activeTab={revisionTab}
+              counts={revisionCounts}
+              onChange={setRevisionTab}
+            />
+          )}
         </>
       ) : (
         <>
@@ -1633,6 +2001,51 @@ export const VerifiedTutorPageContent: React.FC<{
             />
           </div>
         </div>
+      ) : isRevisionQueue ? (
+        <div className="overflow-hidden rounded-[26px] bg-white p-3 sm:p-4">
+          <div className="overflow-x-auto">
+            <table className="min-w-[1080px] w-full border-separate border-spacing-y-3">
+              <RevisionTableHeader />
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={8} className="rounded-[22px] bg-white p-6 text-sm text-neutral-600">
+                      Memuat data...
+                    </td>
+                  </tr>
+                )}
+
+                {!loading && visibleItems.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="rounded-[22px] bg-white p-8 text-center text-neutral-600">
+                      Belum ada data revisi yang sesuai filter.
+                    </td>
+                  </tr>
+                )}
+
+                {!loading &&
+                  pageRows.map((row) => (
+                    <RevisionRowItem
+                      key={row.id}
+                      row={row}
+                      instruments={instrumentsByItemId.get(Number(row.id)) ?? []}
+                      onReview={() => openModal('approved', row)}
+                    />
+                  ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-center">
+            <Pagination
+              total={total}
+              totalPages={totalPages}
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              onChange={(p) => setPage(p)}
+            />
+          </div>
+        </div>
       ) : (
         <>
           <div className="overflow-hidden rounded-2xl bg-white">
@@ -1660,12 +2073,16 @@ export const VerifiedTutorPageContent: React.FC<{
                     <LegacyRowItem
                       key={row.id}
                       row={row}
-                      onApprove={() => openModal('approved', row)}
-                      onRevision={() => openModal('revision', row)}
-                      onCertification={() => openCertificationOffer(row)}
-                      revisionQueue={queue === 'revision'}
-                      certificationQueue={
-                        queue === 'certification' ||
+                  onApprove={() => openModal('approved', row)}
+                  onRevision={() => openModal('revision', row)}
+                  onCertification={
+                    CERTIFICATION_FEATURE_MAINTENANCE
+                      ? undefined
+                      : () => openCertificationOffer(row)
+                  }
+                  revisionQueue={false}
+                  certificationQueue={
+                    queue === 'certification' ||
                         queue === 'certification_offer' ||
                         queue === 'manual_certification'
                       }
@@ -1711,7 +2128,7 @@ export const VerifiedTutorPageContent: React.FC<{
             : undefined
         }
         onRevisionFromReview={
-          modalMode === 'approved' && isScreeningQueue
+          modalMode === 'approved' && allowReviewRevisionFlow
             ? () => {
                 setModalMode('revision');
               }
@@ -1728,18 +2145,10 @@ export const VerifiedTutorPageContent: React.FC<{
         }
         approveDisabled={
           modalMode === 'approved' &&
-          ((selected?.has_pending_revision === true) ||
-            (revisionSelected && Object.keys(revisionSelected).length > 0) ||
-            (hasInstrumentCerts && decidedInstrumentDraftCount !== totalInstrumentCerts) ||
-            (totalEducation > 0 && decidedEducationCount !== totalEducation) ||
-            (totalAwards > 0 && decidedAwardCount !== totalAwards))
+          !hasInstrumentCerts
         }
         approveDisabledHint={
-          selected?.has_pending_revision === true
-            ? 'Masih menunggu perbaikan data dari tutor (pending revisi).'
-            : revisionSelected && Object.keys(revisionSelected).length > 0
-            ? 'Tidak bisa menyetujui jika masih ada field yang ditandai perlu revisi. Kirim Laporan Kesalahan dulu atau hilangkan tanda revisi.'
-            : 'Semua sertifikat instrumen, pendidikan, dan penghargaan harus diputuskan.'
+          'Minimal 1 sertifikat lokal/internasional wajib tersedia.'
         }
         data={{
           image: resolveImageUrl(selected?.user?.profile_pic_url ?? null) || defaultUser,
@@ -1775,10 +2184,7 @@ export const VerifiedTutorPageContent: React.FC<{
           screeningState: selected?.screening_state,
           revisionCount: selected?.revision_count,
           screeningNote: selected?.screening_note,
-          revisedFieldKeys:
-            selected?.screening_state === 'revision_resubmitted'
-              ? extractRevisionFieldKeys(selected?.screening_meta)
-              : [],
+          revisedFieldKeys: selectedRevisedFieldKeys,
         }}
         onOpenCertificates={(opts) => {
           const all = applyDrafts(certItems);
@@ -1812,17 +2218,17 @@ export const VerifiedTutorPageContent: React.FC<{
           setAwardModalOpen(true);
         }}
         revisionSelected={
-          isScreeningQueue && (modalMode === 'approved' || modalMode === 'revision')
+          allowReviewRevisionFlow && (modalMode === 'approved' || modalMode === 'revision')
             ? revisionSelected
             : undefined
         }
         revisionDrafts={
-          isScreeningQueue && (modalMode === 'approved' || modalMode === 'revision')
+          allowReviewRevisionFlow && (modalMode === 'approved' || modalMode === 'revision')
             ? revisionDrafts
             : undefined
         }
         onSaveRevisionDraft={
-          isScreeningQueue && (modalMode === 'approved' || modalMode === 'revision')
+          allowReviewRevisionFlow && (modalMode === 'approved' || modalMode === 'revision')
             ? (field_key, label, draft) => {
                 const key = String(field_key || '').trim();
                 if (!key) return;
@@ -1838,7 +2244,7 @@ export const VerifiedTutorPageContent: React.FC<{
             : undefined
         }
         onDeleteRevisionDraft={
-          isScreeningQueue && (modalMode === 'approved' || modalMode === 'revision')
+          allowReviewRevisionFlow && (modalMode === 'approved' || modalMode === 'revision')
             ? (field_key) => {
                 const key = String(field_key || '').trim();
                 if (!key) return;
@@ -2080,6 +2486,11 @@ export const VerifiedTutorPageContent: React.FC<{
               [key]: status,
             };
           });
+          setEduRevisionReasons((prev) => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
         }}
       />
       <AwardCertificateModal
@@ -2119,6 +2530,11 @@ export const VerifiedTutorPageContent: React.FC<{
               [key]: status,
             };
           });
+          setAwardRevisionReasons((prev) => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
         }}
       />
 
@@ -2151,8 +2567,10 @@ export const VerifiedTutorPageContent: React.FC<{
               );
             } else if (revNoteCtx.type === 'education') {
               setEduDrafts((prev) => ({ ...prev, [key]: 'revision' }));
+              setEduRevisionReasons((prev) => ({ ...prev, [key]: reason }));
             } else if (revNoteCtx.type === 'award') {
               setAwardDrafts((prev) => ({ ...prev, [key]: 'revision' }));
+              setAwardRevisionReasons((prev) => ({ ...prev, [key]: reason }));
             }
 
             setRevNoteOpen(false);

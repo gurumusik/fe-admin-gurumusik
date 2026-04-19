@@ -11,12 +11,14 @@ import {
   RiMusic2Line,
   RiPencilLine,
   RiPhoneLine,
+  RiQuestionFill,
 } from 'react-icons/ri';
 import type { CertificateItem } from '@/features/dashboard/components/ManageCertificateModal';
 import type { EducationCertificateData } from '@/features/dashboard/components/EducationCertificateModal';
 import type { AwardCertificateData } from '@/features/dashboard/components/AwardCertificateModal';
 import { resolveImageUrl } from '@/utils/resolveImageUrl';
 import { getLanguageIcon } from '@/utils/getLanguageIcon';
+import ConfirmationModal from '@/components/ui/common/ConfirmationModal';
 import {
   listRevisionTemplates,
   type RevisionTemplateDTO,
@@ -407,9 +409,6 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   mode,
   onClose,
   onSubmit,
-  onRejectFromReview,
-  onRevisionFromReview,
-  onOfferCertificationFromReview,
   data,
   onOpenCertificates,
   onOpenEducationDetail,
@@ -425,6 +424,9 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   const [file] = useState<File | null>(null);
   const [reason, setReason] = useState('');
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [decisionConfirmOpen, setDecisionConfirmOpen] = useState(false);
+  const [pendingDecisionPayload, setPendingDecisionPayload] =
+    useState<ApproveTeacherPayload | null>(null);
   const [activeRevisionField, setActiveRevisionField] = useState<{
     field_key: string;
     label: string;
@@ -440,6 +442,8 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   useEffect(() => {
     if (!open) {
       setActiveRevisionField(null);
+      setDecisionConfirmOpen(false);
+      setPendingDecisionPayload(null);
     }
   }, [open]);
 
@@ -489,16 +493,21 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
       ? revisionDrafts?.[activeRevisionField.field_key]
       : undefined;
 
-  const submitApproved = () => onSubmit({ mode: 'approved' });
   const submitRevision = () => onOpenRevisionComposer?.();
-  const submitRejected = () =>
-    onSubmit({ mode: 'rejected', reason, attachment: file });
-  const submitFailedVerificationMessage = () =>
-    onSubmit({
-      mode: 'rejected',
-      reason:
-        'Guru belum lolos verifikasi. Silakan periksa kembali email dan WhatsApp Anda untuk detail selanjutnya.',
-    });
+  const openDecisionConfirm = (payload: ApproveTeacherPayload) => {
+    setPendingDecisionPayload(payload);
+    setDecisionConfirmOpen(true);
+  };
+  const closeDecisionConfirm = () => {
+    setDecisionConfirmOpen(false);
+    setPendingDecisionPayload(null);
+  };
+  const confirmDecisionSubmit = () => {
+    if (!pendingDecisionPayload) return;
+    const payload = pendingDecisionPayload;
+    closeDecisionConfirm();
+    onSubmit(payload);
+  };
 
   const hasEducation =
     Array.isArray(data?.educationList) && data!.educationList!.length > 0;
@@ -616,52 +625,42 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
     [allInstrumentSummaryRows]
   );
 
-  const acceptedInstrumentRows = useMemo(
-    () =>
-      instrumentSummaryRows.filter((row) =>
-        row.items.some((item) => getDisplayCertStatus(item) === 'Disetujui')
-      ),
-    [instrumentSummaryRows]
+  const approvedInstrumentCertCount = certs.filter(
+    (item) => getDisplayCertStatus(item) === 'Disetujui'
+  ).length;
+  const hasApprovedLocalInternationalCert = approvedInstrumentCertCount > 0;
+  const hasPendingReviewInstrument = allInstrumentSummaryRows.some(
+    (row) => row.status === 'pending'
   );
-  const notAcceptedInstrumentRows = useMemo(
-    () =>
-      instrumentSummaryRows.filter((row) =>
-        row.items.every((item) => getDisplayCertStatus(item) !== 'Disetujui')
-      ),
-    [instrumentSummaryRows]
-  );
-  const hasApprovedInstrumentDecision = acceptedInstrumentRows.length > 0;
-  const hasPendingInstrumentDecision = certs.some(
-    (item) => {
-      const status = getDisplayCertStatus(item);
-      return status === 'Menunggu Verifikasi' || status === 'Revisi';
-    }
-  );
-  const hasPendingEducationDecision = (data?.educationList ?? []).some(
-    (item) => !item.draftStatus || item.draftStatus === 'revision'
-  );
-  const hasPendingAwardDecision = (data?.awardList ?? []).some(
-    (item) => !item.draftStatus || item.draftStatus === 'revision'
-  );
-  const rejectDisabled =
-    hasPendingInstrumentDecision ||
-    hasPendingEducationDecision ||
-    hasPendingAwardDecision;
   const rejectDisabledHint =
-    'Semua sertifikat instrumen, pendidikan, dan penghargaan harus diputuskan sebelum mengirim pesan.';
+    'Minimal 1 sertifikat lokal/internasional berstatus Disetujui dibutuhkan untuk verifikasi guru.';
+  const pendingReviewDisabledHint =
+    'Masih ada instrumen berstatus Menunggu Verifikasi. Tentukan aksi dulu sebelum submit.';
+  const approvePrimaryDisabled =
+    hasApprovedLocalInternationalCert && (approveDisabled || hasPendingReviewInstrument);
+  const approvePrimaryDisabledHint = hasPendingReviewInstrument
+    ? pendingReviewDisabledHint
+    : approveDisabledHint;
+  const rejectPrimaryDisabled =
+    !hasApprovedLocalInternationalCert && hasPendingReviewInstrument;
   const reviewPrimaryAction = isRevisionMode
     ? submitRevision
-    : hasApprovedInstrumentDecision
-      ? submitApproved
-      : submitFailedVerificationMessage;
+    : hasApprovedLocalInternationalCert
+      ? () => openDecisionConfirm({ mode: 'approved' })
+      : () =>
+        openDecisionConfirm({
+          mode: 'rejected',
+          reason:
+            'Guru belum lolos verifikasi. Silakan periksa kembali email dan WhatsApp Anda untuk detail selanjutnya.',
+        });
   const reviewPrimaryDisabled = isRevisionMode
     ? selectedRevisionCount === 0
-    : hasApprovedInstrumentDecision
-      ? approveDisabled
-      : rejectDisabled;
+    : hasApprovedLocalInternationalCert
+      ? approvePrimaryDisabled
+      : rejectPrimaryDisabled;
   const reviewPrimaryLabel = isRevisionMode
     ? 'Kirim Laporan Kesalahan'
-    : hasApprovedInstrumentDecision
+    : hasApprovedLocalInternationalCert
       ? 'Verifikasi Guru'
       : 'Kirim Pesan';
   const displayTeacherName = [data?.name, data?.short_name].filter(Boolean).join(' / ') || '-';
@@ -1457,8 +1456,10 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                         </p>
                       ) : !isRevisionMode && reviewPrimaryDisabled ? (
                         <p className="mt-2 text-sm text-neutral-600">
-                          {hasApprovedInstrumentDecision
-                            ? approveDisabledHint
+                          {hasPendingReviewInstrument
+                            ? pendingReviewDisabledHint
+                            : hasApprovedLocalInternationalCert
+                            ? approvePrimaryDisabledHint
                             : rejectDisabledHint}
                         </p>
                       ) : null}
@@ -1493,7 +1494,13 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
               <div className="pt-4">
                 <button
                   type="button"
-                  onClick={submitRejected}
+                  onClick={() =>
+                    openDecisionConfirm({
+                      mode: 'rejected',
+                      reason,
+                      attachment: file,
+                    })
+                  }
                   className="w-full h-11 rounded-full font-semibold bg-[var(--primary-color)] text-neutral-900 cursor-pointer"
                 >
                   Kirim Laporan
@@ -1527,6 +1534,36 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
             }
             : undefined
         }
+      />
+
+      <ConfirmationModal
+        isOpen={decisionConfirmOpen}
+        onClose={closeDecisionConfirm}
+        icon={<RiQuestionFill />}
+        iconTone="warning"
+        title={
+          pendingDecisionPayload?.mode === 'approved'
+            ? 'Yakin Verifikasi Guru?'
+            : 'Yakin Beri Pesan?'
+        }
+        texts={
+          pendingDecisionPayload?.mode === 'approved'
+            ? ['Jika diverifikasi guru akan tampil pada catalog guru dengan data diatas']
+            : [
+                'Keputusan ini akan dikirim ke guru sesuai hasil review yang sudah ditentukan.',
+              ]
+        }
+        showCloseIcon={false}
+        button2={{
+          label: 'Ga Jadi Deh',
+          variant: 'outline',
+          onClick: closeDecisionConfirm,
+        }}
+        button1={{
+          label: 'Ya, Saya Yakin',
+          variant: 'primary',
+          onClick: confirmDecisionSubmit,
+        }}
       />
     </div>
   );

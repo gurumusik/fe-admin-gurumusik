@@ -44,5 +44,17 @@ export const REVISION_FIELD_LABELS: Record<string, string> = {
 };
 
 export function getRevisionFieldLabel(fieldKey: string) {
-  return REVISION_FIELD_LABELS[fieldKey] ?? humanizeFieldKey(fieldKey);
+  const key = String(fieldKey || '').trim();
+  if (!key) return '-';
+
+  const instrumentMatch = key.match(/^certificates\.instrument\.(\d+)$/);
+  if (instrumentMatch) return `Sertifikat instrumen #${instrumentMatch[1]}`;
+
+  const educationMatch = key.match(/^certificates\.education\.(\d+)$/);
+  if (educationMatch) return `Sertifikat pendidikan #${educationMatch[1]}`;
+
+  const awardMatch = key.match(/^certificates\.award\.(\d+)$/);
+  if (awardMatch) return `Sertifikat penghargaan #${awardMatch[1]}`;
+
+  return REVISION_FIELD_LABELS[key] ?? humanizeFieldKey(key);
 }

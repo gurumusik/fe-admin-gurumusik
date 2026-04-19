@@ -282,7 +282,7 @@ const AwardCertificateModal: React.FC<Props> = ({
               Pilih Aksi Dibawah!!
             </p>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="grid flex-1 grid-cols-2 overflow-hidden rounded-full border border-[#D6E1EC] bg-white sm:grid-cols-4">
+              <div className="grid flex-1 grid-cols-1 overflow-hidden rounded-full border border-[#D6E1EC] bg-white sm:grid-cols-3">
                 <button
                   type="button"
                   disabled
@@ -307,25 +307,13 @@ const AwardCertificateModal: React.FC<Props> = ({
                   type="button"
                   onClick={() => setDraftDecision('rejected')}
                   className={[
-                    'h-10 border-r border-[#E4ECF4] px-4 text-xs font-medium transition',
+                    'h-10 px-4 text-xs font-medium transition',
                     draftDecision === 'rejected'
                       ? 'bg-[#FFF1F5] text-[var(--accent-red-color)]'
                       : 'bg-white text-[#2D3445] hover:bg-[#F7FAFD]',
                   ].join(' ')}
                 >
                   Tolak
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraftDecision('approved')}
-                  className={[
-                    'h-10 px-4 text-xs font-medium transition',
-                    draftDecision === 'approved'
-                      ? 'bg-[#EEF9F2] text-[#18B968]'
-                      : 'bg-white text-[#2D3445] hover:bg-[#F7FAFD]',
-                  ].join(' ')}
-                >
-                  Setujui
                 </button>
               </div>
 
