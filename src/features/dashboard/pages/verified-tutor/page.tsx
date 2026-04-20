@@ -1588,6 +1588,58 @@ export const VerifiedTutorPageContent: React.FC<{
       return acc;
     }, []);
 
+  const buildEducationDecisions = (items: EducationCertificateData[]) =>
+    items.reduce<
+      Array<{
+        id: string | number;
+        status: 'approved' | 'rejected';
+        alasan_penolakan?: string | null;
+      }>
+    >((acc, item) => {
+      const key = item.id != null ? String(item.id) : '';
+      if (!key) return acc;
+      const itemId = Number(key);
+      if (!Number.isFinite(itemId) || itemId <= 0) return acc;
+      const draftStatus = eduDrafts[key];
+      if (!draftStatus || draftStatus === 'revision') return acc;
+      if (draftStatus === 'approved') {
+        acc.push({ id: itemId, status: 'approved' });
+        return acc;
+      }
+      acc.push({
+        id: itemId,
+        status: 'rejected',
+        alasan_penolakan: null,
+      });
+      return acc;
+    }, []);
+
+  const buildAwardDecisions = (items: AwardCertificateData[]) =>
+    items.reduce<
+      Array<{
+        id: string | number;
+        status: 'approved' | 'rejected';
+        alasan_penolakan?: string | null;
+      }>
+    >((acc, item) => {
+      const key = item.id != null ? String(item.id) : '';
+      if (!key) return acc;
+      const itemId = Number(key);
+      if (!Number.isFinite(itemId) || itemId <= 0) return acc;
+      const draftStatus = awardDrafts[key];
+      if (!draftStatus || draftStatus === 'revision') return acc;
+      if (draftStatus === 'approved') {
+        acc.push({ id: itemId, status: 'approved' });
+        return acc;
+      }
+      acc.push({
+        id: itemId,
+        status: 'rejected',
+        alasan_penolakan: null,
+      });
+      return acc;
+    }, []);
+
   const certItems = useMemo(
     () => buildCertificatesFromApplication(selected),
     [selected]
@@ -1764,6 +1816,8 @@ export const VerifiedTutorPageContent: React.FC<{
       if (payload.mode === 'approved') {
         setLastRejectHasRevision(false);
         const cert_decisions = buildCertDecisions(certItems);
+        const education_decisions = buildEducationDecisions(selectedEducationList);
+        const award_decisions = buildAwardDecisions(selectedAwardList);
         const revision_fields = buildApproveRevisionFields();
         if (!hasInstrumentCerts) {
           throw new Error('Minimal 1 sertifikat lokal/internasional wajib tersedia');
@@ -1771,6 +1825,8 @@ export const VerifiedTutorPageContent: React.FC<{
         await decideApplication(selected.id, {
           decision: 'approve',
           cert_decisions,
+          ...(education_decisions.length > 0 ? { education_decisions } : {}),
+          ...(award_decisions.length > 0 ? { award_decisions } : {}),
           ...(revision_fields.length > 0 ? { revision_fields } : {}),
         });
       } else {
