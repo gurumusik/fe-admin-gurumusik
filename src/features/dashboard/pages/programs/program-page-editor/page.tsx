@@ -16,6 +16,7 @@ import ConfirmationModal, {
   type ConfirmationModalProps,
 } from '@/components/ui/common/ConfirmationModal';
 import ProgramPageGuiForm from '@/features/dashboard/components/ProgramPageGuiForm';
+import ProgramPageImageUploadField from '@/features/dashboard/components/ProgramPageImageUploadField';
 import {
   getProgramPageDetail,
   type ProgramPageContentPayload,
@@ -450,16 +451,17 @@ export default function ProgramPageEditorPage() {
                 />
               </label>
 
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-neutral-800">OG Image URL</span>
-                <input
-                  type="text"
-                  value={seoForm.ogImage}
-                  onChange={handleSeoField('ogImage')}
-                  className={inputClass}
-                  placeholder="/assets/banner/class/bannerReguler.webp"
-                />
-              </label>
+              <ProgramPageImageUploadField
+                label="OG Image"
+                value={seoForm.ogImage}
+                disabled={saving || unpublishing}
+                previewAlt={seoForm.metaTitle || contentForm.label || 'OG image'}
+                helperText="Dipakai sebagai gambar metadata Open Graph."
+                onChange={(next) => {
+                  setSeoForm((current) => ({ ...current, ogImage: next }));
+                  setSuccessText(null);
+                }}
+              />
 
               <label className="space-y-2 md:col-span-2">
                 <span className="text-sm font-medium text-neutral-800">Meta Description</span>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { RiAddLine, RiDeleteBin6Line } from 'react-icons/ri';
 
+import ProgramPageImageUploadField from '@/features/dashboard/components/ProgramPageImageUploadField';
 import StringItemsInput from '@/features/dashboard/components/StringItemsInput';
 import type {
   ProgramPageBenefitTone,
@@ -435,15 +436,13 @@ export default function ProgramPageGuiForm({
             />
           </Field>
           <div className="grid gap-4">
-            <Field label="Image URL">
-              <input
-                type="text"
-                value={value.hero.imageSrc}
-                disabled={disabled}
-                onChange={(event) => updateHero('imageSrc', event.target.value)}
-                className={inputClass}
-              />
-            </Field>
+            <ProgramPageImageUploadField
+              label="Hero Image"
+              value={value.hero.imageSrc}
+              disabled={disabled}
+              previewAlt={value.hero.imageAlt || value.label || 'Hero image'}
+              onChange={(next) => updateHero('imageSrc', next)}
+            />
             <Field label="Image Alt">
               <input
                 type="text"
@@ -542,17 +541,13 @@ export default function ProgramPageGuiForm({
                     className={inputClass}
                   />
                 </Field>
-                <Field label="Image URL">
-                  <input
-                    type="text"
-                    value={item.imageSrc}
-                    disabled={disabled}
-                    onChange={(event) =>
-                      updateHighlightItem(index, { imageSrc: event.target.value })
-                    }
-                    className={inputClass}
-                  />
-                </Field>
+                <ProgramPageImageUploadField
+                  label="Highlight Image"
+                  value={item.imageSrc}
+                  disabled={disabled}
+                  previewAlt={item.imageAlt || item.label || `Highlight ${index + 1}`}
+                  onChange={(next) => updateHighlightItem(index, { imageSrc: next })}
+                />
                 <Field label="Description">
                   <textarea
                     rows={4}
@@ -788,17 +783,17 @@ export default function ProgramPageGuiForm({
               className={inputClass}
             />
           </Field>
-          <Field label="Brand Logo URL">
-            <input
-              type="text"
-              value={value.benefitsComparison.brandLogoSrc}
-              disabled={disabled}
-              onChange={(event) =>
-                updateBenefitsComparison('brandLogoSrc', event.target.value)
-              }
-              className={inputClass}
-            />
-          </Field>
+          <ProgramPageImageUploadField
+            label="Brand Logo"
+            value={value.benefitsComparison.brandLogoSrc}
+            disabled={disabled}
+            previewAlt={
+              value.benefitsComparison.brandLogoAlt ||
+              value.benefitsComparison.brandLabel ||
+              'Brand logo'
+            }
+            onChange={(next) => updateBenefitsComparison('brandLogoSrc', next)}
+          />
           <Field label="Brand Logo Alt">
             <input
               type="text"
