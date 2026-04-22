@@ -1,46 +1,70 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/services/api/auth.api.ts
-import { baseUrl } from '../http/url';
-import { ENDPOINTS } from '../endpoints/';
-import { tokenStorage, type TokenPair } from '../http/token';
+import { baseUrl } from "../http/url";
+import { ENDPOINTS } from "../endpoints/";
+import { tokenStorage } from "../http/token";
 
-export type LoginPayload = { email: string; password: string };
-export type MeResp = { id: number; name: string; role: 'admin'|'guru'|'user' };
+export type RequestMagicLinkPayload = { email: string };
+export type MagicLinkResponse = { message: string; expires_in_days?: number };
+export type MeResp = {
+  id: number;
+  nama: string;
+  email: string;
+  role: string;
+  is_super_admin?: boolean;
+  is_employee?: boolean;
+  auth_source?: string | null;
+  [key: string]: unknown;
+};
 
-// helper: terima berbagai bentuk respons token
-function coerceTokenPair(input: any): TokenPair {
+function unwrapUser(input: any): MeResp {
   const src = input?.data ?? input ?? {};
-  const access =
-    src.access_token ?? src.accessToken ?? (typeof src.token === 'string' ? src.token : undefined);
-  const refresh =
-    src.refresh_token ?? src.refreshToken ?? (typeof src.refresh === 'string' ? src.refresh : undefined);
+  const user = src?.user ?? src;
 
-  if (!access) throw new Error('Access token kosong pada respons login');
-  // refresh boleh kosong kalau server cookie-based; simpan kalau ada
-  return { access_token: String(access), refresh_token: String(refresh ?? '') };
+  if (!user?.id) {
+    throw new Error("Data user admin tidak ditemukan");
+  }
+
+  return user as MeResp;
 }
 
-export async function login(payload: LoginPayload) {
-  // ⚠️ gunakan any dulu supaya bisa dikoersi
-  const raw = await baseUrl.request<any>(ENDPOINTS.AUTH.LOGIN, {
-    method: 'POST',
+export async function requestMagicLink(payload: RequestMagicLinkPayload) {
+  return baseUrl.request<MagicLinkResponse>(ENDPOINTS.ADMIN_AUTH.REQUEST_LINK, {
+    method: "POST",
     json: payload,
     noAuth: true,
   });
-  const pair = coerceTokenPair(raw);
-  tokenStorage.set(pair.access_token);
-  if (pair.refresh_token) tokenStorage.setRefresh(pair.refresh_token);
+}
 
-  return getMe();
+export async function consumeMagicLink(token: string) {
+  const raw = await baseUrl.request<any>(ENDPOINTS.ADMIN_AUTH.CONSUME, {
+    method: "POST",
+    json: { token },
+    noAuth: true,
+  });
+
+  const accessToken =
+    raw?.accessToken ??
+    raw?.access_token ??
+    raw?.token ??
+    token;
+
+  tokenStorage.set(String(accessToken), "admin_magic");
+  return unwrapUser(raw);
 }
 
 export async function getMe() {
-  return baseUrl.request<MeResp>(ENDPOINTS.AUTH.ME, { method: 'GET' });
+  const raw = await baseUrl.request<any>(ENDPOINTS.ADMIN_AUTH.ME, { method: "GET" });
+  return unwrapUser(raw);
 }
 
 export async function logout() {
+  const token = tokenStorage.get();
+
   try {
-    await baseUrl.request(ENDPOINTS.AUTH.LOGOUT, { method: 'POST' });
+    await baseUrl.request(ENDPOINTS.ADMIN_AUTH.LOGOUT, {
+      method: "POST",
+      json: token ? { token } : undefined,
+    });
   } finally {
     tokenStorage.clearAll();
   }

@@ -19,6 +19,12 @@ export type EmployeeItem = {
   user?: EmployeeUser;
 };
 
+export type CreateAdminEmployeePayload = {
+  nama: string;
+  email: string;
+  no_telp?: string;
+};
+
 export async function listEmployees() {
   return baseUrl.request<{ data?: EmployeeItem[] } | EmployeeItem[]>(
     ENDPOINTS.EMPLOYEES.LIST,
@@ -28,6 +34,13 @@ export async function listEmployees() {
 
 export async function createEmployee(payload: { user_id?: number; email?: string; is_active?: boolean }) {
   return baseUrl.request<any>(ENDPOINTS.EMPLOYEES.CREATE, {
+    method: 'POST',
+    json: payload,
+  });
+}
+
+export async function createAdminEmployee(payload: CreateAdminEmployeePayload) {
+  return baseUrl.request<any>(ENDPOINTS.EMPLOYEES.CREATE_ADMIN, {
     method: 'POST',
     json: payload,
   });

@@ -2,6 +2,8 @@ export function getStatusColor(status: string): string {
   switch (status) {
     case 'Menunggu Verifikasi':
       return 'text-(--accent-orange-color)';
+    case 'Revisi':
+      return 'text-(--accent-orange-color)';
     case 'Tampil':
       return 'text-(--accent-green-color)';
     case 'aktif':

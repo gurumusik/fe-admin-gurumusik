@@ -7,6 +7,7 @@ import {
   RiCoupon2Line,
   RiArrowDownSLine,
   RiUserSearchLine,
+  RiFileEditLine,
   RiSoundModuleLine,
   RiStarLine,
   RiFileAddLine,
@@ -101,6 +102,7 @@ const AdminSidebar: React.FC = () => {
   // single-item actives
   const isPromoActive = isUnder("/dashboard-admin/manage-promo");
   const isVerifiedTutorActive = isUnder("/dashboard-admin/verified-tutor");
+  const isTutorRevisionActive = isUnder("/dashboard-admin/tutor-revision");
   const isRatingActive = isUnder("/dashboard-admin/manage-rating");
   const isEntryTutorActive = isUnder("/dashboard-admin/entry-tutor");
   const isNotificationBroadcastActive = isUnder("/dashboard-admin/notifications");
@@ -386,14 +388,14 @@ const AdminSidebar: React.FC = () => {
                   active={isUnder("/dashboard-admin/student-list")}
                 />
                 <SubItem
-                  to="/dashboard-admin/employees"
-                  label="Employee Access"
-                  active={isUnder("/dashboard-admin/employees")}
-                />
-                <SubItem
                   to="/dashboard-admin/transaction-list"
                   label="Transaction List"
                   active={isUnder("/dashboard-admin/transaction-list")}
+                />
+                <SubItem
+                  to="/dashboard-admin/employees"
+                  label="Employee Access"
+                  active={isUnder("/dashboard-admin/employees")}
                 />
                 <SubItem
                   to="/dashboard-admin/transaction-ticket"
@@ -484,6 +486,34 @@ const AdminSidebar: React.FC = () => {
                     }`}
                 >
                   Verified Tutor
+                </span>
+              </div>
+            </Link>
+          </li>
+
+          <li>
+            <Link
+              to="/dashboard-admin/tutor-revision"
+              className={`group flex items-center justify-between px-2 py-3 rounded-xl
+                ${isTutorRevisionActive
+                  ? "bg-[var(--secondary-light-color,#E6F4FF)]/60"
+                  : "hover:bg-[var(--accent-blue-light-color,#E7EFFD)]"
+                }`}
+            >
+              <div className="flex items-center gap-3">
+                <RiFileEditLine
+                  className={`text-2xl transition-colors ${isTutorRevisionActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                    }`}
+                />
+                <span
+                  className={`ml-2 font-medium text-lg transition-colors ${isTutorRevisionActive
+                      ? "text-[var(--secondary-color,#0682DF)]"
+                      : "text-[#6A7B98] group-hover:text-[var(--secondary-color,#0682DF)]"
+                    }`}
+                >
+                  Tutor Revision
                 </span>
               </div>
             </Link>

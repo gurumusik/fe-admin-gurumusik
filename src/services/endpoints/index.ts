@@ -5,6 +5,12 @@ export const ENDPOINTS = {
     REFRESH: '/auth/refresh', // dipakai di refresh.ts
     ME: '/auth/me',
   },
+  ADMIN_AUTH: {
+    REQUEST_LINK: '/admin-auth/request-link',
+    CONSUME: '/admin-auth/consume',
+    ME: '/admin-auth/me',
+    LOGOUT: '/admin-auth/logout',
+  },
   USERS: {
     ME: '/users/me',
   },
@@ -206,6 +212,7 @@ export const ENDPOINTS = {
   EMPLOYEES: {
     LIST: '/admin/employees',
     CREATE: '/admin/employees',
+    CREATE_ADMIN: '/admin/employees/admin',
     UPDATE: (id: number | string) => `/admin/employees/${id}`,
   },
 

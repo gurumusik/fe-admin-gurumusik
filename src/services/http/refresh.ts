@@ -18,6 +18,10 @@ function coercePair(anyData: any): Partial<TokenPair> | null {
 }
 
 async function doRefresh(): Promise<string | null> {
+  if (tokenStorage.getMode() === "admin_magic") {
+    return null;
+  }
+
   const url = (ENV.API_BASE_URL ?? "") + ENDPOINTS.AUTH.REFRESH;
   const rt = tokenStorage.getRefresh();
 

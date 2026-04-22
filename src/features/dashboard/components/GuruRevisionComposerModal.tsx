@@ -18,6 +18,8 @@ type Props = {
   applicationId: number;
   applicationName?: string;
   pickedFields: PickedField[];
+  initialMessages?: Record<string, string>;
+  initialTemplateIds?: Record<string, string>;
   resetKey?: string | number | null;
   onSent?: () => void;
 };
@@ -33,6 +35,8 @@ export default function GuruRevisionComposerModal({
   applicationId,
   applicationName,
   pickedFields,
+  initialMessages,
+  initialTemplateIds,
   resetKey,
   onSent,
 }: Props) {
@@ -73,12 +77,22 @@ export default function GuruRevisionComposerModal({
 
   useEffect(() => {
     setGeneralMessage('');
-    setMessages({});
-    setSelectedTemplateIds({});
+    setMessages(initialMessages ?? {});
+    setSelectedTemplateIds(initialTemplateIds ?? {});
     fieldRefs.current = {};
     lastFocusKeyRef.current = null;
     lastSelectionRef.current = null;
-  }, [resetKey]);
+  }, [resetKey, initialMessages, initialTemplateIds]);
+
+  useEffect(() => {
+    if (!open) return;
+    setMessages(initialMessages ?? {});
+    setSelectedTemplateIds(initialTemplateIds ?? {});
+    setGeneralMessage('');
+    fieldRefs.current = {};
+    lastFocusKeyRef.current = null;
+    lastSelectionRef.current = null;
+  }, [open, applicationId, pickedFieldKeys, initialMessages, initialTemplateIds]);
 
   useEffect(() => {
     fieldRefs.current = {};
@@ -88,18 +102,18 @@ export default function GuruRevisionComposerModal({
     setMessages((prev) => {
       const next: Record<string, string> = {};
       for (const key of pickedFieldKeys.split('|')) {
-        if (key) next[key] = prev[key] ?? '';
+        if (key) next[key] = prev[key] ?? initialMessages?.[key] ?? '';
       }
       return next;
     });
     setSelectedTemplateIds((prev) => {
       const next: Record<string, string> = {};
       for (const key of pickedFieldKeys.split('|')) {
-        if (key) next[key] = prev[key] ?? '';
+        if (key) next[key] = prev[key] ?? initialTemplateIds?.[key] ?? '';
       }
       return next;
     });
-  }, [applicationId, pickedFieldKeys]);
+  }, [applicationId, pickedFieldKeys, initialMessages, initialTemplateIds]);
 
   const fieldsSorted = useMemo(() => {
     const list = pickedFields

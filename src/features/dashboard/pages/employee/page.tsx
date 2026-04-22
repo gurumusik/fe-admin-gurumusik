@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
 import {
   RiTeamLine,
   RiSearchLine,
@@ -8,7 +9,9 @@ import {
   RiCloseLine,
 } from 'react-icons/ri';
 import ConfirmationModal from '@/components/ui/common/ConfirmationModal';
+import type { RootState } from '@/app/store';
 import {
+  createAdminEmployee,
   createEmployee,
   listEmployees,
   updateEmployeeStatus,
@@ -36,10 +39,23 @@ const EmployeePage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [input, setInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [adminSubmitting, setAdminSubmitting] = useState(false);
+  const [adminFormError, setAdminFormError] = useState<string | null>(null);
+  const [adminForm, setAdminForm] = useState({
+    nama: '',
+    email: '',
+    no_telp: '',
+  });
 
-  const [modalType, setModalType] = useState<'confirm' | 'success' | 'error' | null>(null);
+  const [modalType, setModalType] = useState<
+    'confirm' | 'success' | 'error' | 'adminForm' | 'adminSuccess' | null
+  >(null);
   const [selected, setSelected] = useState<EmployeeItem | null>(null);
   const [nextActive, setNextActive] = useState<boolean>(false);
+  const rawUser = useSelector((state: RootState) => state.auth.user as any);
+  const currentUser = (rawUser?.user ?? rawUser) || null;
+  const currentRole = String(currentUser?.role || '').toLowerCase();
+  const canCreateAdmin = Boolean(currentUser?.is_super_admin) || currentRole === 'superadmin';
 
   const loadData = async () => {
     try {
@@ -109,6 +125,61 @@ const EmployeePage: React.FC = () => {
     }
   };
 
+  const openAdminModal = () => {
+    setAdminForm({ nama: '', email: '', no_telp: '' });
+    setAdminFormError(null);
+    setModalType('adminForm');
+  };
+
+  const closeAdminModal = () => {
+    if (adminSubmitting) return;
+    setModalType(null);
+    setAdminFormError(null);
+  };
+
+  const handleCreateAdmin = async () => {
+    if (!canCreateAdmin) {
+      setAdminFormError('Hanya superadmin yang dapat menambah admin.');
+      return;
+    }
+
+    const nama = adminForm.nama.trim();
+    const email = adminForm.email.trim().toLowerCase();
+    const no_telp = adminForm.no_telp.trim();
+
+    if (!nama) {
+      setAdminFormError('Nama wajib diisi.');
+      return;
+    }
+
+    if (!email) {
+      setAdminFormError('Email wajib diisi.');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setAdminFormError('Format email tidak valid.');
+      return;
+    }
+
+    try {
+      setAdminSubmitting(true);
+      setAdminFormError(null);
+      await createAdminEmployee({
+        nama,
+        email,
+        ...(no_telp ? { no_telp } : {}),
+      });
+      setAdminForm({ nama: '', email: '', no_telp: '' });
+      setModalType('adminSuccess');
+      await loadData();
+    } catch (e: any) {
+      setAdminFormError(e?.message || 'Gagal membuat admin.');
+    } finally {
+      setAdminSubmitting(false);
+    }
+  };
+
   const askToggle = (row: EmployeeItem) => {
     setSelected(row);
     setNextActive(!row.is_active);
@@ -136,10 +207,10 @@ const EmployeePage: React.FC = () => {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-neutral-900">
-                Employee Demo Access
+                Employee Access
               </h2>
               <p className="text-sm text-neutral-600">
-                Tentukan siapa yang boleh akses demo (role guru/murid).
+                Kelola allowlist employee yang bisa menerima akses internal.
               </p>
             </div>
           </div>
@@ -162,8 +233,8 @@ const EmployeePage: React.FC = () => {
 
         <div className="mt-5 rounded-2xl border border-neutral-200 p-4">
           <div className="mb-3 rounded-xl bg-[var(--accent-blue-light-color)]/60 p-3 text-sm text-neutral-700">
-            Jika <b>belum ada</b> employee aktif, semua guru/murid tetap bisa akses demo.
-            Setelah ada employee aktif, hanya yang terdaftar di sini yang bisa masuk.
+            Akun <b>role admin</b> yang aktif di sini bisa menerima login dashboard admin via magic-link.
+            Akun dengan <b>role superadmin</b> otomatis punya akses penuh ke halaman ini.
           </div>
           <p className="text-sm text-neutral-600 mb-3">
             Tambah employee dengan email atau user_id (angka).
@@ -184,6 +255,16 @@ const EmployeePage: React.FC = () => {
               <RiUserAddLine className="mr-2 text-lg" />
               Tambah Employee
             </button>
+            {canCreateAdmin && (
+              <button
+                type="button"
+                onClick={openAdminModal}
+                className="inline-flex items-center justify-center h-11 rounded-full border border-[var(--secondary-color)] bg-white text-[var(--secondary-color)] font-semibold px-6 hover:bg-[var(--secondary-light-color)] transition"
+              >
+                <RiUserAddLine className="mr-2 text-lg" />
+                Tambah Admin
+              </button>
+            )}
           </div>
         </div>
 
@@ -268,6 +349,75 @@ const EmployeePage: React.FC = () => {
       </section>
 
       <ConfirmationModal
+        isOpen={modalType === 'adminForm'}
+        onClose={closeAdminModal}
+        iconTone="info"
+        title="Tambah Admin"
+        texts={['Admin baru akan langsung aktif sebagai employee dan bisa login dashboard admin via magic-link.']}
+        align="left"
+        widthClass="max-w-lg"
+        closeOnOverlay={!adminSubmitting}
+        button2={{ label: 'Batal', onClick: closeAdminModal, variant: 'outline' }}
+        button1={{
+          label: 'Buat Admin',
+          onClick: handleCreateAdmin,
+          variant: 'primary',
+          loading: adminSubmitting,
+        }}
+      >
+        <div className="space-y-4 text-left">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              Nama
+            </label>
+            <input
+              value={adminForm.nama}
+              onChange={(e) => setAdminForm((prev) => ({ ...prev, nama: e.target.value }))}
+              placeholder="Nama admin"
+              className="w-full h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
+              autoComplete="name"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              Email
+            </label>
+            <input
+              value={adminForm.email}
+              onChange={(e) => setAdminForm((prev) => ({ ...prev, email: e.target.value }))}
+              placeholder="admin@domain.com"
+              className="w-full h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
+              autoComplete="email"
+              type="email"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              Nomor Telepon
+            </label>
+            <input
+              value={adminForm.no_telp}
+              onChange={(e) => setAdminForm((prev) => ({ ...prev, no_telp: e.target.value }))}
+              placeholder="Opsional"
+              className="w-full h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
+              autoComplete="tel"
+            />
+            <p className="mt-1 text-xs text-neutral-500">
+              Boleh dikosongkan jika admin hanya memakai magic-link.
+            </p>
+          </div>
+
+          {adminFormError && (
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+              {adminFormError}
+            </div>
+          )}
+        </div>
+      </ConfirmationModal>
+
+      <ConfirmationModal
         isOpen={modalType === 'confirm'}
         onClose={() => setModalType(null)}
         icon={<RiCloseLine />}
@@ -295,6 +445,19 @@ const EmployeePage: React.FC = () => {
         iconTone="success"
         title="Perubahan Tersimpan"
         texts={['Status employee berhasil diperbarui.']}
+        align="center"
+        widthClass="max-w-md"
+        button1={{ label: 'Tutup', onClick: () => setModalType(null), variant: 'primary' }}
+        showCloseIcon
+      />
+
+      <ConfirmationModal
+        isOpen={modalType === 'adminSuccess'}
+        onClose={() => setModalType(null)}
+        icon={<RiCheckboxCircleFill />}
+        iconTone="success"
+        title="Admin Berhasil Dibuat"
+        texts={['User admin sudah dibuat dan ditambahkan sebagai employee aktif.']}
         align="center"
         widthClass="max-w-md"
         button1={{ label: 'Tutup', onClick: () => setModalType(null), variant: 'primary' }}
