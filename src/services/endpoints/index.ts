@@ -64,6 +64,13 @@ export const ENDPOINTS = {
     UPDATE: (id: number|string) => `/programs/${id}`, // PUT admin
     DELETE: (id: number|string) => `/programs/${id}`, // DELETE admin
   },
+  PROGRAM_PAGES: {
+    LIST: '/program-pages',
+    DETAIL: (type: 'regular' | 'special-need' | 'hobby') => `/program-pages/${type}`,
+    UPDATE: (type: 'regular' | 'special-need' | 'hobby') => `/program-pages/${type}`,
+    PUBLISH: (type: 'regular' | 'special-need' | 'hobby') => `/program-pages/${type}/publish`,
+    UNPUBLISH: (type: 'regular' | 'special-need' | 'hobby') => `/program-pages/${type}/unpublish`,
+  },
   PAKET: {
     LIST: '/paket',                              // GET ?search=&page=&limit=
     GROUPED: '/paket/grouped',
