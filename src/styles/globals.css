@@ -17,8 +17,62 @@
     --accent-green-color: #05C46B;
     --accent-green-light-color: #E9FCEF;
 
+    /* Neutral palette */
+    --neutral-50: #ffffff;
+    --neutral-100: #F5F8FA;
+    --neutral-200: #DAE5EB;
+    --neutral-300: #C3D4DE;
+    --neutral-400: #AABECF;
+    --neutral-500: #94A9C0;
+    --neutral-600: #7D91AE;
+    --neutral-700: #657692;
+    --neutral-800: #57657C;
+    --neutral-900: #4A5565;
+    --neutral-950: #2B313B;
+
+    --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+
+    /* Typography scale (Poppins) */
+    --display-large-size: 64px;
+    --display-large-weight: 400;
+    --display-medium-size: 48px;
+    --display-medium-weight: 400;
+    --display-small-size: 40px;
+    --display-small-weight: 400;
+
+    --headline-large-size: 32px;
+    --headline-large-weight: 600;
+    --headline-medium-size: 24px;
+    --headline-medium-weight: 600;
+    --headline-small-size: 20px;
+    --headline-small-weight: 600;
+
+    --title-large-size: 20px;
+    --title-large-weight: 500;
+    --title-medium-size: 16px;
+    --title-medium-weight: 600;
+    --title-small-size: 14px;
+    --title-small-weight: 600;
+
+    --label-large-size: 16px;
+    --label-large-weight: 500;
+    --label-medium-size: 14px;
+    --label-medium-weight: 500;
+    --label-small-size: 12px;
+    --label-small-weight: 500;
+
+    --body-large-size: 16px;
+    --body-large-weight: 400;
+    --body-medium-size: 14px;
+    --body-medium-weight: 400;
+    --body-small-size: 12px;
+    --body-small-weight: 400;
+
     --carousel-gradient: linear-gradient(90deg,rgba(42, 123, 155, 1) 0%, rgba(87, 199, 133, 1) 50%, rgba(237, 221, 83, 1) 100%);
 }
 
 :root { --promo-offset: 0px; }
-body { padding-top: var(--promo-offset); }
+body {
+    padding-top: var(--promo-offset);
+    font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+}

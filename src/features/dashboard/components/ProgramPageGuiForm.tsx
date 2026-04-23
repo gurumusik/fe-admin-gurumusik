@@ -44,6 +44,56 @@ const BENEFIT_TONE_OPTIONS: Array<{ value: ProgramPageBenefitTone; label: string
   { value: 'no', label: 'No' },
 ];
 
+const COLOR_TOKEN_GROUPS: Array<{
+  label: string;
+  options: Array<{ label: string; value: string }>;
+}> = [
+  {
+    label: 'Brand',
+    options: [
+      { label: 'Primary Color', value: 'var(--primary-color)' },
+      { label: 'Primary Light Color', value: 'var(--primary-light-color)' },
+      { label: 'Secondary Color', value: 'var(--secondary-color)' },
+      { label: 'Secondary Light Color', value: 'var(--secondary-light-color)' },
+    ],
+  },
+  {
+    label: 'Accent',
+    options: [
+      { label: 'Accent Purple', value: 'var(--accent-purple-color)' },
+      { label: 'Accent Purple Light', value: 'var(--accent-purple-light-color)' },
+      { label: 'Accent Red', value: 'var(--accent-red-color)' },
+      { label: 'Accent Red Light', value: 'var(--accent-red-light-color)' },
+      { label: 'Accent Orange', value: 'var(--accent-orange-color)' },
+      { label: 'Accent Orange Light', value: 'var(--accent-orange-light-color)' },
+      { label: 'Accent Blue', value: 'var(--accent-blue-color)' },
+      { label: 'Accent Blue Light', value: 'var(--accent-blue-light-color)' },
+      { label: 'Accent Green', value: 'var(--accent-green-color)' },
+      { label: 'Accent Green Light', value: 'var(--accent-green-light-color)' },
+    ],
+  },
+  {
+    label: 'Neutral',
+    options: [
+      { label: 'Neutral 50', value: 'var(--neutral-50)' },
+      { label: 'Neutral 100', value: 'var(--neutral-100)' },
+      { label: 'Neutral 200', value: 'var(--neutral-200)' },
+      { label: 'Neutral 300', value: 'var(--neutral-300)' },
+      { label: 'Neutral 400', value: 'var(--neutral-400)' },
+      { label: 'Neutral 500', value: 'var(--neutral-500)' },
+      { label: 'Neutral 600', value: 'var(--neutral-600)' },
+      { label: 'Neutral 700', value: 'var(--neutral-700)' },
+      { label: 'Neutral 800', value: 'var(--neutral-800)' },
+      { label: 'Neutral 900', value: 'var(--neutral-900)' },
+      { label: 'Neutral 950', value: 'var(--neutral-950)' },
+    ],
+  },
+];
+
+const COLOR_TOKEN_VALUES = new Set(
+  COLOR_TOKEN_GROUPS.flatMap((group) => group.options.map((option) => option.value))
+);
+
 const THEME_FIELD_GROUPS: Array<{
   title: string;
   description: string;
@@ -54,10 +104,32 @@ const THEME_FIELD_GROUPS: Array<{
     description: 'Warna dasar halaman dan tipografi section umum.',
     fields: [
       { key: 'pageBackground', label: 'Page Background', mode: 'paint' },
-      { key: 'sectionBadgeBackground', label: 'Section Badge Background', mode: 'paint' },
-      { key: 'sectionBadgeText', label: 'Section Badge Text', mode: 'paint' },
       { key: 'sectionHeadingText', label: 'Section Heading Text', mode: 'paint' },
       { key: 'sectionMutedText', label: 'Section Muted Text', mode: 'paint' },
+    ],
+  },
+  {
+    title: 'Eyebrow / Chip Colors',
+    description: 'Warna background dan teks untuk chip kecil di atas judul tiap section.',
+    fields: [
+      { key: 'heroBadgeBackground', label: 'Hero Eyebrow Background', mode: 'paint' },
+      { key: 'heroBadgeText', label: 'Hero Eyebrow Text', mode: 'paint' },
+      {
+        key: 'sectionBadgeBackground',
+        label: 'Highlights & Benefits Eyebrow Background',
+        helperText: 'Dipakai oleh chip seperti "Get the highlights" dan "Benefits".',
+        mode: 'paint',
+      },
+      {
+        key: 'sectionBadgeText',
+        label: 'Highlights & Benefits Eyebrow Text',
+        helperText: 'Dipakai oleh chip seperti "Get the highlights" dan "Benefits".',
+        mode: 'paint',
+      },
+      { key: 'statsBadgeBackground', label: 'Stats Eyebrow Background', mode: 'paint' },
+      { key: 'statsBadgeText', label: 'Stats Eyebrow Text', mode: 'paint' },
+      { key: 'pricingBadgeBackground', label: 'Pricing Eyebrow Background', mode: 'paint' },
+      { key: 'pricingBadgeText', label: 'Pricing Eyebrow Text', mode: 'paint' },
     ],
   },
   {
@@ -66,8 +138,6 @@ const THEME_FIELD_GROUPS: Array<{
     fields: [
       { key: 'heroBackground', label: 'Hero Background', helperText: 'Bisa warna solid atau gradient.', mode: 'paint' },
       { key: 'heroGlow', label: 'Hero Glow', helperText: 'Biasanya rgba(...)', mode: 'paint' },
-      { key: 'heroBadgeBackground', label: 'Hero Badge Background', mode: 'paint' },
-      { key: 'heroBadgeText', label: 'Hero Badge Text', mode: 'paint' },
       { key: 'heroTitleText', label: 'Hero Title Text', mode: 'paint' },
       { key: 'heroDescriptionText', label: 'Hero Description Text', mode: 'paint' },
       { key: 'heroCtaBackground', label: 'Hero CTA Background', mode: 'paint' },
@@ -101,8 +171,6 @@ const THEME_FIELD_GROUPS: Array<{
     description: 'Warna section ungu statistik.',
     fields: [
       { key: 'statsBackground', label: 'Stats Background', mode: 'paint' },
-      { key: 'statsBadgeBackground', label: 'Stats Badge Background', mode: 'paint' },
-      { key: 'statsBadgeText', label: 'Stats Badge Text', mode: 'paint' },
       { key: 'statsTitleText', label: 'Stats Title Text', mode: 'paint' },
       { key: 'statsDescriptionText', label: 'Stats Description Text', mode: 'paint' },
       { key: 'statsMetricValueText', label: 'Stats Metric Value Text', mode: 'paint' },
@@ -131,8 +199,6 @@ const THEME_FIELD_GROUPS: Array<{
     description: 'Warna card pricing dan CTA section harga.',
     fields: [
       { key: 'pricingBackground', label: 'Pricing Background', mode: 'paint' },
-      { key: 'pricingBadgeBackground', label: 'Pricing Badge Background', mode: 'paint' },
-      { key: 'pricingBadgeText', label: 'Pricing Badge Text', mode: 'paint' },
       { key: 'pricingTitleText', label: 'Pricing Title Text', mode: 'paint' },
       { key: 'pricingCardBackground', label: 'Pricing Card Background', mode: 'paint' },
       { key: 'pricingCardBorder', label: 'Pricing Card Border', mode: 'paint' },
@@ -235,33 +301,60 @@ const ThemeFieldInput = ({
 }) => {
   const showPreview = mode === 'paint';
   const showColorPicker = isHexColor(value);
+  const selectedTokenValue = COLOR_TOKEN_VALUES.has(value.trim()) ? value.trim() : '';
 
   return (
     <Field label={label} helperText={helperText}>
-      <div className="flex items-center gap-2">
-        {showPreview ? (
-          <div
-            className="h-11 w-11 shrink-0 rounded-xl border border-neutral-200 bg-white"
-            style={{ background: value || undefined }}
-            aria-hidden="true"
-          />
+      <div className="space-y-2">
+        {mode === 'paint' ? (
+          <select
+            value={selectedTokenValue}
+            disabled={disabled}
+            onChange={(event) => {
+              if (event.target.value) {
+                onChange(event.target.value);
+              }
+            }}
+            className={selectClass}
+          >
+            <option value="">Custom / manual value</option>
+            {COLOR_TOKEN_GROUPS.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
         ) : null}
-        {showColorPicker ? (
+
+        <div className="flex items-center gap-2">
+          {showPreview ? (
+            <div
+              className="h-11 w-11 shrink-0 rounded-xl border border-neutral-200 bg-white"
+              style={{ background: value || undefined }}
+              aria-hidden="true"
+            />
+          ) : null}
+          {showColorPicker ? (
+            <input
+              type="color"
+              value={value}
+              disabled={disabled}
+              onChange={(event) => onChange(event.target.value)}
+              className="h-11 w-14 rounded-xl border border-neutral-300 bg-white p-1"
+            />
+          ) : null}
           <input
-            type="color"
+            type="text"
             value={value}
             disabled={disabled}
             onChange={(event) => onChange(event.target.value)}
-            className="h-11 w-14 rounded-xl border border-neutral-300 bg-white p-1"
+            className={inputClass}
           />
-        ) : null}
-        <input
-          type="text"
-          value={value}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.value)}
-          className={inputClass}
-        />
+        </div>
       </div>
     </Field>
   );
@@ -600,7 +693,7 @@ export default function ProgramPageGuiForm({
                 {
                   label: '',
                   description: '',
-                  imageSrc: '',
+                  imageSrc: '/assets/images/default_noimg.png',
                   imageAlt: '',
                   imageObjectPosition: '',
                 },
@@ -1161,7 +1254,7 @@ export default function ProgramPageGuiForm({
 
       <SectionCard
         title="Theme & Visual Tokens"
-        description="Atur warna, gradient, border, dan shadow per section. Untuk nilai gradient/shadow, isi manual di field teks."
+        description="Atur warna, gradient, border, dan shadow per section. Field warna bisa memilih token global; gradient/shadow tetap bisa diisi manual."
       >
         <div className="space-y-5">
           {THEME_FIELD_GROUPS.map((group) => (
