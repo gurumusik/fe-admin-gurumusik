@@ -91,6 +91,23 @@ export type ProgramPagePricingContent = {
   plans: ProgramPagePricingPlan[];
 };
 
+export type ProgramPageExploreProgramItem = {
+  badge: string;
+  title: string;
+  description: string;
+  imageSrc: string;
+  imageAlt: string;
+  ctaLabel: string;
+  ctaHref: string;
+  benefits: string[];
+};
+
+export type ProgramPageExploreProgramsContent = {
+  eyebrow: string;
+  title: string;
+  items: ProgramPageExploreProgramItem[];
+};
+
 export type ProgramPageTheme = {
   pageBackground: string;
   heroBackground: string;
@@ -161,6 +178,26 @@ export type ProgramPageTheme = {
   pricingBenefitIconColor: string;
   pricingCtaBackground: string;
   pricingCtaText: string;
+  exploreBackground: string;
+  exploreEyebrowBackground: string;
+  exploreEyebrowText: string;
+  exploreTitleText: string;
+  exploreCardBackground: string;
+  exploreCardBorder: string;
+  exploreCardShadow: string;
+  exploreCardBadgeBackground: string;
+  exploreCardBadgeText: string;
+  exploreCardTitleText: string;
+  exploreCardDescriptionText: string;
+  exploreBenefitLabelText: string;
+  exploreBenefitText: string;
+  exploreBenefitIconColor: string;
+  exploreCtaBackground: string;
+  exploreCtaText: string;
+  exploreDotActive: string;
+  exploreDotInactive: string;
+  exploreNavBorder: string;
+  exploreNavIcon: string;
 };
 
 export type ProgramPageSeoPayload = {
@@ -179,6 +216,7 @@ export type ProgramPageContentPayload = {
   stats: ProgramPageStatsContent;
   benefitsComparison: ProgramPageBenefitsComparisonContent;
   pricing: ProgramPagePricingContent;
+  explorePrograms: ProgramPageExploreProgramsContent;
 };
 
 export type ProgramPageSummaryDTO = {
@@ -235,6 +273,150 @@ const cleanNullableText = (value: unknown) => {
   return text ? text : null;
 };
 
+const DEFAULT_EXPLORE_PROGRAMS_CONTENT: ProgramPageExploreProgramsContent = {
+  eyebrow: 'Explore Our Program',
+  title: 'Jelajahi Program Lainnya',
+  items: [],
+};
+
+const pickThemeValue = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return '';
+};
+
+const normalizeProgramPageTheme = (value: unknown): ProgramPageTheme => {
+  const theme =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Partial<ProgramPageTheme>)
+      : {};
+
+  return {
+    ...(theme as ProgramPageTheme),
+    exploreBackground: pickThemeValue(theme.exploreBackground, theme.pageBackground, '#FFFFFF'),
+    exploreEyebrowBackground: pickThemeValue(
+      theme.exploreEyebrowBackground,
+      theme.sectionBadgeBackground,
+      'var(--accent-purple-color)'
+    ),
+    exploreEyebrowText: pickThemeValue(
+      theme.exploreEyebrowText,
+      theme.sectionBadgeText,
+      'var(--accent-purple-light-color)'
+    ),
+    exploreTitleText: pickThemeValue(
+      theme.exploreTitleText,
+      theme.sectionHeadingText,
+      '#2C2F38'
+    ),
+    exploreCardBackground: pickThemeValue(
+      theme.exploreCardBackground,
+      theme.highlightCardBackground,
+      '#FFFFFF'
+    ),
+    exploreCardBorder: pickThemeValue(
+      theme.exploreCardBorder,
+      theme.highlightCardBorder,
+      '#E2E8F0'
+    ),
+    exploreCardShadow: pickThemeValue(
+      theme.exploreCardShadow,
+      theme.highlightCardShadow,
+      '0 28px 64px rgba(76, 64, 142, 0.1)'
+    ),
+    exploreCardBadgeBackground: pickThemeValue(
+      theme.exploreCardBadgeBackground,
+      theme.highlightLabelBackground,
+      '#FFFFFF'
+    ),
+    exploreCardBadgeText: pickThemeValue(
+      theme.exploreCardBadgeText,
+      theme.highlightLabelText,
+      '#171717'
+    ),
+    exploreCardTitleText: pickThemeValue(
+      theme.exploreCardTitleText,
+      theme.sectionHeadingText,
+      '#2C2F38'
+    ),
+    exploreCardDescriptionText: pickThemeValue(
+      theme.exploreCardDescriptionText,
+      theme.sectionMutedText,
+      '#404554'
+    ),
+    exploreBenefitLabelText: pickThemeValue(
+      theme.exploreBenefitLabelText,
+      theme.sectionHeadingText,
+      '#2C2F38'
+    ),
+    exploreBenefitText: pickThemeValue(
+      theme.exploreBenefitText,
+      theme.pricingBenefitText,
+      '#434A58'
+    ),
+    exploreBenefitIconColor: pickThemeValue(
+      theme.exploreBenefitIconColor,
+      theme.pricingBenefitIconColor,
+      '#14B86A'
+    ),
+    exploreCtaBackground: pickThemeValue(
+      theme.exploreCtaBackground,
+      theme.pricingCtaBackground,
+      '#FFD54A'
+    ),
+    exploreCtaText: pickThemeValue(theme.exploreCtaText, theme.pricingCtaText, '#171717'),
+    exploreDotActive: pickThemeValue(theme.exploreDotActive, theme.dotActive, '#3B82F6'),
+    exploreDotInactive: pickThemeValue(
+      theme.exploreDotInactive,
+      theme.dotInactive,
+      '#BFDBFE'
+    ),
+    exploreNavBorder: pickThemeValue(theme.exploreNavBorder, theme.navBorder, '#BFDBFE'),
+    exploreNavIcon: pickThemeValue(theme.exploreNavIcon, theme.navIcon, '#3B82F6'),
+  };
+};
+
+export const normalizeProgramPageContentPayload = (
+  content: ProgramPageContentPayload
+): ProgramPageContentPayload => ({
+  ...content,
+  theme: normalizeProgramPageTheme((content as any).theme),
+  explorePrograms: {
+    eyebrow:
+      typeof (content as any).explorePrograms?.eyebrow === 'string' &&
+      (content as any).explorePrograms.eyebrow.trim()
+        ? (content as any).explorePrograms.eyebrow.trim()
+        : DEFAULT_EXPLORE_PROGRAMS_CONTENT.eyebrow,
+    title:
+      typeof (content as any).explorePrograms?.title === 'string' &&
+      (content as any).explorePrograms.title.trim()
+        ? (content as any).explorePrograms.title.trim()
+        : DEFAULT_EXPLORE_PROGRAMS_CONTENT.title,
+    items: Array.isArray((content as any).explorePrograms?.items)
+      ? (content as any).explorePrograms.items.map(
+          (item: ProgramPageExploreProgramItem) => ({
+            ...item,
+            benefits: Array.isArray(item.benefits) ? item.benefits : [],
+          })
+        )
+      : DEFAULT_EXPLORE_PROGRAMS_CONTENT.items,
+  },
+});
+
+const normalizeProgramPageDetail = (
+  detail: ProgramPageDetailDTO
+): ProgramPageDetailDTO => ({
+  ...detail,
+  draft_content: normalizeProgramPageContentPayload(detail.draft_content),
+  published_content: detail.published_content
+    ? normalizeProgramPageContentPayload(detail.published_content)
+    : null,
+});
+
 const normalizeSeoPayload = (
   payload?: ProgramPageSeoPayload | null
 ): ProgramPageSeoPayload | null => {
@@ -258,29 +440,64 @@ export async function listProgramPages() {
 }
 
 export async function getProgramPageDetail(type: ProgramPageType) {
-  return baseUrl.request<ProgramPageDetailResponse>(ENDPOINTS.PROGRAM_PAGES.DETAIL(type), {
-    method: 'GET',
-  });
+  const response = await baseUrl.request<ProgramPageDetailResponse>(
+    ENDPOINTS.PROGRAM_PAGES.DETAIL(type),
+    {
+      method: 'GET',
+    }
+  );
+
+  return {
+    ...response,
+    data: normalizeProgramPageDetail(response.data),
+  };
 }
 
 export async function updateProgramPage(type: ProgramPageType, payload: UpdateProgramPagePayload) {
-  return baseUrl.request<ProgramPageMutationResponse>(ENDPOINTS.PROGRAM_PAGES.UPDATE(type), {
-    method: 'PUT',
-    json: {
-      ...payload,
-      seo: normalizeSeoPayload(payload.seo),
-    },
-  });
+  const response = await baseUrl.request<ProgramPageMutationResponse>(
+    ENDPOINTS.PROGRAM_PAGES.UPDATE(type),
+    {
+      method: 'PUT',
+      json: {
+        ...payload,
+        draft_content: payload.draft_content
+          ? normalizeProgramPageContentPayload(payload.draft_content)
+          : payload.draft_content,
+        seo: normalizeSeoPayload(payload.seo),
+      },
+    }
+  );
+
+  return {
+    ...response,
+    data: normalizeProgramPageDetail(response.data),
+  };
 }
 
 export async function publishProgramPage(type: ProgramPageType) {
-  return baseUrl.request<ProgramPageMutationResponse>(ENDPOINTS.PROGRAM_PAGES.PUBLISH(type), {
-    method: 'PATCH',
-  });
+  const response = await baseUrl.request<ProgramPageMutationResponse>(
+    ENDPOINTS.PROGRAM_PAGES.PUBLISH(type),
+    {
+      method: 'PATCH',
+    }
+  );
+
+  return {
+    ...response,
+    data: normalizeProgramPageDetail(response.data),
+  };
 }
 
 export async function unpublishProgramPage(type: ProgramPageType) {
-  return baseUrl.request<ProgramPageMutationResponse>(ENDPOINTS.PROGRAM_PAGES.UNPUBLISH(type), {
-    method: 'PATCH',
-  });
+  const response = await baseUrl.request<ProgramPageMutationResponse>(
+    ENDPOINTS.PROGRAM_PAGES.UNPUBLISH(type),
+    {
+      method: 'PATCH',
+    }
+  );
+
+  return {
+    ...response,
+    data: normalizeProgramPageDetail(response.data),
+  };
 }

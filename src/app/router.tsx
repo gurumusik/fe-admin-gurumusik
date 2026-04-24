@@ -124,6 +124,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/entry-tutor", element: <EntryTutorPage /> },
       { path: "/dashboard-admin/invoice/:id", element: <InvoicePage /> },
       { path: "/dashboard-admin/programs", element: <ManageProgramPage /> },
+      { path: "/dashboard-admin/programs/pages/:type/style", element: <ProgramPageEditorPage /> },
       { path: "/dashboard-admin/programs/pages/:type", element: <ProgramPageEditorPage /> },
       { path: "/dashboard-admin/paket", element: <ManagePaketPage /> },
       { path: "/dashboard-admin/certificate-instrument", element: <CertificateInstrumentPage /> },

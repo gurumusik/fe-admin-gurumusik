@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   RiArrowLeftLine,
   RiCheckboxCircleFill,
+  RiCloseLine,
   RiExternalLinkLine,
   RiEyeLine,
+  RiMenuLine,
   RiQuestionFill,
   RiRefreshLine,
   RiSaveLine,
@@ -61,6 +63,12 @@ type SeoFormState = {
   metaDescription: string;
   ogImage: string;
   canonicalUrl: string;
+};
+
+type ShortcutItem = {
+  id: string;
+  label: string;
+  description: string;
 };
 
 const emptySeoForm: SeoFormState = {
@@ -125,6 +133,7 @@ const applyDetailToState = (
 
 export default function ProgramPageEditorPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const params = useParams();
 
   const type = useMemo(() => {
@@ -146,6 +155,7 @@ export default function ProgramPageEditorPage() {
   const [seoForm, setSeoForm] = useState<SeoFormState>(emptySeoForm);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [successText, setSuccessText] = useState<string | null>(null);
+  const [isShortcutOpen, setIsShortcutOpen] = useState(false);
   const [confirm, setConfirm] = useState<
     Pick<
       ConfirmationModalProps,
@@ -290,12 +300,115 @@ export default function ProgramPageEditorPage() {
     );
   }
 
+  const editorMode = location.pathname.endsWith('/style') ? 'style' : 'content';
+  const isStyleEditor = editorMode === 'style';
+  const editorBaseUrl = `/dashboard-admin/programs/pages/${type}`;
+  const contentEditorUrl = editorBaseUrl;
+  const styleEditorUrl = `${editorBaseUrl}/style`;
+  const quickAccessSuffix = isStyleEditor ? '/style' : '';
+  const shortcutItems: ShortcutItem[] = isStyleEditor
+    ? [
+        {
+          id: 'section-style-general',
+          label: 'General',
+          description: 'Background halaman dan warna teks umum.',
+        },
+        {
+          id: 'section-style-eyebrow',
+          label: 'Eyebrow',
+          description: 'Warna chip atau badge kecil per section.',
+        },
+        {
+          id: 'section-style-hero',
+          label: 'Hero',
+          description: 'Warna hero, CTA, dan floating badge.',
+        },
+        {
+          id: 'section-style-highlights',
+          label: 'Highlights',
+          description: 'Warna card highlight dan navigasi.',
+        },
+        {
+          id: 'section-style-stats',
+          label: 'Stats',
+          description: 'Warna section statistik.',
+        },
+        {
+          id: 'section-style-comparison',
+          label: 'Comparison',
+          description: 'Warna tabel comparison benefit.',
+        },
+        {
+          id: 'section-style-pricing',
+          label: 'Pricing',
+          description: 'Warna pricing card dan CTA.',
+        },
+        {
+          id: 'section-style-explore-programs',
+          label: 'Explore Programs',
+          description: 'Warna section explore dan card-nya.',
+        },
+        {
+          id: 'section-editor-quick-access',
+          label: 'Ubah Program',
+          description: 'Pilih type program lain dari quick access.',
+        },
+      ]
+    : [
+        {
+          id: 'section-hero',
+          label: 'Hero',
+          description: 'Badge, title, description, CTA, dan image hero.',
+        },
+        {
+          id: 'section-highlights',
+          label: 'Highlights',
+          description: 'Eyebrow, title, dan daftar highlight.',
+        },
+        {
+          id: 'section-stats',
+          label: 'Stats',
+          description: 'Eyebrow, title, description, dan metric.',
+        },
+        {
+          id: 'section-benefit-comparison',
+          label: 'Benefit Comparison',
+          description: 'Tabel perbandingan program vs kompetitor.',
+        },
+        {
+          id: 'section-pricing',
+          label: 'Pricing Section',
+          description: 'Title pricing, plan, benefit, dan CTA.',
+        },
+        {
+          id: 'section-explore-programs',
+          label: 'Explore Programs',
+          description: 'Section explore program lain.',
+        },
+        {
+          id: 'section-editor-quick-access',
+          label: 'Ubah Program',
+          description: 'Pilih type program lain dari quick access.',
+        },
+      ];
   const previewUrl = `/program/${type}`;
+
+  const scrollToSection = (sectionId: string) => {
+    setIsShortcutOpen(false);
+    window.setTimeout(() => {
+      const el = document.getElementById(sectionId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  };
 
   return (
     <>
-      <div className="space-y-6">
-        <section className="rounded-2xl bg-white p-4 sm:p-6">
+      <div className="space-y-6 pb-28">
+        <section
+          id="section-editor-header"
+          className="scroll-mt-28 rounded-2xl bg-white p-4 sm:p-6"
+        >
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-3">
               <button
@@ -309,13 +422,15 @@ export default function ProgramPageEditorPage() {
 
               <div>
                 <div className="inline-flex rounded-full bg-[var(--secondary-light-color)] px-3 py-1 text-xs font-semibold text-[var(--secondary-color)]">
-                  Program Page CMS
+                  {isStyleEditor ? 'Program Page Styling' : 'Program Page CMS'}
                 </div>
                 <h1 className="mt-3 text-2xl font-semibold text-neutral-900">
                   {typeMeta.label} Program Page
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm text-neutral-600">
-                  {typeMeta.description}
+                  {isStyleEditor
+                    ? 'Atur warna, border, shadow, dan token visual untuk halaman program ini.'
+                    : typeMeta.description}
                 </p>
               </div>
 
@@ -333,6 +448,31 @@ export default function ProgramPageEditorPage() {
                 <span className="inline-flex items-center rounded-full bg-neutral-100 px-3 py-1 font-medium text-neutral-700">
                   Schema v{detail?.content_schema_version ?? '-'}
                 </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  to={contentEditorUrl}
+                  className={cls(
+                    'inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold transition',
+                    !isStyleEditor
+                      ? 'border-[var(--secondary-color)] bg-[var(--secondary-light-color)]/50 text-[var(--secondary-color)]'
+                      : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                  )}
+                >
+                  Konten
+                </Link>
+                <Link
+                  to={styleEditorUrl}
+                  className={cls(
+                    'inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold transition',
+                    isStyleEditor
+                      ? 'border-[var(--secondary-color)] bg-[var(--secondary-light-color)]/50 text-[var(--secondary-color)]'
+                      : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                  )}
+                >
+                  Styling
+                </Link>
               </div>
             </div>
 
@@ -361,7 +501,11 @@ export default function ProgramPageEditorPage() {
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#F6C437] px-5 text-sm font-semibold text-[#0B0B0B] hover:brightness-95 disabled:opacity-60"
               >
                 <RiSaveLine />
-                {saving ? 'Menyimpan...' : 'Simpan & Publish'}
+                {saving
+                  ? 'Menyimpan...'
+                  : isStyleEditor
+                    ? 'Simpan Styling & Publish'
+                    : 'Simpan & Publish'}
               </button>
               {detail?.status === 'published' ? (
                 <button
@@ -426,19 +570,41 @@ export default function ProgramPageEditorPage() {
         </section>
 
         <div className="grid gap-6 xl:grid-cols-[0.7fr_0.3fr]">
-          <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6">
+          <section
+            id="section-editor-info"
+            className="scroll-mt-28 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6"
+          >
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-[var(--accent-blue-light-color)]/70">
-                <RiEyeLine className="text-xl text-[var(--secondary-color)]" />
+              <div
+                className={cls(
+                  'grid h-10 w-10 place-items-center rounded-full',
+                  isStyleEditor
+                    ? 'bg-[var(--accent-purple-light-color)]/70'
+                    : 'bg-[var(--accent-blue-light-color)]/70'
+                )}
+              >
+                <RiEyeLine
+                  className={cls(
+                    'text-xl',
+                    isStyleEditor
+                      ? 'text-[var(--accent-purple-color)]'
+                      : 'text-[var(--secondary-color)]'
+                  )}
+                />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-neutral-900">SEO & Publish Info</h2>
+                <h2 className="text-lg font-semibold text-neutral-900">
+                  {isStyleEditor ? 'Style Editor Info' : 'SEO & Publish Info'}
+                </h2>
                 <p className="text-sm text-neutral-600">
-                  Metadata ini dipakai untuk halaman public dan sitemap.
+                  {isStyleEditor
+                    ? 'Page ini khusus untuk styling warna dan visual token. Konten utama tetap diedit di tab Konten.'
+                    : 'Metadata ini dipakai untuk halaman public dan sitemap.'}
                 </p>
               </div>
             </div>
 
+            {!isStyleEditor ? (
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
                 <span className="text-sm font-medium text-neutral-800">Meta Title</span>
@@ -497,9 +663,32 @@ export default function ProgramPageEditorPage() {
                 />
               </label>
             </div>
+            ) : (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-neutral-200 p-4">
+                  <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    Mode
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-neutral-900">
+                    Styling Only
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-neutral-200 p-4">
+                  <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    Preview
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-neutral-900">
+                    Perubahan styling langsung memengaruhi halaman public.
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
-          <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6">
+          <section
+            id="section-editor-quick-access"
+            className="scroll-mt-28 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6"
+          >
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-full bg-emerald-50">
                 <RiCheckboxCircleFill className="text-xl text-emerald-600" />
@@ -507,7 +696,7 @@ export default function ProgramPageEditorPage() {
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900">Quick Access</h2>
                 <p className="text-sm text-neutral-600">
-                  Pindah cepat ke editor type lain.
+                  Pindah cepat ke editor type lain dengan mode yang sama.
                 </p>
               </div>
             </div>
@@ -516,7 +705,7 @@ export default function ProgramPageEditorPage() {
               {PROGRAM_TYPE_OPTIONS.map((item) => (
                 <Link
                   key={item.type}
-                  to={`/dashboard-admin/programs/pages/${item.type}`}
+                  to={`/dashboard-admin/programs/pages/${item.type}${quickAccessSuffix}`}
                   className={cls(
                     'rounded-2xl border p-4 transition',
                     item.type === type
@@ -539,8 +728,82 @@ export default function ProgramPageEditorPage() {
             setSuccessText(null);
           }}
           disabled={saving || unpublishing}
+          mode={editorMode}
         />
       </div>
+
+      <div className="pointer-events-none fixed inset-x-0 bottom-5 z-[80] flex justify-center px-4">
+        <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-black/10 bg-white/95 p-2 shadow-[0_18px_42px_rgba(15,23,42,0.18)] backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setIsShortcutOpen(true)}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-5 text-sm font-semibold text-neutral-700 hover:bg-black/5"
+          >
+            <RiMenuLine />
+            Shortcut
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            disabled={saving || unpublishing}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#F6C437] px-5 text-sm font-semibold text-[#0B0B0B] hover:brightness-95 disabled:opacity-60"
+          >
+            <RiSaveLine />
+            {saving ? 'Menyimpan...' : 'Publish'}
+          </button>
+        </div>
+      </div>
+
+      {isShortcutOpen ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Shortcut section"
+          onClick={() => setIsShortcutOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-[28px] bg-white p-5 shadow-[0_24px_64px_rgba(15,23,42,0.22)] sm:p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex rounded-full bg-[var(--secondary-light-color)] px-3 py-1 text-xs font-semibold text-[var(--secondary-color)]">
+                  Shortcut
+                </div>
+                <h2 className="mt-3 text-xl font-semibold text-neutral-900">
+                  Lompat ke section
+                </h2>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Pilih section untuk scroll langsung ke editor yang Anda butuhkan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsShortcutOpen(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 text-neutral-600 hover:bg-black/5"
+                aria-label="Tutup shortcut"
+              >
+                <RiCloseLine />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {shortcutItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => scrollToSection(item.id)}
+                  className="rounded-2xl border border-neutral-200 px-4 py-4 text-left transition hover:border-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]/40"
+                >
+                  <div className="text-sm font-semibold text-neutral-900">{item.label}</div>
+                  <div className="mt-1 text-sm text-neutral-600">{item.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmationModal
         isOpen={confirm.isOpen}

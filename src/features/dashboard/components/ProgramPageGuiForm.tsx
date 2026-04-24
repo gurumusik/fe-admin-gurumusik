@@ -23,6 +23,7 @@ type ProgramPageGuiFormProps = {
   value: ProgramPageContentPayload;
   onChange: (next: ProgramPageContentPayload) => void;
   disabled?: boolean;
+  mode?: 'content' | 'style';
 };
 
 type ThemeFieldSpec = {
@@ -95,11 +96,13 @@ const COLOR_TOKEN_VALUES = new Set(
 );
 
 const THEME_FIELD_GROUPS: Array<{
+  id: string;
   title: string;
   description: string;
   fields: ThemeFieldSpec[];
 }> = [
   {
+    id: 'section-style-general',
     title: 'General',
     description: 'Warna dasar halaman dan tipografi section umum.',
     fields: [
@@ -109,6 +112,7 @@ const THEME_FIELD_GROUPS: Array<{
     ],
   },
   {
+    id: 'section-style-eyebrow',
     title: 'Eyebrow / Chip Colors',
     description: 'Warna background dan teks untuk chip kecil di atas judul tiap section.',
     fields: [
@@ -130,9 +134,12 @@ const THEME_FIELD_GROUPS: Array<{
       { key: 'statsBadgeText', label: 'Stats Eyebrow Text', mode: 'paint' },
       { key: 'pricingBadgeBackground', label: 'Pricing Eyebrow Background', mode: 'paint' },
       { key: 'pricingBadgeText', label: 'Pricing Eyebrow Text', mode: 'paint' },
+      { key: 'exploreEyebrowBackground', label: 'Explore Eyebrow Background', mode: 'paint' },
+      { key: 'exploreEyebrowText', label: 'Explore Eyebrow Text', mode: 'paint' },
     ],
   },
   {
+    id: 'section-style-hero',
     title: 'Hero',
     description: 'Warna hero, CTA, dan floating badge.',
     fields: [
@@ -150,6 +157,7 @@ const THEME_FIELD_GROUPS: Array<{
     ],
   },
   {
+    id: 'section-style-highlights',
     title: 'Highlights',
     description: 'Style card dan navigasi section benefit/highlights.',
     fields: [
@@ -167,6 +175,7 @@ const THEME_FIELD_GROUPS: Array<{
     ],
   },
   {
+    id: 'section-style-stats',
     title: 'Stats',
     description: 'Warna section ungu statistik.',
     fields: [
@@ -179,6 +188,7 @@ const THEME_FIELD_GROUPS: Array<{
     ],
   },
   {
+    id: 'section-style-comparison',
     title: 'Comparison',
     description: 'Warna tabel comparison benefit.',
     fields: [
@@ -195,6 +205,7 @@ const THEME_FIELD_GROUPS: Array<{
     ],
   },
   {
+    id: 'section-style-pricing',
     title: 'Pricing',
     description: 'Warna card pricing dan CTA section harga.',
     fields: [
@@ -220,6 +231,36 @@ const THEME_FIELD_GROUPS: Array<{
       { key: 'pricingCtaText', label: 'Pricing CTA Text', mode: 'paint' },
     ],
   },
+  {
+    id: 'section-style-explore-programs',
+    title: 'Explore Programs',
+    description:
+      'Warna section explore, badge/eyebrow, isi card, CTA, dan navigasi carousel mobile.',
+    fields: [
+      { key: 'exploreBackground', label: 'Explore Background', mode: 'paint' },
+      { key: 'exploreTitleText', label: 'Explore Title Text', mode: 'paint' },
+      { key: 'exploreCardBackground', label: 'Explore Card Background', mode: 'paint' },
+      { key: 'exploreCardBorder', label: 'Explore Card Border', mode: 'paint' },
+      { key: 'exploreCardShadow', label: 'Explore Card Shadow', mode: 'text' },
+      { key: 'exploreCardBadgeBackground', label: 'Explore Card Badge Background', mode: 'paint' },
+      { key: 'exploreCardBadgeText', label: 'Explore Card Badge Text', mode: 'paint' },
+      { key: 'exploreCardTitleText', label: 'Explore Card Title Text', mode: 'paint' },
+      {
+        key: 'exploreCardDescriptionText',
+        label: 'Explore Card Description Text',
+        mode: 'paint',
+      },
+      { key: 'exploreBenefitLabelText', label: 'Explore Benefit Label Text', mode: 'paint' },
+      { key: 'exploreBenefitText', label: 'Explore Benefit Text', mode: 'paint' },
+      { key: 'exploreBenefitIconColor', label: 'Explore Benefit Icon Color', mode: 'paint' },
+      { key: 'exploreCtaBackground', label: 'Explore CTA Background', mode: 'paint' },
+      { key: 'exploreCtaText', label: 'Explore CTA Text', mode: 'paint' },
+      { key: 'exploreDotActive', label: 'Explore Dot Active', mode: 'paint' },
+      { key: 'exploreDotInactive', label: 'Explore Dot Inactive', mode: 'paint' },
+      { key: 'exploreNavBorder', label: 'Explore Navigation Border', mode: 'paint' },
+      { key: 'exploreNavIcon', label: 'Explore Navigation Icon', mode: 'paint' },
+    ],
+  },
 ];
 
 const isHexColor = (value: string) => /^#(?:[0-9A-F]{3}){1,2}$/i.test(value.trim());
@@ -227,13 +268,18 @@ const isHexColor = (value: string) => /^#(?:[0-9A-F]{3}){1,2}$/i.test(value.trim
 const SectionCard = ({
   title,
   description,
+  id,
   children,
 }: {
   title: string;
   description: string;
+  id?: string;
   children: React.ReactNode;
 }) => (
-  <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6">
+  <section
+    id={id}
+    className="scroll-mt-28 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6"
+  >
     <div className="mb-5">
       <h2 className="text-lg font-semibold text-neutral-900">{title}</h2>
       <p className="mt-1 text-sm text-neutral-600">{description}</p>
@@ -364,6 +410,7 @@ export default function ProgramPageGuiForm({
   value,
   onChange,
   disabled,
+  mode = 'content',
 }: ProgramPageGuiFormProps) {
   const updateContent = <K extends keyof ProgramPageContentPayload>(
     key: K,
@@ -412,6 +459,18 @@ export default function ProgramPageGuiForm({
     updateContent('pricing', { ...value.pricing, [key]: nextValue });
   };
 
+  const updateExplorePrograms = <
+    K extends keyof ProgramPageContentPayload['explorePrograms']
+  >(
+    key: K,
+    nextValue: ProgramPageContentPayload['explorePrograms'][K]
+  ) => {
+    updateContent('explorePrograms', {
+      ...value.explorePrograms,
+      [key]: nextValue,
+    });
+  };
+
   const updateTheme = <K extends keyof ProgramPageTheme>(key: K, nextValue: string) => {
     updateContent('theme', { ...value.theme, [key]: nextValue });
   };
@@ -456,12 +515,28 @@ export default function ProgramPageGuiForm({
     updatePricing('plans', nextPlans);
   };
 
+  const updateExploreProgramItem = (
+    index: number,
+    patch: Partial<ProgramPageContentPayload['explorePrograms']['items'][number]>
+  ) => {
+    const nextItems = value.explorePrograms.items.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, ...patch } : item
+    );
+    updateExplorePrograms('items', nextItems);
+  };
+
+  const isContentMode = mode === 'content';
+  const isStyleMode = mode === 'style';
+
   return (
     <div className="space-y-6">
-      <SectionCard
-        title="Page Identity"
-        description="Informasi dasar page program. Label ini dipakai juga sebagai ringkasan di admin."
-      >
+      {isContentMode ? (
+        <>
+          <SectionCard
+            id="section-page-identity"
+            title="Page Identity"
+            description="Informasi dasar page program. Label ini dipakai juga sebagai ringkasan di admin."
+          >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Type">
             <input type="text" value={value.type} disabled className={inputClass} />
@@ -476,12 +551,13 @@ export default function ProgramPageGuiForm({
             />
           </Field>
         </div>
-      </SectionCard>
+          </SectionCard>
 
-      <SectionCard
-        title="Hero Section"
-        description="Konten section pertama: badge, judul, deskripsi, CTA, dan gambar utama."
-      >
+          <SectionCard
+            id="section-hero"
+            title="Hero Section"
+            description="Konten section pertama: badge, judul, deskripsi, CTA, dan gambar utama."
+          >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Badge">
             <input
@@ -573,12 +649,13 @@ export default function ProgramPageGuiForm({
             disabled={disabled}
           />
         </div>
-      </SectionCard>
+          </SectionCard>
 
-      <SectionCard
-        title="Highlights Section"
-        description="Benefit slider / highlights section setelah hero."
-      >
+          <SectionCard
+            id="section-highlights"
+            title="Highlights Section"
+            description="Benefit slider / highlights section setelah hero."
+          >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Eyebrow">
             <input
@@ -704,12 +781,13 @@ export default function ProgramPageGuiForm({
             Tambah Highlight
           </IconButton>
         </div>
-      </SectionCard>
+          </SectionCard>
 
-      <SectionCard
-        title="Stats Section"
-        description="Section statistik hasil murid / parents satisfaction."
-      >
+          <SectionCard
+            id="section-stats"
+            title="Stats Section"
+            description="Section statistik hasil murid / parents satisfaction."
+          >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Eyebrow">
             <input
@@ -825,12 +903,13 @@ export default function ProgramPageGuiForm({
             Tambah Stat
           </IconButton>
         </div>
-      </SectionCard>
+          </SectionCard>
 
-      <SectionCard
-        title="Benefit Comparison Section"
-        description="Tabel perbandingan GuruMusik vs kompetitor."
-      >
+          <SectionCard
+            id="section-benefit-comparison"
+            title="Benefit Comparison Section"
+            description="Tabel perbandingan GuruMusik vs kompetitor."
+          >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Eyebrow">
             <input
@@ -1032,12 +1111,13 @@ export default function ProgramPageGuiForm({
             Tambah Row
           </IconButton>
         </div>
-      </SectionCard>
+          </SectionCard>
 
-      <SectionCard
-        title="Pricing Section"
-        description="Section harga dan plan card."
-      >
+          <SectionCard
+            id="section-pricing"
+            title="Pricing Section"
+            description="Section harga dan plan card."
+          >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Eyebrow">
             <input
@@ -1250,42 +1330,220 @@ export default function ProgramPageGuiForm({
             Tambah Plan
           </IconButton>
         </div>
-      </SectionCard>
+          </SectionCard>
 
-      <SectionCard
-        title="Theme & Visual Tokens"
-        description="Atur warna, gradient, border, dan shadow per section. Field warna bisa memilih token global; gradient/shadow tetap bisa diisi manual."
-      >
-        <div className="space-y-5">
-          {THEME_FIELD_GROUPS.map((group) => (
-            <details
-              key={group.title}
-              open
-              className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4"
-            >
-              <summary className="cursor-pointer list-none text-base font-semibold text-neutral-900">
-                {group.title}
-                <span className="mt-1 block text-sm font-normal text-neutral-600">
-                  {group.description}
-                </span>
-              </summary>
-              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {group.fields.map((field) => (
-                  <ThemeFieldInput
-                    key={field.key}
-                    label={field.label}
-                    helperText={field.helperText}
-                    mode={field.mode}
-                    value={value.theme[field.key]}
-                    disabled={disabled}
-                    onChange={(next) => updateTheme(field.key, next)}
-                  />
-                ))}
+          <SectionCard
+            id="section-explore-programs"
+            title="Explore Programs Section"
+            description="Section manual untuk menampilkan program lain dalam bentuk card carousel/grid."
+          >
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Eyebrow">
+            <input
+              type="text"
+              value={value.explorePrograms.eyebrow}
+              disabled={disabled}
+              onChange={(event) =>
+                updateExplorePrograms('eyebrow', event.target.value)
+              }
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Section Title">
+            <input
+              type="text"
+              value={value.explorePrograms.title}
+              disabled={disabled}
+              onChange={(event) =>
+                updateExplorePrograms('title', event.target.value)
+              }
+              className={inputClass}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          {value.explorePrograms.items.map((item, index) => (
+            <div key={`explore-program-${index}`} className="rounded-2xl border border-neutral-200 p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-neutral-900">
+                  Card #{index + 1}
+                </div>
+                <IconButton
+                  variant="danger"
+                  disabled={disabled || value.explorePrograms.items.length <= 1}
+                  onClick={() =>
+                    updateExplorePrograms(
+                      'items',
+                      value.explorePrograms.items.filter((_, itemIndex) => itemIndex !== index)
+                    )
+                  }
+                >
+                  <RiDeleteBin6Line />
+                  Hapus
+                </IconButton>
               </div>
-            </details>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Badge">
+                  <input
+                    type="text"
+                    value={item.badge}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      updateExploreProgramItem(index, { badge: event.target.value })
+                    }
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Card Title">
+                  <input
+                    type="text"
+                    value={item.title}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      updateExploreProgramItem(index, { title: event.target.value })
+                    }
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="CTA Label">
+                  <input
+                    type="text"
+                    value={item.ctaLabel}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      updateExploreProgramItem(index, { ctaLabel: event.target.value })
+                    }
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="CTA Href">
+                  <input
+                    type="text"
+                    value={item.ctaHref}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      updateExploreProgramItem(index, { ctaHref: event.target.value })
+                    }
+                    className={inputClass}
+                    placeholder="/program/special-need"
+                  />
+                </Field>
+                <div className="md:col-span-2">
+                  <Field label="Description">
+                    <textarea
+                      value={item.description}
+                      disabled={disabled}
+                      onChange={(event) =>
+                        updateExploreProgramItem(index, { description: event.target.value })
+                      }
+                      className={textAreaClass}
+                      rows={3}
+                    />
+                  </Field>
+                </div>
+                <ProgramPageImageUploadField
+                  label="Card Image"
+                  value={item.imageSrc}
+                  disabled={disabled}
+                  previewAlt={item.imageAlt || item.title || 'Explore program image'}
+                  onChange={(next) => updateExploreProgramItem(index, { imageSrc: next })}
+                />
+                <Field label="Image Alt">
+                  <input
+                    type="text"
+                    value={item.imageAlt}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      updateExploreProgramItem(index, { imageAlt: event.target.value })
+                    }
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
+
+              <div className="mt-4">
+                <StringItemsInput
+                  label="Benefits"
+                  value={item.benefits}
+                  onChange={(benefits) =>
+                    updateExploreProgramItem(index, { benefits })
+                  }
+                  placeholder="Contoh: Guru berpengalaman khusus ABK."
+                  addLabel="Tambah Benefit"
+                  disabled={disabled}
+                />
+              </div>
+            </div>
           ))}
         </div>
-      </SectionCard>
+
+        <div className="mt-4">
+          <IconButton
+            disabled={disabled}
+            onClick={() =>
+              updateExplorePrograms('items', [
+                ...value.explorePrograms.items,
+                {
+                  badge: '',
+                  title: '',
+                  description: '',
+                  imageSrc: '',
+                  imageAlt: '',
+                  ctaLabel: '',
+                  ctaHref: '',
+                  benefits: [],
+                },
+              ])
+            }
+          >
+            <RiAddLine />
+            Tambah Card
+          </IconButton>
+        </div>
+          </SectionCard>
+        </>
+      ) : null}
+
+      {isStyleMode ? (
+        <SectionCard
+          id="section-theme-visual-tokens"
+          title="Theme & Visual Tokens"
+          description="Atur warna, gradient, border, dan shadow per section. Field warna bisa memilih token global; gradient/shadow tetap bisa diisi manual."
+        >
+          <div className="space-y-5">
+            {THEME_FIELD_GROUPS.map((group) => (
+              <details
+                key={group.title}
+                id={group.id}
+                open
+                className="scroll-mt-28 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4"
+              >
+                <summary className="cursor-pointer list-none text-base font-semibold text-neutral-900">
+                  {group.title}
+                  <span className="mt-1 block text-sm font-normal text-neutral-600">
+                    {group.description}
+                  </span>
+                </summary>
+                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {group.fields.map((field) => (
+                    <ThemeFieldInput
+                      key={field.key}
+                      label={field.label}
+                      helperText={field.helperText}
+                      mode={field.mode}
+                      value={value.theme[field.key]}
+                      disabled={disabled}
+                      onChange={(next) => updateTheme(field.key, next)}
+                    />
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        </SectionCard>
+      ) : null}
     </div>
   );
 }
