@@ -8,5 +8,5 @@ export const DashboardPage: React.FC = () => {
     navigate("/dashboard-admin/instrument", { replace: true });
   }, [navigate]);
 
-  return null;
+  return null; 
 };
