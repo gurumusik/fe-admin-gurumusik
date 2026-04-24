@@ -81,6 +81,7 @@ const AdminSidebar: React.FC = () => {
     "/dashboard-admin/wa-handoffs",
     "/dashboard-admin/live-chat",
     "/dashboard-admin/teacher-change",
+    "/dashboard-admin/tutor-no-schedule",
     "/dashboard-admin/tutor-report",
     "/dashboard-admin/student-report",
   ];
@@ -328,6 +329,11 @@ const AdminSidebar: React.FC = () => {
                   to="/dashboard-admin/teacher-change"
                   label="Teacher Change"
                   active={isExact("/dashboard-admin/teacher-change")}
+                />
+                <SubItem
+                  to="/dashboard-admin/tutor-no-schedule"
+                  label="Guru Tanpa Jadwal"
+                  active={isUnder("/dashboard-admin/tutor-no-schedule")}
                 />
                 <SubItem
                   to="/dashboard-admin/tutor-report"

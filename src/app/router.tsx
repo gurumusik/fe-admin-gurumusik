@@ -12,6 +12,7 @@ import EditModulePage from "@/features/dashboard/pages/module/edit-module/page";
 import AdminRefundPage from "@/features/dashboard/pages/refund/page";
 import TutorReportPage from "@/features/dashboard/pages/tutor-report/page";
 import StudentReportPage from "@/features/dashboard/pages/student-report/page";
+import TutorNoSchedulePage from "@/features/dashboard/pages/tutor-no-schedule/page";
 import VerifiedTutorPage from "@/features/dashboard/pages/verified-tutor/page";
 import VerifiedTutorCertificationsPage from "@/features/dashboard/pages/verified-tutor/certifications/page";
 import VerifiedTutorManualCertificationsPage from "@/features/dashboard/pages/verified-tutor/manual-certifications/page";
@@ -88,6 +89,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/refund", element: <AdminRefundPage /> },
       { path: "/dashboard-admin/tutor-report", element: <TutorReportPage /> },
       { path: "/dashboard-admin/student-report", element: <StudentReportPage /> },
+      { path: "/dashboard-admin/tutor-no-schedule", element: <TutorNoSchedulePage /> },
       { path: "/dashboard-admin/reschedule", element: <ReschedulePage /> },
       { path: "/dashboard-admin/make-reschedule", element: <MakeReschedulePage /> },
       { path: "/dashboard-admin/request-assist", element: <RequestAssistPage /> },
