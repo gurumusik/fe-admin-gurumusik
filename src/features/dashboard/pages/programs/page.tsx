@@ -5,6 +5,7 @@ import React, {
   type FormEvent,
   type ChangeEvent,
 } from "react";
+import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "@/app/store";
 import {
@@ -38,6 +39,24 @@ type ProgramForm = {
   durasi_menit: string;
   komisi_guru_per_sesi: string;
 };
+
+const PROGRAM_PAGE_LINKS = [
+  {
+    type: "regular",
+    label: "Regular",
+    description: "Kelola content halaman program reguler dan publish langsung.",
+  },
+  {
+    type: "special-need",
+    label: "Special Need",
+    description: "Kelola content halaman program special need dan publish langsung.",
+  },
+  {
+    type: "hobby",
+    label: "Hobby",
+    description: "Kelola content halaman program hobby dan publish langsung.",
+  },
+] as const;
 
 const initialForm: ProgramForm = {
   nama_program: "",
@@ -266,6 +285,41 @@ const ManageProgramPage: React.FC = () => {
         >
           {creating ? "Menyimpan..." : "+ Tambah Program"}
         </button>
+      </div>
+
+      <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm p-4 sm:p-5">
+        <div className="flex flex-col gap-2">
+          <div className="inline-flex w-fit rounded-full bg-[var(--secondary-light-color)] px-3 py-1 text-xs font-semibold text-[var(--secondary-color)]">
+            Program Page CMS
+          </div>
+          <h2 className="text-lg font-semibold text-neutral-900">
+            Edit content halaman /program/[type]
+          </h2>
+          <p className="text-sm text-neutral-600">
+            Halaman ini terpisah dari CRUD master program. Gunakan editor CMS untuk mengubah content page,
+            SEO, lalu simpan perubahan agar langsung tampil di halaman public.
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {PROGRAM_PAGE_LINKS.map((item) => (
+            <Link
+              key={item.type}
+              to={`/dashboard-admin/programs/pages/${item.type}`}
+              className="rounded-2xl border border-neutral-200 p-4 transition hover:border-neutral-300 hover:bg-neutral-50"
+            >
+              <div className="text-sm font-semibold text-neutral-900">
+                {item.label}
+              </div>
+              <p className="mt-2 text-sm text-neutral-600">
+                {item.description}
+              </p>
+              <div className="mt-4 inline-flex rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-700">
+                Buka Editor
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Card: Filter & Table */}

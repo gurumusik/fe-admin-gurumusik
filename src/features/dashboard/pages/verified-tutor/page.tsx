@@ -820,6 +820,15 @@ const mapCertStatus = (raw?: string | null): CertStatus => {
   return 'Menunggu Verifikasi'; // termasuk 'under_review' / default
 };
 
+const mapDraftDecisionStatus = (
+  raw?: string | null
+): 'approved' | 'rejected' | null => {
+  const value = String(raw || '').toLowerCase();
+  if (value === 'approved') return 'approved';
+  if (value === 'rejected') return 'rejected';
+  return null;
+};
+
 const LANGUAGE_MAP: Record<string, { label: string; code: string }> = {
   id: { label: 'Indonesia', code: 'ID' },
   en: { label: 'English', code: 'EN' },
@@ -1645,8 +1654,6 @@ export const VerifiedTutorPageContent: React.FC<{
     [selected]
   );
 
-  const hasInstrumentCerts = certItems.length > 0;
-
   const selectedLanguages = useMemo(() => {
     const a = Array.isArray(selected?.bahasa) ? selected?.bahasa : [];
     const b = Array.isArray(selected?.user?.detailGuru?.bahasa)
@@ -1667,6 +1674,8 @@ export const VerifiedTutorPageContent: React.FC<{
       instrument: a.instrument ?? null,
       files: Array.isArray((a as any).files) ? (a as any).files : null,
       video_url: a.video_url ?? null,
+      status: a.status ?? null,
+      alasan_penolakan: a.alasan_penolakan ?? null,
     }));
   }, [selected]);
 
@@ -1681,6 +1690,8 @@ export const VerifiedTutorPageContent: React.FC<{
       minorInstrument: e.minorInstrument ?? null,
       url_sertifikat_kelulusan: e.url_sertifikat_kelulusan ?? null,
       video_url: e.video_url ?? null,
+      status: e.status ?? null,
+      alasan_penolakan: e.alasan_penolakan ?? null,
     }));
   }, [selected]);
 
@@ -1700,7 +1711,7 @@ export const VerifiedTutorPageContent: React.FC<{
           ) {
             return 'revision' as const;
           }
-          return null;
+          return mapDraftDecisionStatus(a.status ?? null);
         })(),
       })),
     [selectedAwardList, awardDrafts, isSelectedRevisionResubmitted, selectedRevisedItemStatusIndex]
@@ -1722,11 +1733,25 @@ export const VerifiedTutorPageContent: React.FC<{
           ) {
             return 'revision' as const;
           }
-          return null;
+          return mapDraftDecisionStatus(e.status ?? null);
         })(),
       })),
     [selectedEducationList, eduDrafts, isSelectedRevisionResubmitted, selectedRevisedItemStatusIndex]
   );
+
+  const reviewedCertItems = applyDrafts(certItems);
+  const hasAnyCertificateRecords =
+    reviewedCertItems.length > 0 ||
+    educationListWithDrafts.length > 0 ||
+    awardListWithDrafts.length > 0;
+  const hasApprovedActivationCertificate =
+    reviewedCertItems.some((item) => {
+      if (item.draftStatus === 'approved') return true;
+      if (item.draftStatus === 'rejected' || item.draftStatus === 'revision') return false;
+      return item.status === 'Disetujui';
+    }) ||
+    educationListWithDrafts.some((item) => item.draftStatus === 'approved') ||
+    awardListWithDrafts.some((item) => item.draftStatus === 'approved');
 
   const buildRevisionItemFieldKey = (prefix: string, rawId: unknown) => {
     const id = Number(rawId);
@@ -1819,8 +1844,8 @@ export const VerifiedTutorPageContent: React.FC<{
         const education_decisions = buildEducationDecisions(selectedEducationList);
         const award_decisions = buildAwardDecisions(selectedAwardList);
         const revision_fields = buildApproveRevisionFields();
-        if (!hasInstrumentCerts) {
-          throw new Error('Minimal 1 sertifikat lokal/internasional wajib tersedia');
+        if (!hasApprovedActivationCertificate) {
+          throw new Error('Minimal 1 sertifikat tipe apa pun wajib disetujui');
         }
         await decideApplication(selected.id, {
           decision: 'approve',
@@ -2201,10 +2226,10 @@ export const VerifiedTutorPageContent: React.FC<{
         }
         approveDisabled={
           modalMode === 'approved' &&
-          !hasInstrumentCerts
+          !hasAnyCertificateRecords
         }
         approveDisabledHint={
-          'Minimal 1 sertifikat lokal/internasional wajib tersedia.'
+          'Minimal 1 sertifikat tipe apa pun wajib tersedia.'
         }
         data={{
           image: resolveImageUrl(selected?.user?.profile_pic_url ?? null) || defaultUser,
@@ -2225,7 +2250,7 @@ export const VerifiedTutorPageContent: React.FC<{
           certificateUrl: selected?.portfolio_url ?? undefined,
           awardCertificateUrl:
             selected?.sertifikat_penghargaan_url ?? undefined,
-          certificates: applyDrafts(certItems),
+          certificates: reviewedCertItems,
           languages: selectedLanguages,
           classInfo: {
             title: selected?.judul_kelas ?? undefined,
@@ -2243,7 +2268,7 @@ export const VerifiedTutorPageContent: React.FC<{
           revisedFieldKeys: selectedRevisedFieldKeys,
         }}
         onOpenCertificates={(opts) => {
-          const all = applyDrafts(certItems);
+          const all = reviewedCertItems;
           let filtered = all;
           if (opts?.instrumentName) {
             const key = opts.instrumentName.toLowerCase();

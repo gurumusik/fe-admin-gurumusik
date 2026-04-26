@@ -628,24 +628,27 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
   const approvedInstrumentCertCount = certs.filter(
     (item) => getDisplayCertStatus(item) === 'Disetujui'
   ).length;
-  const hasApprovedLocalInternationalCert = approvedInstrumentCertCount > 0;
+  const approvedEducationCertCount = (data?.educationList ?? []).filter(
+    (item) => item.draftStatus === 'approved'
+  ).length;
+  const approvedAwardCertCount = (data?.awardList ?? []).filter(
+    (item) => item.draftStatus === 'approved'
+  ).length;
+  const hasApprovedActivationCertificate =
+    approvedInstrumentCertCount + approvedEducationCertCount + approvedAwardCertCount > 0;
   const hasPendingReviewInstrument = allInstrumentSummaryRows.some(
     (row) => row.status === 'pending'
   );
-  const rejectDisabledHint =
-    'Minimal 1 sertifikat lokal/internasional berstatus Disetujui dibutuhkan untuk verifikasi guru.';
   const pendingReviewDisabledHint =
     'Masih ada instrumen berstatus Menunggu Verifikasi. Tentukan aksi dulu sebelum submit.';
   const approvePrimaryDisabled =
-    hasApprovedLocalInternationalCert && (approveDisabled || hasPendingReviewInstrument);
-  const approvePrimaryDisabledHint = hasPendingReviewInstrument
-    ? pendingReviewDisabledHint
-    : approveDisabledHint;
+    hasApprovedActivationCertificate && approveDisabled;
+  const approvePrimaryDisabledHint = approveDisabledHint;
   const rejectPrimaryDisabled =
-    !hasApprovedLocalInternationalCert && hasPendingReviewInstrument;
+    !hasApprovedActivationCertificate && hasPendingReviewInstrument;
   const reviewPrimaryAction = isRevisionMode
     ? submitRevision
-    : hasApprovedLocalInternationalCert
+    : hasApprovedActivationCertificate
       ? () => openDecisionConfirm({ mode: 'approved' })
       : () =>
         openDecisionConfirm({
@@ -655,12 +658,12 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
         });
   const reviewPrimaryDisabled = isRevisionMode
     ? selectedRevisionCount === 0
-    : hasApprovedLocalInternationalCert
+    : hasApprovedActivationCertificate
       ? approvePrimaryDisabled
       : rejectPrimaryDisabled;
   const reviewPrimaryLabel = isRevisionMode
     ? 'Kirim Laporan Kesalahan'
-    : hasApprovedLocalInternationalCert
+    : hasApprovedActivationCertificate
       ? 'Verifikasi Guru'
       : 'Kirim Pesan';
   const displayTeacherName = [data?.name, data?.short_name].filter(Boolean).join(' / ') || '-';
@@ -1456,11 +1459,9 @@ const ApproveTeacherModal: React.FC<ApproveTeacherModalProps> = ({
                         </p>
                       ) : !isRevisionMode && reviewPrimaryDisabled ? (
                         <p className="mt-2 text-sm text-neutral-600">
-                          {hasPendingReviewInstrument
-                            ? pendingReviewDisabledHint
-                            : hasApprovedLocalInternationalCert
+                          {hasApprovedActivationCertificate
                             ? approvePrimaryDisabledHint
-                            : rejectDisabledHint}
+                            : pendingReviewDisabledHint}
                         </p>
                       ) : null}
                     </div>

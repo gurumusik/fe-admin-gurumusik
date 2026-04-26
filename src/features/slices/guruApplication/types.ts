@@ -89,6 +89,9 @@ export type GAPendidikanGuruLite = {
     nama_instrumen?: string | null;
     icon?: string | null;
   } | null;
+  status?: 'approved' | 'under_review' | 'rejected' | null;
+  alasan_penolakan?: string | null;
+  tipe_sertifikat?: string | null;
 };
 
 export type GAUserLite = {
@@ -163,6 +166,9 @@ export type GuruApplicationDTO = {
     penyelenggara?: string | null;
     detail_penghargaan?: string | null;
     video_url?: string | null;
+    status?: 'approved' | 'under_review' | 'rejected' | null;
+    alasan_penolakan?: string | null;
+    tipe_sertifikat?: string | null;
     instrument?: {
       id: number;
       nama?: string | null;

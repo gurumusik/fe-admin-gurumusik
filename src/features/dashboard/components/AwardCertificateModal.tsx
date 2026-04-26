@@ -27,6 +27,8 @@ export type AwardCertificateData = {
     created_at?: string | null;
   }> | null;
   video_url?: string | null;
+  status?: 'approved' | 'under_review' | 'rejected' | null;
+  alasan_penolakan?: string | null;
   draftStatus?: 'approved' | 'rejected' | 'revision' | null;
 };
 
@@ -282,7 +284,7 @@ const AwardCertificateModal: React.FC<Props> = ({
               Pilih Aksi Dibawah!!
             </p>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="grid flex-1 grid-cols-1 overflow-hidden rounded-full border border-[#D6E1EC] bg-white sm:grid-cols-3">
+              <div className="grid flex-1 grid-cols-1 overflow-hidden rounded-full border border-[#D6E1EC] bg-white sm:grid-cols-4">
                 <button
                   type="button"
                   disabled
@@ -290,6 +292,18 @@ const AwardCertificateModal: React.FC<Props> = ({
                   title="Sedang maintenance"
                 >
                   Ajukan Ujian
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraftDecision('approved')}
+                  className={[
+                    'h-10 border-r border-[#E4ECF4] px-4 text-xs font-medium transition',
+                    draftDecision === 'approved'
+                      ? 'bg-[#E8FFF1] text-[#18B968]'
+                      : 'bg-white text-[#2D3445] hover:bg-[#F7FAFD]',
+                  ].join(' ')}
+                >
+                  Setujui
                 </button>
                 <button
                   type="button"

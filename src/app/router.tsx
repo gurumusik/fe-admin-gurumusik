@@ -12,6 +12,7 @@ import EditModulePage from "@/features/dashboard/pages/module/edit-module/page";
 import AdminRefundPage from "@/features/dashboard/pages/refund/page";
 import TutorReportPage from "@/features/dashboard/pages/tutor-report/page";
 import StudentReportPage from "@/features/dashboard/pages/student-report/page";
+import TutorNoSchedulePage from "@/features/dashboard/pages/tutor-no-schedule/page";
 import VerifiedTutorPage from "@/features/dashboard/pages/verified-tutor/page";
 import VerifiedTutorCertificationsPage from "@/features/dashboard/pages/verified-tutor/certifications/page";
 import VerifiedTutorManualCertificationsPage from "@/features/dashboard/pages/verified-tutor/manual-certifications/page";
@@ -40,6 +41,7 @@ import MakeReschedulePage from "@/features/dashboard/pages/make-reschedule/page"
 import EntryTutorPage from "@/features/dashboard/pages/entry-tutor/page"
 import InvoicePage from '@/features/dashboard/pages/invoice/page';
 import ManageProgramPage from '@/features/dashboard/pages/programs/page';
+import ProgramPageEditorPage from '@/features/dashboard/pages/programs/program-page-editor/page';
 import ManagePaketPage from '@/features/dashboard/pages/paket/page';
 import CertificateInstrumentPage from '@/features/dashboard/pages/certificate-instrument/page';
 import EmployeePage from '@/features/dashboard/pages/employee/page';
@@ -87,6 +89,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/refund", element: <AdminRefundPage /> },
       { path: "/dashboard-admin/tutor-report", element: <TutorReportPage /> },
       { path: "/dashboard-admin/student-report", element: <StudentReportPage /> },
+      { path: "/dashboard-admin/tutor-no-schedule", element: <TutorNoSchedulePage /> },
       { path: "/dashboard-admin/reschedule", element: <ReschedulePage /> },
       { path: "/dashboard-admin/make-reschedule", element: <MakeReschedulePage /> },
       { path: "/dashboard-admin/request-assist", element: <RequestAssistPage /> },
@@ -123,6 +126,8 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/entry-tutor", element: <EntryTutorPage /> },
       { path: "/dashboard-admin/invoice/:id", element: <InvoicePage /> },
       { path: "/dashboard-admin/programs", element: <ManageProgramPage /> },
+      { path: "/dashboard-admin/programs/pages/:type/style", element: <ProgramPageEditorPage /> },
+      { path: "/dashboard-admin/programs/pages/:type", element: <ProgramPageEditorPage /> },
       { path: "/dashboard-admin/paket", element: <ManagePaketPage /> },
       { path: "/dashboard-admin/certificate-instrument", element: <CertificateInstrumentPage /> },
       { path: "/dashboard-admin/employees", element: <EmployeePage /> },

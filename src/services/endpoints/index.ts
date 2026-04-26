@@ -17,7 +17,9 @@ export const ENDPOINTS = {
   GURU: {
     LIST: '/guru',
     INCOMPLETE: '/guru/incomplete',
+    MISSING_SCHEDULE: '/guru/missing-schedule',
     DETAIL: (id: number | string) => `/guru/${id}`,
+    SCHEDULE_REMINDER_LOGS: (id: number | string) => `/guru/${id}/schedule-reminder-logs`,
     SCHEDULES: (id: number | string) => `/guru/${id}/schedules`,
     CLASSES: (id: number | string) => `/guru/${id}/classes`,
     CLASSES_SESSIONS: (guruId: number | string) => `/guru/${guruId}/classes/sessions`,
@@ -63,6 +65,13 @@ export const ENDPOINTS = {
     CREATE: '/programs',        // POST admin
     UPDATE: (id: number|string) => `/programs/${id}`, // PUT admin
     DELETE: (id: number|string) => `/programs/${id}`, // DELETE admin
+  },
+  PROGRAM_PAGES: {
+    LIST: '/program-pages',
+    DETAIL: (type: 'regular' | 'special-need' | 'hobby') => `/program-pages/${type}`,
+    UPDATE: (type: 'regular' | 'special-need' | 'hobby') => `/program-pages/${type}`,
+    PUBLISH: (type: 'regular' | 'special-need' | 'hobby') => `/program-pages/${type}/publish`,
+    UNPUBLISH: (type: 'regular' | 'special-need' | 'hobby') => `/program-pages/${type}/unpublish`,
   },
   PAKET: {
     LIST: '/paket',                              // GET ?search=&page=&limit=
