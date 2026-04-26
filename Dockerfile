@@ -19,8 +19,11 @@ RUN pnpm config set fetch-retries 5 \
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy project files (kecuali node_modules)
+# Copy project files
 COPY . .
+
+ARG ENV_FILE
+COPY ${ENV_FILE} .env
 
 # Build project
 RUN pnpm run build
