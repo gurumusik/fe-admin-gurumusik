@@ -1396,6 +1396,26 @@ export default function ProgramPageGuiForm({
                     className={inputClass}
                   />
                 </Field>
+                <ThemeFieldInput
+                  label="Badge Background"
+                  value={item.badgeBackgroundColor ?? ''}
+                  mode="paint"
+                  disabled={disabled}
+                  helperText="Kosongkan untuk pakai warna badge global Explore."
+                  onChange={(next) =>
+                    updateExploreProgramItem(index, { badgeBackgroundColor: next })
+                  }
+                />
+                <ThemeFieldInput
+                  label="Badge Text"
+                  value={item.badgeTextColor ?? ''}
+                  mode="paint"
+                  disabled={disabled}
+                  helperText="Kosongkan untuk pakai warna teks badge global Explore."
+                  onChange={(next) =>
+                    updateExploreProgramItem(index, { badgeTextColor: next })
+                  }
+                />
                 <Field label="Card Title">
                   <input
                     type="text"
@@ -1487,6 +1507,8 @@ export default function ProgramPageGuiForm({
                 ...value.explorePrograms.items,
                 {
                   badge: '',
+                  badgeBackgroundColor: '',
+                  badgeTextColor: '',
                   title: '',
                   description: '',
                   imageSrc: '',

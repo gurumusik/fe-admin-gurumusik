@@ -93,6 +93,8 @@ export type ProgramPagePricingContent = {
 
 export type ProgramPageExploreProgramItem = {
   badge: string;
+  badgeBackgroundColor?: string | null;
+  badgeTextColor?: string | null;
   title: string;
   description: string;
   imageSrc: string;
@@ -382,30 +384,45 @@ const normalizeProgramPageTheme = (value: unknown): ProgramPageTheme => {
 
 export const normalizeProgramPageContentPayload = (
   content: ProgramPageContentPayload
-): ProgramPageContentPayload => ({
-  ...content,
-  theme: normalizeProgramPageTheme((content as any).theme),
-  explorePrograms: {
-    eyebrow:
-      typeof (content as any).explorePrograms?.eyebrow === 'string' &&
-      (content as any).explorePrograms.eyebrow.trim()
-        ? (content as any).explorePrograms.eyebrow.trim()
-        : DEFAULT_EXPLORE_PROGRAMS_CONTENT.eyebrow,
-    title:
-      typeof (content as any).explorePrograms?.title === 'string' &&
-      (content as any).explorePrograms.title.trim()
-        ? (content as any).explorePrograms.title.trim()
-        : DEFAULT_EXPLORE_PROGRAMS_CONTENT.title,
-    items: Array.isArray((content as any).explorePrograms?.items)
-      ? (content as any).explorePrograms.items.map(
+): ProgramPageContentPayload => {
+  const rawExplorePrograms =
+    content.explorePrograms &&
+    typeof content.explorePrograms === 'object' &&
+    !Array.isArray(content.explorePrograms)
+      ? content.explorePrograms
+      : DEFAULT_EXPLORE_PROGRAMS_CONTENT;
+
+  return {
+    ...content,
+    theme: normalizeProgramPageTheme(content.theme),
+    explorePrograms: {
+      eyebrow:
+        typeof rawExplorePrograms.eyebrow === 'string' && rawExplorePrograms.eyebrow.trim()
+          ? rawExplorePrograms.eyebrow.trim()
+          : DEFAULT_EXPLORE_PROGRAMS_CONTENT.eyebrow,
+      title:
+        typeof rawExplorePrograms.title === 'string' && rawExplorePrograms.title.trim()
+          ? rawExplorePrograms.title.trim()
+          : DEFAULT_EXPLORE_PROGRAMS_CONTENT.title,
+      items: Array.isArray(rawExplorePrograms.items)
+        ? rawExplorePrograms.items.map(
           (item: ProgramPageExploreProgramItem) => ({
             ...item,
+            badgeBackgroundColor:
+              typeof item.badgeBackgroundColor === 'string'
+                ? item.badgeBackgroundColor.trim()
+                : '',
+            badgeTextColor:
+              typeof item.badgeTextColor === 'string'
+                ? item.badgeTextColor.trim()
+                : '',
             benefits: Array.isArray(item.benefits) ? item.benefits : [],
           })
         )
-      : DEFAULT_EXPLORE_PROGRAMS_CONTENT.items,
-  },
-});
+        : DEFAULT_EXPLORE_PROGRAMS_CONTENT.items,
+    },
+  };
+};
 
 const normalizeProgramPageDetail = (
   detail: ProgramPageDetailDTO
