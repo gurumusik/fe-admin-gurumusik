@@ -21,7 +21,7 @@ import {
 } from 'react-icons/ri';
 import defaultUser from '@/assets/images/default-user.png';
 import { useDispatch, useSelector } from 'react-redux';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { AppDispatch } from '@/app/store';
 
 import ConfirmationModal from '@/components/ui/common/ConfirmationModal';
@@ -138,6 +138,7 @@ const mapCertStatus = (raw?: string | null): CertStatus => {
 
 export default function ProfileTutorPage() {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const { state } = useLocation() as { state?: LocationState };
 
   // Ambil guruId dari state atau query (?guru_id / ?id)
@@ -484,6 +485,12 @@ export default function ProfileTutorPage() {
             </button>
 
             <div className="flex gap-3">
+              <button
+                onClick={() => navigate('/dashboard-admin/tutor-list/class-list-tutor/profile-tutor/edit', { state: { guruId } })}
+                className="flex gap-2 items-center bg-[var(--secondary-color)] text-white text-sm rounded-full py-1.5 px-4 hover:brightness-95 transition"
+              >
+                Edit Profile
+              </button>
               {showBeriCuti && (
                 <button
                   onClick={() => setOpenVacation(true)}

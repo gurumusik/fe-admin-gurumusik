@@ -47,3 +47,20 @@ export async function rejectSertifikat(id: number | string, alasan?: string) {
 export async function setUnderReviewSertifikat(id: number | string) {
   return patchSertifikatStatus(id, { status: 'under_review' });
 }
+
+/** PATCH video_url pada sertifikat instrumen guru (admin) */
+export async function updateSertifikatVideoUrl(
+  id: number | string,
+  video_url: string | null
+) {
+  const idStr = String(id ?? '').trim();
+  if (!idStr || idStr === 'NaN' || !/^\d+$/.test(idStr)) {
+    throw new Error(`id sertifikat tidak valid: "${idStr}"`);
+  }
+  const url = ENDPOINTS.SERTIFIKAT.UPDATE_VIDEO(idStr);
+  return baseUrl.request<any>(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ video_url }),
+  });
+}

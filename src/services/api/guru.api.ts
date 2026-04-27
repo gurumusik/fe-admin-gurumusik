@@ -103,3 +103,74 @@ export async function createGuruFromEntry(
     body: JSON.stringify(payload),
   });
 }
+
+export type UpdateGuruBasicPayload = {
+  nama?: string;
+  nama_panggilan?: string;
+  no_telp?: string;
+  alamat?: string;
+  province?: string;
+  province_id?: string;
+  city?: string;
+  city_id?: string;
+  bio?: string;
+  home_lat?: number | null;
+  home_lng?: number | null;
+  profile_pic_url?: string | null;
+};
+
+export async function updateGuruBasicApi(
+  payload: UpdateGuruBasicPayload,
+  guruId?: number | string
+) {
+  const url = ENDPOINTS.GURU.UPDATE_BASIC(guruId);
+  return baseUrl.request<any>(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export type UpdateGuruDetailPayload = {
+  title?: string;
+  intro_link?: string;
+  bahasa?: string[];
+  bio?: string;
+  designed_for?: string[];
+};
+
+export async function updateGuruDetailApi(
+  payload: UpdateGuruDetailPayload,
+  guruId?: number | string
+) {
+  const url = ENDPOINTS.GURU.UPDATE_DETAIL(guruId);
+  return baseUrl.request<any>(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateGuruLanguagesApi(
+  bahasa: string[],
+  guruId?: number | string
+) {
+  const url = ENDPOINTS.GURU.UPDATE_LANGUAGES(guruId);
+  return baseUrl.request<any>(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bahasa }),
+  });
+}
+
+export async function uploadGuruAvatarApi(file: File, guruId?: number | string) {
+  const formData = new FormData();
+  formData.append('profile_pic', file);
+  const url = guruId
+    ? `${ENDPOINTS.GURU.UPLOAD_AVATAR}?id=${guruId}`
+    : ENDPOINTS.GURU.UPLOAD_AVATAR;
+  return baseUrl.request<any>(url, {
+    method: 'POST',
+    body: formData,
+  });
+}

@@ -34,6 +34,7 @@ import SlipKomisiPage from "@/features/dashboard/pages/commision/slip-komisi/pag
 import RequestModulePage from "@/features/dashboard/pages/module/request-module/page";
 import DetailRequestModulePage from "@/features/dashboard/pages/module/request-module/detail-request/page";
 import ProfileTutorPage from "@/features/dashboard/pages/tutor-list/class-list-tutor/profile-tutor/page";
+import EditProfileTutorPage from "@/features/dashboard/pages/tutor-list/class-list-tutor/edit-profile-tutor/page";
 import DetailClassTutorPage from "@/features/dashboard/pages/tutor-list/class-list-tutor/detail-class/page";
 import ManageRatingPage from "@/features/dashboard/pages/manage-rating/page";
 import ReschedulePage from "@/features/dashboard/pages/reschedule/page";
@@ -106,6 +107,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard-admin/tutor-list/class-list-tutor", element: <ClassListTutorPage /> },
       { path: "/dashboard-admin/tutor-list/class-list-tutor/detail-class", element: <DetailClassTutorPage /> },
       { path: "/dashboard-admin/tutor-list/class-list-tutor/profile-tutor", element: <ProfileTutorPage /> },
+      { path: "/dashboard-admin/tutor-list/class-list-tutor/profile-tutor/edit", element: <EditProfileTutorPage /> },
       { path: "/dashboard-admin/student-list", element: <StudentListPage /> },
       { path: "/dashboard-admin/student-list/detail-student", element: <DetailStudentPage /> },
       { path: "/dashboard-admin/student-list/detail-student/detail-class/:classId", element: <DetailStudentClassPage /> },
