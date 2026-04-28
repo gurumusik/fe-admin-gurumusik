@@ -354,7 +354,7 @@ const TutorClassReportModal: React.FC<TutorClassReportModalProps> = ({
               ) : (
                 <>
                   <div className="rounded-2xl border border-black/10 bg-neutral-50 p-4 text-neutral-900 whitespace-pre-wrap">
-                    {reviewText || 'â€”'}
+                    {reviewText || ''}
                   </div>
 
                   <div className="mt-4">
