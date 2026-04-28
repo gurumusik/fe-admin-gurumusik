@@ -32,9 +32,9 @@ export const ENDPOINTS = {
     STATUS_BULK: `/guru/status/bulk`,
     UPDATE_IS_SHOW: (guruId?: number | string ) => `/guru/${guruId}/ratings/:ratingId/is_show`,
     CREATE_FROM_ENTRY: `/guru/admin/guru`,
-    UPDATE_BASIC: (id?: number | string) => id ? `/guru/basic?id=${id}` : `/guru/basic`,
-    UPDATE_DETAIL: (id?: number | string) => id ? `/guru/detail?id=${id}` : `/guru/detail`,
-    UPDATE_LANGUAGES: (id?: number | string) => id ? `/guru/languages?id=${id}` : `/guru/languages`,
+    UPDATE_BASIC: (id?: number | string) => id ? `/guru/admin/basic?id=${id}` : `/guru/admin/basic`,
+    UPDATE_DETAIL: (id?: number | string) => id ? `/guru/admin/detail?id=${id}` : `/guru/admin/detail`,
+    UPDATE_LANGUAGES: (id?: number | string) => id ? `/guru/admin/languages?id=${id}` : `/guru/admin/languages`,
     UPLOAD_AVATAR: `/guru/avatar`,
   },
   INSTRUMENTS: {
