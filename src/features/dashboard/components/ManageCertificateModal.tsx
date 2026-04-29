@@ -5,9 +5,8 @@ import { getStatusColor } from "@/utils/getStatusColor";
 import {
   RiCloseLine,
   RiExternalLinkLine,
-  RiEyeFill,
+  RiEyeLine,
   RiMusic2Line,
-  RiStickyNoteFill,
   RiCheckboxMultipleFill,
   RiArrowLeftSLine,
 } from "react-icons/ri";
@@ -163,7 +162,13 @@ const getDraftDecision = (item?: CertificateItem | null): DraftDecision => {
 
 const isLocalOrInternationalType = (certType?: string | null) => {
   const value = String(certType || "").trim().toLowerCase();
-  return !value || value === "lokal" || value === "internasional";
+  return (
+    !value ||
+    value === "lokal" ||
+    value === "internasional" ||
+    value === "local" ||
+    value === "international"
+  );
 };
 
 const getPrimaryVideoUrl = (item?: CertificateItem | null) => {
@@ -353,12 +358,22 @@ const ManageCertificateModal: React.FC<Props> = ({
   const canSubmitReject = reason.trim().length >= 5 && !submitting && !rejectReadonly;
   const selectedTypeKey = (() => {
     const raw = String(selected?.certType || "").trim().toLowerCase();
+    if (raw === "local") return "lokal";
+    if (raw === "international") return "internasional";
     return CERT_TYPE_OPTIONS.some((item) => item.key === raw) ? raw : "lokal";
   })();
   const selectedVideoUrl = getPrimaryVideoUrl(selected);
   const selectedCertificateUrl = getPrimaryCertificateUrl(selected);
   const selectedCertificateFileName = getDisplayFileName(selected);
   const useDraftRedesign = decisionMode === "draft" && isLocalOrInternationalType(selected?.certType);
+  const selectedDisplayStatus = selected ? getDisplayStatus(selected) : null;
+  const canReviewSelected =
+    Boolean(canDecide) && selectedDisplayStatus === "Menunggu Verifikasi";
+  const showActionSection = Boolean(canDecide && selected);
+  const canSaveDraftDecision =
+    canReviewSelected && draftDecision !== "pending";
+  const noteLabel =
+    selectedDisplayStatus === "Tidak Disetujui" ? "Alasan Penolakan" : "Catatan Admin";
 
   const submitReject = async () => {
     if (!selected) return;
@@ -387,10 +402,14 @@ const ManageCertificateModal: React.FC<Props> = ({
 
   const submitDraftDecision = () => {
     if (!selected || decisionMode !== "draft") return;
+    if (draftDecision === "pending") return;
     if (draftDecision === "approved") {
       onDraftChange?.(selected, { status: "approved", reason: null });
     } else if (draftDecision === "rejected") {
-      onDraftChange?.(selected, { status: "rejected", reason: null });
+      openReject({
+        presetReason: selected.draftReason ?? selected.rejectReason ?? "",
+      });
+      return;
     } else if (draftDecision === "revision") {
       onDraftChange?.(selected, { status: "revision", reason: null });
     } else {
@@ -398,12 +417,6 @@ const ManageCertificateModal: React.FC<Props> = ({
     }
     handleClose();
   };
-
-  const showDecisionButtons =
-    canDecide &&
-    !!selected &&
-    (getDisplayStatus(selected) === "Menunggu Verifikasi" ||
-      getDisplayStatus(selected) === "Revisi");
 
   return (
     <div
@@ -438,6 +451,8 @@ const ManageCertificateModal: React.FC<Props> = ({
               <ul>
                 {items.map((item) => {
                   const displayStatus = getDisplayStatus(item);
+                  const useReviewAction =
+                    Boolean(canDecide) && displayStatus === "Menunggu Verifikasi";
                   return (
                   <li key={item.id} className="py-3 border-b border-neutral-300 px-3">
                     <div className="flex items-center gap-3">
@@ -461,36 +476,24 @@ const ManageCertificateModal: React.FC<Props> = ({
                         </div>
                       </div>
 
-                      {displayStatus === "Disetujui" && (
-                        <BtnSquare ariaLabel="Lihat detail sertifikat" onClick={() => openDetail(item)} bordered>
-                          <RiEyeFill size={22} className="text-[var(--secondary-color)]" />
-                        </BtnSquare>
-                      )}
-
-                      {(displayStatus === "Menunggu Verifikasi" || displayStatus === "Revisi") && (
-                        <BtnSquare ariaLabel="Setujui / Review sertifikat" onClick={() => openDetail(item)} bordered>
-                          <RiCheckboxMultipleFill size={22} className="text-[var(--secondary-color)]" />
-                        </BtnSquare>
-                      )}
-
-                      {displayStatus === "Tidak Disetujui" && (
-                        <div className="flex items-center gap-3">
-                          <BtnSquare
-                            ariaLabel="Lihat alasan penolakan"
-                            onClick={() => {
-                              setSelected(item);
-                              openReject({ readonly: true, presetReason: item.rejectReason ?? "" });
-                            }}
-                            bordered={false}
-                          >
-                            <RiStickyNoteFill size={22} className="text-[var(--secondary-color)]" />
-                          </BtnSquare>
-
-                          <BtnSquare ariaLabel="Lihat detail sertifikat" onClick={() => openDetail(item)} bordered>
-                            <RiEyeFill size={22} className="text-[var(--secondary-color)]" />
-                          </BtnSquare>
-                        </div>
-                      )}
+                      <BtnSquare
+                        ariaLabel={
+                          useReviewAction
+                            ? "Setujui / Review sertifikat"
+                            : "Lihat detail sertifikat"
+                        }
+                        onClick={() => openDetail(item)}
+                        bordered
+                      >
+                        {useReviewAction ? (
+                          <RiCheckboxMultipleFill
+                            size={22}
+                            className="text-[var(--secondary-color)]"
+                          />
+                        ) : (
+                          <RiEyeLine size={22} className="text-[var(--secondary-color)]" />
+                        )}
+                      </BtnSquare>
                     </div>
                   </li>
                 )})}
@@ -655,11 +658,27 @@ const ManageCertificateModal: React.FC<Props> = ({
                   </button>
                 </div>
 
-                {canDecide ? (
+                {selected?.rejectReason ? (
+                <div className="mb-5">
+                  <div className="mb-2 text-[16px] font-semibold text-[#2D3445]">
+                    {noteLabel}
+                  </div>
+                  <div className="rounded-[14px] border border-[#D8E1EC] bg-[#F6F9FC] px-4 py-3 text-[15px] text-[#334155]">
+                    {selected.rejectReason}
+                  </div>
+                </div>
+                ) : null}
+
+                {showActionSection ? (
                 <div className="border-t border-[#DCE5EF] pt-4">
                   <p className="mb-3 text-[16px] font-semibold text-[#2D3445]">
                     Pilih Aksi Dibawah!!
                   </p>
+                  {!canReviewSelected ? (
+                    <p className="mb-3 text-sm text-[#8A94A6]">
+                      Aksi dinonaktifkan karena status sertifikat bukan Menunggu Verifikasi.
+                    </p>
+                  ) : null}
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                     <div className="grid flex-1 grid-cols-2 overflow-hidden rounded-full border border-[#D6E1EC] bg-white sm:grid-cols-4">
                       <button
@@ -672,9 +691,16 @@ const ManageCertificateModal: React.FC<Props> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDraftDecision("revision")}
+                        disabled={!canReviewSelected}
+                        onClick={() => {
+                          if (!canReviewSelected) return;
+                          setDraftDecision("revision");
+                        }}
                         className={[
                           "h-12 border-r border-[#E4ECF4] px-4 text-[15px] font-medium transition",
+                          !canReviewSelected
+                            ? "bg-[#F7FAFD] text-[#9FB0C5] cursor-not-allowed"
+                            :
                           draftDecision === "revision"
                             ? "bg-[#E9F3FF] text-[var(--secondary-color)]"
                             : "bg-white text-[#2D3445] hover:bg-[#F7FAFD]",
@@ -684,9 +710,16 @@ const ManageCertificateModal: React.FC<Props> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDraftDecision("rejected")}
+                        disabled={!canReviewSelected}
+                        onClick={() => {
+                          if (!canReviewSelected) return;
+                          setDraftDecision("rejected");
+                        }}
                         className={[
                           "h-12 border-r border-[#E4ECF4] px-4 text-[15px] font-medium transition",
+                          !canReviewSelected
+                            ? "bg-[#F7FAFD] text-[#9FB0C5] cursor-not-allowed"
+                            :
                           draftDecision === "rejected"
                             ? "bg-[#FFF1F5] text-[var(--accent-red-color)]"
                             : "bg-white text-[#2D3445] hover:bg-[#F7FAFD]",
@@ -696,9 +729,16 @@ const ManageCertificateModal: React.FC<Props> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDraftDecision("approved")}
+                        disabled={!canReviewSelected}
+                        onClick={() => {
+                          if (!canReviewSelected) return;
+                          setDraftDecision("approved");
+                        }}
                         className={[
                           "h-12 px-4 text-[15px] font-medium transition",
+                          !canReviewSelected
+                            ? "bg-[#F7FAFD] text-[#9FB0C5] cursor-not-allowed"
+                            :
                           draftDecision === "approved"
                             ? "bg-[#EEF9F2] text-[#18B968]"
                             : "bg-white text-[#2D3445] hover:bg-[#F7FAFD]",
@@ -710,8 +750,14 @@ const ManageCertificateModal: React.FC<Props> = ({
 
                     <button
                       type="button"
+                      disabled={!canSaveDraftDecision}
                       onClick={submitDraftDecision}
-                      className="h-12 rounded-full bg-[var(--primary-color)] px-8 text-[15px] font-semibold text-neutral-900 transition hover:brightness-95 lg:min-w-[140px]"
+                      className={[
+                        "h-12 rounded-full px-8 text-[15px] font-semibold transition lg:min-w-[140px]",
+                        canSaveDraftDecision
+                          ? "bg-[var(--primary-color)] text-neutral-900 hover:brightness-95"
+                          : "bg-neutral-200 text-neutral-500 cursor-not-allowed",
+                      ].join(" ")}
                     >
                       Simpan
                     </button>
@@ -916,18 +962,39 @@ const ManageCertificateModal: React.FC<Props> = ({
                   </button>
                 )}
               </div>
-              {showDecisionButtons && (
+              {selected?.rejectReason ? (
+                <div className="mt-6">
+                  <div className="text-[15px] font-semibold text-neutral-900 mb-2">
+                    {noteLabel}
+                  </div>
+                  <div className="rounded-xl border border-neutral-300 bg-neutral-100/50 px-4 py-3 text-neutral-700">
+                    {selected.rejectReason}
+                  </div>
+                </div>
+              ) : null}
+              {showActionSection && (
                 <div className="mt-4 grid grid-cols-2 gap-4">
                   <button
-                    onClick={() => openReject()}
-                    className="rounded-full px-8 py-3 border-2 bg-white
-                             text-[var(--accent-red-color)] border-[var(--accent-red-color)]
-                             hover:bg-[var(--accent-pink-color)]/5"
+                    type="button"
+                    disabled={!canReviewSelected}
+                    onClick={() => {
+                      if (!canReviewSelected) return;
+                      openReject();
+                    }}
+                    className={[
+                      "rounded-full px-8 py-3 border-2 bg-white",
+                      canReviewSelected
+                        ? "text-[var(--accent-red-color)] border-[var(--accent-red-color)] hover:bg-[var(--accent-pink-color)]/5"
+                        : "text-neutral-400 border-neutral-300 cursor-not-allowed",
+                    ].join(" ")}
                   >
                     Tolak
                   </button>
                   <button
+                    type="button"
+                    disabled={!canReviewSelected}
                     onClick={async () => {
+                      if (!canReviewSelected) return;
                       if (decisionMode === "draft") {
                         onDraftChange?.(selected, { status: "approved", reason: null });
                         handleClose();
@@ -938,8 +1005,12 @@ const ManageCertificateModal: React.FC<Props> = ({
                       }
                       handleClose();
                     }}
-                    className="rounded-full px-8 py-3 font-semibold shadow
-                             bg-[var(--primary-color)] text-neutral-900 hover:brightness-95"
+                    className={[
+                      "rounded-full px-8 py-3 font-semibold shadow",
+                      canReviewSelected
+                        ? "bg-[var(--primary-color)] text-neutral-900 hover:brightness-95"
+                        : "bg-neutral-200 text-neutral-500 cursor-not-allowed shadow-none",
+                    ].join(" ")}
                   >
                     Setujui
                   </button>
@@ -1081,7 +1152,7 @@ const ManageCertificateModal: React.FC<Props> = ({
 
             <div className="px-5 md:px-6 pb-5">
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={backToList} className="rounded-full px-6 py-3 border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50">
+                <button onClick={backToDetail} className="rounded-full px-6 py-3 border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50">
                   {rejectReadonly ? "Kembali" : "Kembali"}
                 </button>
                 {!rejectReadonly && (
@@ -1090,7 +1161,11 @@ const ManageCertificateModal: React.FC<Props> = ({
                     disabled={!canSubmitReject}
                     className="rounded-full px-6 py-3 font-semibold bg-[var(--primary-color)] text-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 transition"
                   >
-                    {submitting ? "Mengirim…" : "Kirim Laporan"}
+                    {submitting
+                      ? "Menyimpan..."
+                      : decisionMode === "draft"
+                        ? "Simpan Penolakan"
+                        : "Kirim Laporan"}
                   </button>
                 )}
               </div>
