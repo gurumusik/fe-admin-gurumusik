@@ -56,6 +56,12 @@ const EmployeePage: React.FC = () => {
   const currentUser = (rawUser?.user ?? rawUser) || null;
   const currentRole = String(currentUser?.role || '').toLowerCase();
   const canCreateAdmin = Boolean(currentUser?.is_super_admin) || currentRole === 'superadmin';
+  const isProduction =
+    Boolean(import.meta.env.PROD) ||
+    String(import.meta.env.VITE_NODE_ENV || '').toLowerCase() === 'production';
+  const canAddEmployee = !isProduction;
+  const canManageEmployees = !isProduction || canCreateAdmin;
+  const showManagementPanel = !isProduction || canCreateAdmin;
 
   const loadData = async () => {
     try {
@@ -94,6 +100,11 @@ const EmployeePage: React.FC = () => {
   }, [rows, search]);
 
   const handleAdd = async () => {
+    if (!canAddEmployee) {
+      setError('Penambahan employee manual tidak tersedia di production.');
+      return;
+    }
+
     const raw = input.trim();
     if (!raw) {
       setError('Masukkan email atau user_id terlebih dahulu.');
@@ -126,6 +137,7 @@ const EmployeePage: React.FC = () => {
   };
 
   const openAdminModal = () => {
+    if (!canCreateAdmin) return;
     setAdminForm({ nama: '', email: '', no_telp: '' });
     setAdminFormError(null);
     setModalType('adminForm');
@@ -181,13 +193,14 @@ const EmployeePage: React.FC = () => {
   };
 
   const askToggle = (row: EmployeeItem) => {
+    if (!canManageEmployees) return;
     setSelected(row);
     setNextActive(!row.is_active);
     setModalType('confirm');
   };
 
   const doToggle = async () => {
-    if (!selected) return;
+    if (!selected || !canManageEmployees) return;
     try {
       await updateEmployeeStatus(selected.id, nextActive);
       setModalType('success');
@@ -231,42 +244,59 @@ const EmployeePage: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-neutral-200 p-4">
-          <div className="mb-3 rounded-xl bg-[var(--accent-blue-light-color)]/60 p-3 text-sm text-neutral-700">
-            Akun <b>role admin</b> yang aktif di sini bisa menerima login dashboard admin via magic-link.
-            Akun dengan <b>role superadmin</b> otomatis punya akses penuh ke halaman ini.
-          </div>
-          <p className="text-sm text-neutral-600 mb-3">
-            Tambah employee dengan email atau user_id (angka).
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="email@domain.com atau user_id"
-              className="w-full h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
-            />
-            <button
-              type="button"
-              onClick={handleAdd}
-              disabled={submitting}
-              className="inline-flex items-center justify-center h-11 rounded-full bg-[#F6C437] text-[#0B0B0B] font-semibold px-6 hover:brightness-95 transition disabled:opacity-60"
-            >
-              <RiUserAddLine className="mr-2 text-lg" />
-              Tambah Employee
-            </button>
-            {canCreateAdmin && (
-              <button
-                type="button"
-                onClick={openAdminModal}
-                className="inline-flex items-center justify-center h-11 rounded-full border border-[var(--secondary-color)] bg-white text-[var(--secondary-color)] font-semibold px-6 hover:bg-[var(--secondary-light-color)] transition"
-              >
-                <RiUserAddLine className="mr-2 text-lg" />
-                Tambah Admin
-              </button>
+        {showManagementPanel && (
+          <div className="mt-5 rounded-2xl border border-neutral-200 p-4">
+            <div className="mb-3 rounded-xl bg-[var(--accent-blue-light-color)]/60 p-3 text-sm text-neutral-700">
+              Akun <b>role admin</b> yang aktif di sini bisa menerima login dashboard admin via magic-link.
+              Akun dengan <b>role superadmin</b> otomatis punya akses penuh ke halaman ini.
+            </div>
+
+            {canAddEmployee ? (
+              <p className="mb-3 text-sm text-neutral-600">
+                Tambah employee dengan email atau user_id (angka).
+              </p>
+            ) : (
+              canCreateAdmin && (
+                <p className="mb-3 text-sm text-neutral-600">
+                  Di production, penambahan employee manual disembunyikan. Superadmin masih bisa menambah admin.
+                </p>
+              )
             )}
+
+            <div className={cls('flex flex-col gap-3', canAddEmployee && 'sm:flex-row sm:items-center')}>
+              {canAddEmployee && (
+                <>
+                  <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="email@domain.com atau user_id"
+                    className="w-full h-11 rounded-xl border border-neutral-300 px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--secondary-color)]/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAdd}
+                    disabled={submitting}
+                    className="inline-flex items-center justify-center h-11 rounded-full bg-[#F6C437] text-[#0B0B0B] font-semibold px-6 hover:brightness-95 transition disabled:opacity-60"
+                  >
+                    <RiUserAddLine className="mr-2 text-lg" />
+                    Tambah Employee
+                  </button>
+                </>
+              )}
+
+              {canCreateAdmin && (
+                <button
+                  type="button"
+                  onClick={openAdminModal}
+                  className="inline-flex items-center justify-center h-11 rounded-full border border-[var(--secondary-color)] bg-white text-[var(--secondary-color)] font-semibold px-6 hover:bg-[var(--secondary-light-color)] transition"
+                >
+                  <RiUserAddLine className="mr-2 text-lg" />
+                  Tambah Admin
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {error && (
           <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
@@ -283,13 +313,15 @@ const EmployeePage: React.FC = () => {
                 <th className="py-3 px-3 font-semibold">Role</th>
                 <th className="py-3 px-3 font-semibold">Status</th>
                 <th className="py-3 px-3 font-semibold">Dibuat</th>
-                <th className="py-3 pr-4 pl-3 font-semibold">Aksi</th>
+                {canManageEmployees && (
+                  <th className="py-3 pr-4 pl-3 font-semibold">Aksi</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-sm text-neutral-500">
+                  <td colSpan={canManageEmployees ? 6 : 5} className="py-8 text-center text-sm text-neutral-500">
                     Memuat data...
                   </td>
                 </tr>
@@ -297,7 +329,7 @@ const EmployeePage: React.FC = () => {
 
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-sm text-neutral-500">
+                  <td colSpan={canManageEmployees ? 6 : 5} className="py-8 text-center text-sm text-neutral-500">
                     Belum ada employee.
                   </td>
                 </tr>
@@ -331,15 +363,17 @@ const EmployeePage: React.FC = () => {
                       <td className="py-3 px-3 text-neutral-700">
                         {toDate(row.created_at)}
                       </td>
-                      <td className="py-3 pr-4 pl-3">
-                        <button
-                          type="button"
-                          onClick={() => askToggle(row)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-[var(--secondary-color)] px-3 py-2 text-sm text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
-                        >
-                          {active ? 'Nonaktifkan' : 'Aktifkan'}
-                        </button>
-                      </td>
+                      {canManageEmployees && (
+                        <td className="py-3 pr-4 pl-3">
+                          <button
+                            type="button"
+                            onClick={() => askToggle(row)}
+                            className="inline-flex items-center gap-2 rounded-xl border border-[var(--secondary-color)] px-3 py-2 text-sm text-[var(--secondary-color)] hover:bg-[var(--secondary-light-color)]"
+                          >
+                            {active ? 'Nonaktifkan' : 'Aktifkan'}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
